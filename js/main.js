@@ -4,6 +4,7 @@
 (() => {
   "use strict";
   const ZS = window.ZS;
+  const params = new URLSearchParams(location.search);
 
   const cv = document.getElementById("c");
   const ctx = cv.getContext("2d");
@@ -13,9 +14,7 @@
 
   const world = new ZS.World(window.ZS_WW || 3200, window.ZS_WH || 2400); // a page may size its own world
   // ?seed=N pins the map (reproducible runs); otherwise a fresh world on every refresh
-  world.seed =
-    parseInt(new URLSearchParams(location.search).get("seed"), 10) | 0 ||
-    (Math.random() * 0x7fffffff) | 0;
+  world.seed = parseInt(params.get("seed"), 10) | 0 || (Math.random() * 0x7fffffff) | 0;
   const nav = new ZS.Nav(world);
   world.nav = nav;
   // scenario: which pack this page runs. Each HTML page sets
@@ -61,6 +60,42 @@
 
   // debug/verification handle (also a hook for future player/vehicle work)
   ZS.debug = { cam, world, nav, buildings: ZS.Buildings, scenario };
+  // Recording-only controls. They exist only behind ?record=1 and let the
+  // capture harness advance the simulation without waiting in real time.
+  // Normal play keeps the exact same clock and surface.
+  let recordingOffset = 0;
+  if (params.get("record") === "1") {
+    ZS.recording = {
+      advance(seconds) {
+        const step = 1 / 30;
+        const n = Math.max(0, Math.ceil(seconds / step));
+        const event = ZS.sound && ZS.sound.event;
+        if (event) ZS.sound.event = () => {};
+        try {
+          for (let i = 0; i < n; i++) {
+            recordingOffset += step;
+            const t = performance.now() / 1000 + recordingOffset;
+            ZS.setBoil(t);
+            ZS.Sim.update(step, t, world, W, H);
+          }
+        } finally {
+          if (event) ZS.sound.event = event;
+        }
+        ZS.drawScene(ctx, cam, world, ZS.Sim, performance.now() / 1000 + recordingOffset, W, H);
+      },
+      fit() {
+        cam.auto = false;
+        cam.fit(W, H);
+      },
+      focus(x, y, zoom) {
+        cam.auto = false;
+        cam.x = x;
+        cam.y = y;
+        cam.zoom = ZS.clamp(zoom, cam.minZoom, cam.maxZoom);
+        cam.clamp(W, H);
+      },
+    };
+  }
   // default to the auto camera when the scenario can point at the action;
   // drag/zoom input hands control back for the session — a tap doesn't
   // (it's an action, e.g. sound unlock or the artillery call)
@@ -159,7 +194,7 @@
 
   let last = performance.now();
   function loop(now) {
-    const t = now / 1000;
+    const t = now / 1000 + recordingOffset;
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     ZS.setBoil(t);
