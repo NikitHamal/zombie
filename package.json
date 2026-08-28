@@ -1,0 +1,14 @@
+{
+  "name": "zombie-sim",
+  "private": true,
+  "description": "The Outbreak — a hand-drawn sketch zombie sim on a zoomable paper world",
+  "scripts": {
+    "format": "oxfmt js/",
+    "lint": "oxlint js/"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.63.0",
+    "oxlint": "^1.78.0",
+    "playwright": "^1.62.1"
+  }
+}

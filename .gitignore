@@ -1,0 +1,9 @@
+node_modules/
+.verify/
+.omp/
+tasks/
+js.bak/
+*.bak
+*.log
+*.mp4
+*.webm
