@@ -453,6 +453,7 @@
       this.bonus = { farm: 0 }; // things found out there that stay found
       this.winterWood = 0; // the day's burn, for the panel
       this.souls = 0; // candles on the shrine
+      this.putDown = 0; // the dead put down, all through the run
       this.drag = null; // a line of barricades being dragged out
       this.seasonI = 0;
       this.army = null; // the field: who is under arms (js/village/army.js)
@@ -1452,6 +1453,7 @@
       this.grief = (s && s.grief) || 0;
       this.bonus = (s && s.bonus) || { farm: 0 };
       this.souls = (s && s.souls) || 0;
+      this.putDown = (s && s.putDown) || 0;
       if (s && s.props)
         this.props = s.props.map(([kind, x, y, seed]) => ZS.Art.prop(kind, x, y, seed));
       else if (!this.props.length) this.spawnProps();
@@ -1829,6 +1831,7 @@
         grief: Math.round(this.grief * 100) / 100,
         bonus: this.bonus,
         souls: this.souls,
+        putDown: this.putDown || 0,
         props: this.props.map((p) => [
           p.kind,
           Math.round(p.x),
@@ -1933,6 +1936,8 @@
     // make sure the night's tally knows their name
     onDead(a) {
       if (this.sel && this.sel.o === a) this.sel = null;
+      // the dead put down, for the run card at the end of it
+      if (a.st === 2) this.putDown = (this.putDown || 0) + 1;
       if (a.st !== 0 || !this.nightLog) return;
       if (a.name && this.nightLog.lost.indexOf(a.name) < 0) this.nightLog.lost.push(a.name);
     }
@@ -3475,14 +3480,32 @@
 
     _gameOver(reason) {
       if (this.over) return;
+      const raised = this.world.buildings.filter((b) => b.built && !b.ruined).length;
       const lines = [
         "the village lasted " + this.day + (this.day === 1 ? " day" : " days"),
-        "villagers left: " + this.villagers().length,
+        "souls lost: " + (this.souls || 0) + " · dead put down: " + (this.putDown || 0),
+        "raised: " +
+          raised +
+          " buildings · " +
+          Object.keys(this.done || {}).length +
+          " things learned",
         "walls standing: " +
           this.world.buildings.filter((b) => b.kind === "wall" && b.built).length,
-        "dead put down: " + (this.nightLog ? this.nightLog.killed : 0),
-        "it starts again from the ruin",
       ];
+      if (this.army && (this.army.kills || this.army.trained))
+        lines.push(
+          "the field: " +
+            (this.army.trained || 0) +
+            " trained · " +
+            (this.army.kills || 0) +
+            " of theirs put down · " +
+            (this.army.lost || 0) +
+            " lost",
+        );
+      if (this.cured) lines.push("and the plague was ended, in the end");
+      // and the last of the ledger, so the run reads like a run
+      for (const e of (this.chron || []).slice(0, 3)) lines.push("day " + e.day + " — " + e.txt);
+      lines.push("it starts again from the ruin");
       this.over = { title: reason, lines };
       this.card = { title: reason, lines, lost: true };
       if (ZS.sound) ZS.sound.event("boom", this.hall.x, this.hall.y);

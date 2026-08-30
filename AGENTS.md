@@ -488,6 +488,14 @@ three named save slots plus an autosave at every dawn. The save is
 condition and materials, every person with their trait and memories, the
 props, the parties, the ledger. v1 saves (the old format) still load.
 
+### The run card
+
+When it ends, the card reads like a run: how long the village lasted,
+souls lost against the dead put down (`scen.putDown`, kept in `onDead`),
+what was raised and learned, the walls still standing, the field's own
+tally (trained, theirs put down, lost), whether the plague was ended, and
+the last three lines of the ledger.
+
 ### Controls
 
 | key | what |
