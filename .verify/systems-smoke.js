@@ -33,7 +33,11 @@ check(G.villagers().length === before - 2, "and they leave the village", G.villa
 check(G.away.length === 2, "they are accounted for while they are gone");
 const food0 = G.res.food;
 let guard = 0;
-while (G.ow.parties.length && guard++ < 4000) frames(1);
+// a dawn card holds the world still, which is the point of it
+while (G.ow.parties.length && guard++ < 12000) {
+  frames(1);
+  if (G.card) G.dismissCard();
+}
 check(G.ow.parties.length === 0, "the party comes home", guard + " frames");
 check(G.villagers().length === before, "and the village is whole again", G.villagers().length + " villagers");
 check(G.away.length === 0, "nobody is stranded out there");
@@ -47,11 +51,22 @@ if (dark) {
   const sc = ZS.Overworld.send(G.ow, G, dark.id, true);
   check(sc.ok, "a scout can be sent", sc.ok ? sc.p.members[0].name : sc.err);
   guard = 0;
-  while (G.ow.parties.length && guard++ < 4000) frames(1);
+  // the walk there and back is itself a day or more of play
+  while (G.ow.parties.length && guard++ < 12000) {
+    frames(1);
+    if (G.card) G.dismissCard();
+  }
   check(
-    dark.seen >= 2 || G.chron.some((e) => e.kind === "death" && e.txt.indexOf("lost") >= 0),
+    dark.seen >= 2 ||
+      G.chron.some((e) => e.kind === "death" && e.txt.indexOf("lost") >= 0),
     "and comes back knowing the place — or does not come back at all",
-    "seen=" + dark.seen,
+    dark.id +
+      " seen=" +
+      dark.seen +
+      " · " +
+      (G.ow.parties.length ? "still out there" : "home") +
+      " · " +
+      (G.chron.find((e) => e.txt.indexOf("scout") >= 0) || { txt: "no word" }).txt,
   );
 }
 

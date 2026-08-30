@@ -61,7 +61,7 @@
       click("qualb", () => this.act("quality"));
       click("home", () => scen.focusHall());
       click("fit", () => scen.fitView());
-      click("bell", () => scen.callNight());
+      click("bell", () => scen.ringBell());
       click("sound", () => scen.toggleSound());
       click("helpb", () => this.toggleHelp());
       click("helpwrap", () => this.toggleHelp(false));
@@ -173,7 +173,7 @@
       if (lower === "v") return this.act("villagers-panel");
       if (lower === "h") return this.act("home");
       if (lower === "f") return this.act("fit");
-      if (lower === "n") return this.act("bell");
+      if (lower === "n") return this.act(e.shiftKey ? "nightbell" : "bell");
       if (lower === "m") return this.act("world-panel");
       if (lower === "k") return this.act("sound");
       if (lower === "l") return this.act("chron-panel");
@@ -277,6 +277,9 @@
           s.fitView();
           break;
         case "bell":
+          s.ringBell();
+          break;
+        case "nightbell":
           s.callNight();
           break;
         case "sound":
@@ -665,6 +668,7 @@
         this.html.panel = html;
         e.innerHTML = html;
         this.taskNode = e.querySelector('[data-role="task"]');
+        this.paintValleyMap();
       }
     },
 
@@ -770,6 +774,7 @@
       const s = this.scen;
       if (!ZS.Overworld || !s.ow) return "";
       let h = '<div class="ptitle">the valley <kbd>esc</kbd></div>';
+      h += '<canvas id="valleymap" class="valleymap" width="252" height="168"></canvas>';
       if (s.ow.parties.length) {
         h += '<div class="pfoot">out there now</div>';
         for (const p of s.ow.parties) {
@@ -842,6 +847,113 @@
       }
       h += '<div class="pfoot">loot: ' + this.lootLine() + "</div>";
       return h;
+    },
+
+    // The map of the valley, in the same hand as the world: the hollow at
+    // the left, the roads running out of it, and the fog — a scribbled
+    // cloud — over every place nobody has walked to yet.
+    paintValleyMap() {
+      const s = this.scen;
+      const cv = document.getElementById("valleymap");
+      if (!cv || !cv.getContext || !s.ow || !ZS.Overworld) return;
+      const c = cv.getContext("2d");
+      const W = cv.width || 252,
+        H = cv.height || 168;
+      c.clearRect(0, 0, W, H);
+      const ox = 26,
+        oy = H / 2;
+      const far = 250; // the longest road, in map pixels
+      // the hollow itself
+      c.strokeStyle = "rgba(70,64,52,0.85)";
+      c.lineWidth = 1.4;
+      ZS.wpoly(
+        c,
+        [
+          { x: ox - 9, y: oy + 7 },
+          { x: ox - 9, y: oy - 3 },
+          { x: ox, y: oy - 10 },
+          { x: ox + 9, y: oy - 3 },
+          { x: ox + 9, y: oy + 7 },
+        ],
+        11,
+        0.5,
+        true,
+      );
+      c.fillStyle = "rgba(214,186,120,0.35)";
+      c.fill();
+      s.ow.sites.forEach((st, i) => {
+        const def = ZS.Overworld.def(st.id);
+        const n = s.ow.sites.length;
+        const a = ((i + 0.5) / n - 0.5) * 1.5; // fan the roads out
+        const d = 44 + (def.d / 250) * far;
+        const x = ox + Math.cos(a) * d,
+          y = oy + Math.sin(a) * d * 0.62;
+        if (x > W - 16) return;
+        // the road
+        c.strokeStyle = st.seen ? "rgba(120,102,66,0.75)" : "rgba(120,102,66,0.3)";
+        c.lineWidth = 1.1;
+        c.setLineDash(st.seen ? [] : [3, 4]);
+        ZS.wline(c, ox + 9, oy + 2, x, y, 30 + i * 7, 1.1);
+        c.setLineDash([]);
+        if (!st.seen) {
+          // the fog: a scribbled cloud, and a question
+          c.strokeStyle = "rgba(150,146,128,0.45)";
+          c.lineWidth = 1;
+          for (let k = 0; k < 3; k++)
+            ZS.wline(c, x - 9, y - 3 + k * 3, x + 9, y - 3 + k * 3, 90 + i * 13 + k, 1.4);
+          c.fillStyle = "rgba(90,84,70,0.7)";
+          c.font = 'italic 11px "Segoe Script","Bradley Hand","Comic Sans MS",cursive';
+          c.textAlign = "center";
+          c.fillText("?", x, y + 4);
+          return;
+        }
+        // the place itself: a mark, and its name
+        c.strokeStyle = "rgba(70,64,52,0.8)";
+        c.lineWidth = 1.2;
+        ZS.wpoly(
+          c,
+          [
+            { x: x - 5, y: y + 4 },
+            { x: x - 5, y: y - 2 },
+            { x: x, y: y - 6 },
+            { x: x + 5, y: y - 2 },
+            { x: x + 5, y: y + 4 },
+          ],
+          60 + i * 11,
+          0.4,
+          true,
+        );
+        if (st.seen > 2 || st.taken > 0) {
+          c.fillStyle = "rgba(96,132,58,0.3)";
+          c.fill();
+        }
+        c.fillStyle = st.seen === 1 ? "rgba(90,84,70,0.6)" : "rgba(58,54,44,0.9)";
+        c.font = 'italic 9px "Segoe Script","Bradley Hand","Comic Sans MS",cursive';
+        c.textAlign = "center";
+        c.fillText(def.name.split(" ")[0], x, y + 14);
+      });
+      // whoever is out there now
+      for (const p of s.ow.parties) {
+        const i = s.ow.sites.findIndex((st) => st.id === p.site);
+        if (i < 0) continue;
+        const def = ZS.Overworld.def(p.site);
+        const n = s.ow.sites.length;
+        const a = ((i + 0.5) / n - 0.5) * 1.5;
+        const d = 44 + (def.d / 250) * far;
+        const x = ox + Math.cos(a) * d,
+          y = oy + Math.sin(a) * d * 0.62;
+        const f = ZS.Overworld.progress(p);
+        const px = ox + 9 + (x - ox - 9) * f,
+          py = oy + 2 + (y - oy - 2) * f;
+        c.strokeStyle = "rgba(64,96,52,0.95)";
+        c.lineWidth = 1.4;
+        ZS.wcirc(c, px, py, 3.2, 200 + p.id, 0.5);
+        c.fillStyle = "rgba(64,96,52,0.9)";
+        c.beginPath();
+        c.arc(px, py, 1.6, 0, 6.2832);
+        c.fill();
+      }
+      c.textAlign = "left";
     },
 
     lootLine() {
@@ -978,6 +1090,13 @@
 
     tick(dt) {
       this.paintAlerts();
+      if (this.scen.mode === "world") {
+        this.mapT = (this.mapT || 0) - dt;
+        if (this.mapT <= 0) {
+          this.mapT = 0.25;
+          this.paintValleyMap();
+        }
+      }
       if (this.toastT > 0) {
         this.toastT -= dt;
         if (this.toastT <= 0) this.el.toast.classList.remove("on");

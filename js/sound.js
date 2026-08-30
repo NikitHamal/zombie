@@ -24,6 +24,7 @@
     fire: 0.2,
     turret: 0.3,
     horn: 4,
+    v_bell: 1.2,
     // the formant voice lines
     v_shout: 0.35,
     v_gasp: 0.3,
@@ -910,6 +911,25 @@
         voice({ n: 1, cut: 900, t: 0.12, g: 0.7 * B });
         voice({ f: 110, f2: 40, t: 0.13, g: 0.6 * B });
         break;
+      case "v_bell": {
+        // iron, struck: a bright edge, a long body, and a slow decay that
+        // carries further than anything else in the valley
+        const bb = Math.max(B, 0.6);
+        for (let i = 0; i < 3; i++) {
+          const f = [528, 792, 1188][i];
+          voice({
+            f: f,
+            f2: f * 0.985,
+            type: "triangle",
+            cut: 4200,
+            q: 6,
+            t: 2.6 - i * 0.6,
+            g: (0.3 * bb) / (i + 1),
+          });
+        }
+        voice({ f: 264, f2: 262, t: 2.2, g: 0.2 * bb });
+        break;
+      }
       case "horn": {
         // the bugle as a new night comes up — felt across the map
         const hb = Math.max(B, 0.5);

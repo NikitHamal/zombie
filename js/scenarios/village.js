@@ -6,19 +6,29 @@
  * try to pull the village down. Rebuild the ruin, grow it, arm it, and
  * keep the hall standing — when the hall falls, the village falls.
  *
- * It runs on the same core as the outbreak (the sketch primitives, the
- * nav grid, the agent pipeline, the camera, the sound cues), implements
- * the same scenario contract, and reuses the frozen agent artwork
- * (js/village/figures.js) — the guards wear the same caps and carry the
- * same rifles as the town's defense corps. New files:
- * village.html · js/village/figures.js · js/village/structs.js ·
- * js/village/ui.js · this one. Design: VILLAGE-DESIGN.md.
+ * It runs on the core (the sketch primitives, the nav grid, the agent
+ * pipeline, the camera, the sound cues), implements the scenario contract,
+ * and reuses the frozen agent artwork (js/village/figures.js).
+ *
+ * The page is index.html. Its files:
+ *   js/village/figures.js   the frozen figure + the village's layers
+ *   js/village/structs.js   19 building kinds, their cost and their art
+ *   js/village/art.js       props, livestock, weather, ground decoration
+ *   js/village/kin.js       named people: traits, memory, birth, grief
+ *   js/village/hazards.js   fire, fever, rats, cold, despair
+ *   js/village/overworld.js the valley: eight places, parties, fog, loot
+ *   js/village/chronicle.js the ledger and the three save slots
+ *   js/village/perf.js      quality tiers, the frame budget, the counters
+ *   js/village/ui.js        the paper overlay
+ *   this one                the game
+ * Design and mechanics: AGENTS.md.
  *
  * Contract (see js/scenarios/zombie.js for the canonical list):
  *   terrain · attachStains · init · counts · left · hostile · walkBlocked
  *   maxSpeed · frame · update · maintain · hud · camInterest · tap · draw
  *   drawFX — plus the village's own hooks: drawGround, drawBuildingDecor,
- *   drawOver, pointerMove, and the timeScale the clock runs at.
+ *   drawOver, drawSprite, extraSprites, pointerDown/Move/Up, and the
+ *   timeScale the clock runs at.
  */
 (() => {
   "use strict";
@@ -314,6 +324,7 @@
     flee: "running",
     patrol: "on watch",
     douse: "fighting the fire",
+    mourn: "at the grave",
     away: "out in the valley",
   };
 
@@ -831,6 +842,7 @@
       if (!this._hoverBound) this._bindHover();
       for (const b of this.world.buildings) if (b.want && !b.mat && b.hp < b.maxHp) this._topUp(b);
       if (ZS.Figures) ZS.Figures.opt.zoom = ZS.debug && ZS.debug.cam ? ZS.debug.cam.zoom : 1;
+      if (this.bellT > 0) this.bellT = Math.max(0, this.bellT - dt);
       if (ZS.VillageUI) {
         ZS.VillageUI.tick(dt);
         ZS.VillageUI.refresh();
@@ -924,10 +936,68 @@
     }
 
     // called early: the player rang the bell
+    // the bell. N to ring it.
+    ringBell() {
+      if (this.over) return;
+      if (this.phase === "night" || this.phase === "dusk") {
+        this.bellT = 12;
+        for (const a of this.villagers()) {
+          a.panic = 0;
+          if (a.kin) a.kin.morale = Math.min(1, a.kin.morale + 0.05);
+        }
+        this.fx.push({
+          x: this.hall.x + this.hall.w / 2,
+          y: this.hall.y - 30,
+          t: 1.2,
+          wail: 1,
+          seed: 5,
+        });
+        if (ZS.sound) ZS.sound.event("v_bell", this.hall.x, this.hall.y);
+        if (ZS.VillageUI) ZS.VillageUI.toast("the bell over the dark — it steadies them");
+        return;
+      }
+      if (this.phase !== "day") return;
+      // everyone home, now: work drops where it stands
+      let n = 0;
+      for (const a of this.villagers()) {
+        if (a.st !== 0) continue;
+        n++;
+        this._breakOff(a, true);
+        a.tgt = null;
+        a.musterT = 9;
+        a.mode = "idle";
+      }
+      this.bellT = 6;
+      this.fx.push({
+        x: this.hall.x + this.hall.w / 2,
+        y: this.hall.y - 30,
+        t: 1.2,
+        wail: 1,
+        seed: 5,
+      });
+      if (ZS.sound) ZS.sound.event("v_bell", this.hall.x, this.hall.y);
+      if (ZS.VillageUI)
+        ZS.VillageUI.toast(
+          n ? "the bell — " + n + " of them are coming in" : "the bell rings over an empty green",
+        );
+    }
+
+    // and the other thing a bell is for: calling the dark down early
     callNight() {
       if (this.phase !== "day") return;
       this._startNight(true);
       if (ZS.VillageUI) ZS.VillageUI.toast("the bell — you called the dark down early");
+    }
+
+    _muster(a, dt, t, nav) {
+      const sh = this._shelter();
+      if (dist2(a.x, a.y, sh.x, sh.y) < 58 * 58) {
+        a.vx *= 0.86;
+        a.vy *= 0.86;
+        return;
+      }
+      a.wantMove = true;
+      ZS.planAndFollow(a, sh, false, this.maxSpeed(a) * 1.15, dt, t, nav);
     }
 
     _spawnZed(e) {
@@ -1714,6 +1784,13 @@
     _updateVillager(a, dt, t, grid, nav) {
       const dark = this.phase === "night" || this.phase === "dusk";
       const inf = this.has("infirm");
+      // the bell is ringing: drop it and come in
+      if (a.musterT > 0) {
+        a.musterT -= dt;
+        a.task = "coming in";
+        this._muster(a, dt, t, nav);
+        return;
+      }
       // the bitten run for the infirmary; the wounded stagger there
       if (a.inf > 0 && inf) {
         const s = this._first("infirm");
@@ -1985,6 +2062,12 @@
           }
         }
         if (hot) return str(hot, "douse", 0, true);
+      }
+      // grief: one of them goes and stands at the grave for a while
+      if (this.grief > 0.18 && this.props && this.props.length) {
+        const grave = this.props.find((p) => p.kind === "grave");
+        const already = this.villagers().some((v) => v.tgt && v.tgt.sub === "mourn");
+        if (grave && !already) return str(grave, "mourn", 9);
       }
       const plots = this.world.buildings.filter(
         (b) => b.kind === "farm" && b.built && !b.ruined && b.plot && busy(b) < 1,
@@ -2265,6 +2348,19 @@
           a.mode = "idle";
           a.tgt = null;
         }
+        return;
+      }
+      if (tg.sub === "mourn") {
+        // they stand there. There is nothing to show for it when it ends.
+        a.vx *= 0.86;
+        a.vy *= 0.86;
+        a.mode = "work";
+        a.task = TASK.mourn;
+        a.workT += dt * sp;
+        if (a.workT < tg.work) return;
+        a.workT = 0;
+        a.mode = "idle";
+        a.tgt = null;
         return;
       }
       if (tg.sub === "douse") {
@@ -2705,7 +2801,10 @@
 
     _fire(a, z, w) {
       a.muzzle = 0.12;
-      const mul = this.smithMul() * (ZS.Kin ? ZS.Kin.fight(a) : 1);
+      const mul =
+        this.smithMul() *
+        (ZS.Kin ? ZS.Kin.fight(a) : 1) *
+        (this.bellT > 0 && this.phase !== "day" ? 1.25 : 1);
       this.fx.push({
         x0: a.x,
         y0: a.y - 10,

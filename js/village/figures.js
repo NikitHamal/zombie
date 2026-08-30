@@ -829,27 +829,181 @@
         c.strokeStyle = "rgba(140,44,32," + (0.16 + 0.08 * Math.sin(t * 3 + a.ph)).toFixed(2) + ")";
         c.lineWidth = 2;
         ZS.wcirc(c, a.x, a.y - 6, 26, a.seed + 220, 2.4);
+      } else if (a.zType === "crawler") {
+        // what is left of the legs, dragged behind; and the wet it leaves
+        c.strokeStyle = "rgba(122,38,30,0.55)";
+        c.lineWidth = 1.4;
+        const bk = Math.cos(a.a),
+          bn = Math.sin(a.a);
+        ZS.wline(
+          c,
+          a.x + 4,
+          a.y + 1,
+          a.x - bk * 15 + ZS.sjit(a.seed + 61) * 2,
+          a.y - bn * 6 + 4,
+          a.seed + 231,
+          1.1,
+        );
+        ZS.wline(
+          c,
+          a.x - 4,
+          a.y + 1,
+          a.x - bk * 13 - 2 + ZS.sjit(a.seed + 62) * 2,
+          a.y - bn * 6 + 6,
+          a.seed + 237,
+          1.1,
+        );
+        c.fillStyle = "rgba(112,34,26,0.13)";
+        c.beginPath();
+        c.ellipse(a.x, a.y + 5, 11, 4.2, 0, 0, 6.2832);
+        c.fill();
+        // one arm reaches; the other is gone
+        c.strokeStyle = "rgba(72,102,58,0.9)";
+        c.lineWidth = 1.5;
+        const ph = Math.sin(t * 5 + a.seed) * 0.4;
+        ZS.wline(
+          c,
+          a.x + 1,
+          a.y - 8,
+          a.x + bk * 11 + Math.cos(ph) * 3,
+          a.y - 13 + bn * 4,
+          a.seed + 241,
+          1,
+        );
+      } else if (a.zType === "wailer") {
+        // the mouth: open, and it does not close
+        c.strokeStyle = "rgba(96,26,22,0.85)";
+        c.lineWidth = 1.1;
+        ZS.wcirc(c, a.x, a.y - 14, 3.6, a.seed + 251, 0.6);
+        c.fillStyle = "rgba(70,18,14,0.8)";
+        c.fill();
+        // and the rings, growing as the scream gathers
+        const st = a.screamT || 0;
+        if (st < 2.2) {
+          const k = 1 - st / 2.2;
+          c.strokeStyle = "rgba(150,60,44," + (0.35 * k).toFixed(2) + ")";
+          c.lineWidth = 1;
+          for (let i = 0; i < 2; i++) {
+            const r = 8 + (((1 - k) * 34 + i * 12) % 40);
+            ZS.wcirc(c, a.x, a.y - 15, r, a.seed + 260 + i, 2);
+          }
+        }
+        // a thin, tall thing: the ribs show
+        c.strokeStyle = "rgba(72,102,58,0.55)";
+        c.lineWidth = 1;
+        for (let i = 0; i < 3; i++)
+          ZS.wline(c, a.x - 4, a.y - 9 + i * 4, a.x + 4, a.y - 9 + i * 4, a.seed + 271 + i, 0.5);
       }
+    },
+
+    // a crawler is a body with the legs left off it: it rides low and
+    // drags. Everything else keeps the frozen pose.
+    zedPose(c, a) {
+      if (a.st !== 2 || a.zType !== "crawler") return false;
+      c.save();
+      c.translate(a.x, a.y + 7);
+      c.scale(1.18, 0.52);
+      c.translate(-a.x, -a.y);
+      return true;
+    },
+
+    /* ---------- mood: the small things the living do ---------- */
+
+    // Grief, a hot meal, a cold morning, a child's short legs. All of it
+    // is drawn on top of the frozen figure, never instead of it.
+    mood(c, a, t) {
+      const sc = ZS.scenario;
+      const f = this.frameOf(a, t);
+      // at a grave, with the village still raw: the head goes down
+      if (sc && sc.grief > 0.12 && this.nearGrave(a)) {
+        c.strokeStyle = "rgba(58,54,44,0.75)";
+        c.lineWidth = 1.2;
+        ZS.wline(c, f.hx - 3, f.hy - 3, f.hx + 3, f.hy - 2.2, a.seed + 301, 0.4);
+        c.strokeStyle = "rgba(214,186,96,0.9)";
+        c.lineWidth = 1.4;
+        ZS.wline(c, a.x + 9, a.y + 6, a.x + 9, a.y - 3, a.seed + 302, 0.3);
+        const fl = 1.6 + Math.sin(t * 9 + a.seed) * 0.6;
+        c.fillStyle = "rgba(224,170,74,0.85)";
+        c.beginPath();
+        c.ellipse(a.x + 9, a.y - 4.4, 1.1, fl, 0, 0, 6.2832);
+        c.fill();
+        return;
+      }
+      // a feast: a bowl, and the steam off it
+      if (sc && sc.haz && sc.haz.feastT > 0) {
+        c.strokeStyle = "rgba(92,72,48,0.9)";
+        c.lineWidth = 1.1;
+        ZS.wline(c, f.shx - 5, f.shy + 3, f.shx + 5, f.shy + 3, a.seed + 311, 0.3);
+        ZS.wline(c, f.shx - 4, f.shy + 3, f.shx - 2.5, f.shy + 6, a.seed + 312, 0.3);
+        ZS.wline(c, f.shx + 4, f.shy + 3, f.shx + 2.5, f.shy + 6, a.seed + 313, 0.3);
+        c.strokeStyle = "rgba(200,200,196,0.5)";
+        c.lineWidth = 1;
+        for (let i = 0; i < 2; i++) {
+          const yy = f.shy - 2 - ((t * 9 + i * 1.4) % 3) * 2;
+          ZS.wline(c, f.shx - 2 + i * 3, yy, f.shx - 1 + i * 3, yy - 4, a.seed + 320 + i, 0.7);
+        }
+        return;
+      }
+      // a cold morning: the breath hangs in the air, and they hunch
+      if (sc && sc.haz && sc.haz.cold > 0.05) {
+        c.strokeStyle = "rgba(190,206,214,0.42)";
+        c.lineWidth = 1;
+        const puff = (t * 0.7 + a.seed * 0.13) % 1;
+        ZS.wline(
+          c,
+          f.hx + 5,
+          f.hy + 1,
+          f.hx + 8 + puff * 7,
+          f.hy - 2 - puff * 5,
+          a.seed + 331,
+          0.5,
+        );
+      }
+      // worn down: the shoulders come forward
+      if (sc && sc.morale < 0.34) {
+        c.strokeStyle = "rgba(58,54,44,0.35)";
+        c.lineWidth = 1;
+        ZS.wline(c, f.shx - 4, f.shy + 1, f.shx + 4, f.shy + 2.5, a.seed + 341, 0.4);
+      }
+    },
+
+    nearGrave(a) {
+      const sc = ZS.scenario;
+      if (!sc || !sc.props) return false;
+      for (const p of sc.props) {
+        if (p.kind !== "grave") continue;
+        const dx = p.x - a.x,
+          dy = p.y - a.y;
+        if (dx * dx + dy * dy < 46 * 46) return true;
+      }
+      return false;
     },
 
     /* ---------- the village's per-agent render ---------- */
 
     render(c, a, t) {
+      // a child is a small person, not a small adult: the legs are short
+      // and the head is not
+      const child = a.kin && a.kin.child;
       const k = a.scale || 1;
-      const scaled = k !== 1;
+      const scaled = k !== 1 || child;
       if (scaled) {
         c.save();
         c.translate(a.x, a.y);
-        c.scale(k, k);
+        // a child: shorter, but not a smaller person — the head stays big
+        c.scale(k * (child ? 0.88 : 1), k * (child ? 0.72 : 1));
         c.translate(-a.x, -a.y);
       }
+      const posed = this.zedPose(c, a);
       this.draw(c, a, t);
+      if (posed) c.restore();
       if (scaled) c.restore();
       if (a.st === 2) {
         this.zedMark(c, a, t);
         if (a.inf === undefined) a.inf = 0;
         return;
       }
+      this.mood(c, a, t);
       this.tool(c, a, t);
       this.load(c, a, t);
       if (a.inf > 0) this.infected(c, a, t);
