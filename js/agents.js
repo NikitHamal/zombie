@@ -252,21 +252,26 @@
         }
         const sd = Math.sqrt(sd2);
         if (sd >= sepR) return;
+        // a.noPush (opt-in, village): an agent working a spot or standing a
+        // post holds its ground and lets the crowd move around it
+        const aFix = a.noPush,
+          bFix = b.noPush;
+        if (aFix && bFix) return;
         const ux = sx / sd,
           uy = sy / sd;
         if (sd < SEP_CORE) {
-          const push = (SEP_CORE - sd) * 0.5;
-          corePush(a, ux * push, uy * push, nav);
-          corePush(b, -ux * push, -uy * push, nav);
+          const push = (SEP_CORE - sd) * (aFix || bFix ? 1 : 0.5);
+          if (!aFix) corePush(a, ux * push, uy * push, nav);
+          if (!bFix) corePush(b, -ux * push, -uy * push, nav);
         }
         const f = ((sepR - sd) / sepR) * SEP_FORCE * dt;
         // the soft push is wall-aware: a pair across a wall or door must not
         // be shoved at each other through it (doorfront jitter)
-        if (nav.isWalkable(a.x + ux * 4, a.y + uy * 4, S.walkBlocked(a))) {
+        if (!aFix && nav.isWalkable(a.x + ux * 4, a.y + uy * 4, S.walkBlocked(a))) {
           a.vx += ux * f;
           a.vy += uy * f;
         }
-        if (nav.isWalkable(b.x - ux * 4, b.y - uy * 4, S.walkBlocked(b))) {
+        if (!bFix && nav.isWalkable(b.x - ux * 4, b.y - uy * 4, S.walkBlocked(b))) {
           b.vx -= ux * f;
           b.vy -= uy * f;
         }
@@ -339,11 +344,15 @@
       if (a.wantMove && sp < 22 && !(S.swim && nav.isWater(a.x, a.y))) a.stuckT += dt;
       else a.stuckT = Math.max(0, a.stuckT - dt * 2);
     }
-    // the fallen are lifted from the field
+    // the fallen are lifted from the field (the scenario hears about it:
+    // S.onDead, opt-in — the village clears the selection and keeps score)
     let w = 0;
     for (let i = 0; i < agents.length; i++) {
       const a = agents[i];
-      if (a.dead || a.gone) continue;
+      if (a.dead || a.gone) {
+        if (S.onDead) S.onDead(a);
+        continue;
+      }
       if (w !== i) agents[w] = a;
       w++;
     }
@@ -352,6 +361,8 @@
 
   ZS.makeAgent = makeAgent;
   ZS.updateAgents = updateAgents;
+  // the spacing constants, for scenarios that lay out slots and work spots
+  ZS.SEP = { R: SEP_R, CORE: SEP_CORE, FORCE: SEP_FORCE, CELL, NAV_BUDGET };
   ZS.fx = fx;
   ZS.planAndFollow = planAndFollow;
   ZS.wander = wander;

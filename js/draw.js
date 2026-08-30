@@ -448,13 +448,22 @@
     list.sort((p, q) => p.y - q.y);
     for (const it of list) {
       if (it.k === 0) drawTree(c, it.o, t);
-      else if (it.k === 1) drawBuilding(c, it.o);
-      else if (it.k === 3) ZS.scenario.drawBlock(c, it.o, t);
+      else if (it.k === 1) {
+        drawBuilding(c, it.o);
+        // the scenario's own furniture for this building (the village's
+        // roofs, crops and smoke) — painted with it, so the painter's
+        // order still holds
+        if (ZS.scenario.drawBuildingDecor) ZS.scenario.drawBuildingDecor(c, it.o, t);
+      } else if (it.k === 3) ZS.scenario.drawBlock(c, it.o, t);
       else ZS.scenario.draw(c, it.o, t);
     }
 
     // transient effects (tracers, poofs, blood) — the scenario renders its own records
     if (ZS.fx.length) ZS.scenario.drawFX(c, ZS.fx);
+
+    // the scenario's overlay pass over the whole world: the night wash,
+    // firelight, weather, selection marks and floating numbers
+    if (ZS.scenario.drawOver) ZS.scenario.drawOver(c, world, t, vis);
 
     // voices float above the crowd
     drawBubbles(c, sim.agents, vis);

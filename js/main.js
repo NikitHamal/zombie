@@ -199,7 +199,14 @@
     last = now;
     ZS.setBoil(t);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    ZS.Sim.update(dt, t, world, W, H);
+    // the clock: a scenario may run it slower or faster (the village's
+    // 1x/2x/3x, and 0 while paused). Fast-forward runs the same step
+    // several times so nothing tunnels through a wall.
+    const ts = ZS.scenario.timeScale === undefined ? 1 : ZS.scenario.timeScale;
+    if (ts > 0) {
+      const steps = Math.min(4, Math.max(1, Math.ceil(ts)));
+      for (let i = 0; i < steps; i++) ZS.Sim.update((dt * ts) / steps, t, world, W, H);
+    }
     if (cam.auto) {
       const ti = typeof scenario.camInterest === "function" ? scenario.camInterest(dt) : null;
       if (ti) cam.autoSeek(ti.x, ti.y, ti.zoom, dt, W, H, ti.ease);

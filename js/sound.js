@@ -41,6 +41,8 @@
   const last = {};
   let crackleT = 0;
 
+  let enabled = true; // flipped by a scenario's mute (nothing else uses it)
+
   function unlock() {
     if (!ac) {
       try {
@@ -814,7 +816,7 @@
   }
 
   function event(name, x, y) {
-    if (!ac || ac.state !== "running") return;
+    if (!enabled || !ac || ac.state !== "running") return;
     const now = performance.now() / 1000;
     if (last[name] && now < last[name]) return;
     last[name] = now + (CD[name] || 0.15);
@@ -946,6 +948,14 @@
     event,
     tick,
     unlock,
+    // a scenario's mute switch (the village's M key): the cues keep their
+    // cooldowns, they just stay silent
+    get enabled() {
+      return enabled;
+    },
+    set enabled(v) {
+      enabled = !!v;
+    },
     get unlocked() {
       return !!ac && ac.state === "running";
     },
