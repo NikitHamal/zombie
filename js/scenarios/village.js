@@ -23,7 +23,7 @@
  *   this one                the game
  * Design and mechanics: AGENTS.md.
  *
- * Contract (see js/scenarios/zombie.js for the canonical list):
+ * Contract (the core's scenario contract, as the village implements it):
  *   terrain · attachStains · init · counts · left · hostile · walkBlocked
  *   maxSpeed · frame · update · maintain · hud · camInterest · tap · draw
  *   drawFX — plus the village's own hooks: drawGround, drawBuildingDecor,

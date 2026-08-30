@@ -1,13 +1,12 @@
 /* The Hollow — the figures: villagers, guards, zombies.
-   `draw` is a VERBATIM port of js/scenarios/zombie.js ScenarioZombie.draw
-   — the agent artwork this repo freezes (AGENTS.md hard constraint 3).
-   One deletion: the turret-agent branch at the top of the original (the
-   village has no turret *agents*; the watchtower is a structure, drawn in
-   structs.js). Everything under "VILLAGE EXTENSIONS" is new and additive:
-   the tool in the hand, the load on the shoulder, job glyphs, the
-   selection ring, health pips, names, zombie variants.
-   .verify/figures-check.js asserts the ported body still matches the
-   original character for character. */
+   `draw` is FROZEN: a verbatim port of the original `ScenarioZombie.draw`
+   from the repo's first single-file sim, kept character for character
+   (AGENTS.md hard constraint 3). One deletion: the turret-agent branch at
+   the top of the original (the village has no turret *agents*; the
+   watchtower is a structure, drawn in structs.js).
+   Everything under "VILLAGE EXTENSIONS" is new and additive: the tool in
+   the hand, the load on the shoulder, job glyphs, the selection ring,
+   health pips, names, zombie variants, and the mood layer. */
 (() => {
   "use strict";
   const ZS = (window.ZS = window.ZS || {});

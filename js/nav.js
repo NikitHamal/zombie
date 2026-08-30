@@ -4,7 +4,7 @@
    humans; a broken door becomes plain land (nav.doorBroken). astar() and
    los() are the only geometry agents use for movement, so water and walls
    are a hard block — no agent can ever end up inside them, no matter how
-   fast they run. Scenarios that set `swim` (zombie.js) treat water as a
+   fast they run. A scenario that sets `swim` treats water as a
    soft block instead: astar() treats water cells as passable at 4x cost
    (it swims only when the swim beats the detour), los() sees across it,
    and the core caps in-water speed (SWIM_FRAC in agents.js). */

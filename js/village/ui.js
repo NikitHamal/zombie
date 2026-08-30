@@ -1,9 +1,9 @@
 /* The Hollow — the overlay UI. A thin, paper-coloured DOM layer over the
    canvas: the clock, the stores, the selection card, and two panels that
-   only exist while you want them (build · research). HOLD-DESIGN.md §8 is
-   the precedent: DOM carries the persistent controls, everything the sim
-   writes — toasts, warnings, the dawn and the fall cards — is drawn on the
-   canvas in the sketch hand.
+   only exist while you want them (build · research · the valley · the
+   record). The split is deliberate: DOM carries the persistent controls,
+   everything the sim writes — toasts, warnings, the dawn and the fall
+   cards — is drawn on the canvas in the sketch hand.
 
    Every control has a key. The screen stays clean: panels open on demand,
    the selection card only exists while something is selected. */
