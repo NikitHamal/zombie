@@ -637,7 +637,9 @@
           "|" +
           s.day +
           "|" +
-          (s.pilot ? s.pilot.on + (s.pilot.last || "") : "")
+          (s.pilot ? s.pilot.on + (s.pilot.last || "") : "") +
+          "|" +
+          (s.coach ? s.coach.now || "" : "")
         );
       return "none";
     },
@@ -1674,6 +1676,11 @@
     chronPanel() {
       const s = this.scen;
       let h = '<div class="ptitle">the record <kbd>esc</kbd></div>';
+      // the one thing worth knowing right now
+      if (ZS.Coach) {
+        const lesson = ZS.Coach.line(s);
+        if (lesson) h += '<div class="pfoot"><em>' + lesson + "</em></div>";
+      }
       if (ZS.Autopilot) {
         const on = ZS.Autopilot.on(s);
         h +=

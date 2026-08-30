@@ -1197,6 +1197,8 @@
       if (ZS.Cure && this.cure) ZS.Cure.daily(this);
       // the steward: the day's work, thought about once
       if (ZS.Autopilot) ZS.Autopilot.dawn(this);
+      // and one thing worth knowing, when its moment has come
+      if (ZS.Coach) ZS.Coach.daily(this);
       this._recalc();
       const si = Math.floor((this.day - 1) / 8) % 4;
       if (si !== this.seasonI) {
@@ -1439,6 +1441,7 @@
         }
       }
       this.pilot = ZS.Autopilot ? ZS.Autopilot.load(this, s && s.pilot) : null;
+      this.coach = ZS.Coach ? ZS.Coach.load(this, s && s.coach) : null;
       this.fac = s && s.fac ? s.fac : ZS.Factions.create(this.world.seed);
       if (ZS.Nations) this.nat = ZS.Nations.load(this, s && s.nat);
       this.cure = s && s.cure ? s.cure : ZS.Cure.create();
@@ -1839,6 +1842,7 @@
         army: ZS.Army ? ZS.Army.save(this) : null,
         nat: ZS.Nations ? ZS.Nations.save(this) : null,
         pilot: ZS.Autopilot ? ZS.Autopilot.save(this) : null,
+        coach: ZS.Coach ? ZS.Coach.save(this) : null,
       };
     }
 
@@ -4188,6 +4192,8 @@
           "click the ground to place the " + ZS.Structs.CAT[this.armed].name + " · esc to cancel"
         );
       if (this.phase === "night") return "the dead are in the village · space to pause";
+      const lesson = ZS.Coach ? ZS.Coach.line(this) : null;
+      if (lesson) return lesson;
       const bits = ["V the roster", "B build", "T workshop", "H the hall", "space pause"];
       return bits.join("  ·  ");
     }

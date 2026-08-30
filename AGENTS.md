@@ -372,6 +372,21 @@ every decision goes through the same public calls the buttons use
 - `scen.pilot` is saved (`serialize().pilot`, `Autopilot.load`), so he is
   still in charge after a reload.
 
+### The coach (js/village/coach.js)
+
+Onboarding, in the game's voice: `LESSONS` is an ordered list of
+`{ id, when(scen), txt }`, and `Coach.daily(scen)` (from `_newDay`) gives
+**one** lesson per dawn — the first whose `when` has come true, never one
+that has been said before. The current one is what `scen._hint()` shows in
+the hint bar while it is still worth acting on, and what the record panel
+puts at the top; each is also written to the ledger and toasted.
+
+The gates are states, not days, wherever they can be: *work* on day 1,
+*build* once a site is marked out, *hungry* when the larder drops below
+two days of upkeep, *heal* when somebody is hurt, *field* once there is a
+bed in the barracks, *world* once a nation has been heard of, *bite* the
+first time somebody is bitten. `scen.coach` is saved (`seen`, `now`).
+
 ### Other people (js/village/people.js)
 
 Two of them, and both of them keep an opinion (`0` blood enemies → `1`
@@ -546,8 +561,9 @@ building: `U` upgrade, `R` repair, `X` dismantle.
   `ui-smoke` (the overlay), `systems-smoke` (hazards, parties, birth,
   slots), `people-smoke` (kin, factions, cure), `army-smoke` (ages, units,
   the field), `nations-smoke` (the seven, their wagons and wars),
-  `seed-smoke` (the valley is a place), `pilot-smoke` (the steward), and
-  `play.js [days]` — **the balance harness**, a bot that plays the game and
+  `seed-smoke` (the valley is a place), `pilot-smoke` (the steward),
+  `coach-smoke` (the onboarding), and `play.js [days]` — **the balance
+  harness**, a bot that plays the game and
   reports whether the village is still there. `.verify/README.md` is the
   full list, with the environment flags.
 - **`ZS_RNG` pins every die in the game.** Without it two runs are two
@@ -671,7 +687,8 @@ Tier D — D9 generations and legacy · D10 meta progression and challenge
 modes.
 
 Tier E — E11 climate with warnings · E12 trust between individuals ·
-E13 nights you actually watch · E14 onboarding and access.
+E13 nights you actually watch · E14 onboarding (**the coach has shipped**)
+and access.
 
 Still open from the earlier list: scout reports in the hand of whoever
 went, and more identifiable building art.
