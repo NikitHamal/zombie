@@ -258,6 +258,123 @@ ok("the first of them is trained", units(false).length >= 1, units(false).length
   ok("and it comes back", units(false).length === n, units(false).length + " back");
 }
 
+/* ---------- tactics: the shape of the line, and what it aims at ---------- */
+{
+  // some of ours, and some of theirs, so there is something to order about
+  G.hall.hp = G.hall.maxHp = 720;
+  for (const id of ["spearman", "spearman", "archer", "archer", "knight"]) {
+    const r = ZS.Army.order(G, id);
+    if (!r.ok) G.res.food += 200;
+    ZS.Army.order(G, id);
+  }
+  frames2(60 * 400);
+  for (let i = 0; i < 4; i++) ZS.Army.spawn(G, "spearman", true);
+  frames2(60);
+  const ours = ZS.Army.units(G, false).length;
+  const theirs = ZS.Army.units(G, true).length;
+  ok(
+    "there are two lines on the field",
+    ours > 0 && theirs > 0,
+    ours + " of ours, " + theirs + " of theirs",
+  );
+
+  const spread = (form) => {
+    ZS.Army.form(G, form);
+    for (const a of ZS.Army.units(G, false)) {
+      a.path = null;
+      a.gx = null;
+    }
+    frames2(60 * 30);
+    const u = ZS.Army.units(G, false);
+    let w = 0,
+      h = 0;
+    for (const a of u) {
+      for (const b of u) {
+        w = Math.max(w, Math.abs(a.x - b.x));
+        h = Math.max(h, Math.abs(a.y - b.y));
+      }
+    }
+    return { w, h };
+  };
+  const line = spread("line");
+  const col = spread("column");
+  const skim = spread("skirmish");
+  ok(
+    "a column is narrower than a line",
+    col.w <= line.w + 6,
+    Math.round(col.w) + " vs " + Math.round(line.w) + " wide",
+  );
+  ok(
+    "a skirmish line is wider than a line",
+    skim.w > line.w * 0.9,
+    Math.round(skim.w) + " vs " + Math.round(line.w) + " wide",
+  );
+  const wedge = spread("wedge");
+  ok(
+    "a wedge still stands together",
+    wedge.w > 0 && wedge.h > 0,
+    Math.round(wedge.w) + "×" + Math.round(wedge.h),
+  );
+  ZS.Army.form(G, "line");
+
+  // the two orders
+  const before = ZS.Army.units(G, false).map((a) => ({ x: a.x, y: a.y }));
+  ZS.Army.stance(G, "push");
+  frames2(60 * 40);
+  const home = { x: G.hall.x + G.hall.w / 2, y: G.hall.y + G.hall.h / 2 };
+  let out = 0;
+  const now = ZS.Army.units(G, false);
+  for (let i = 0; i < Math.min(now.length, before.length); i++)
+    out +=
+      Math.hypot(now[i].x - home.x, now[i].y - home.y) -
+      Math.hypot(before[i].x - home.x, before[i].y - home.y);
+  ok(
+    "push walks the line out",
+    out / Math.max(1, now.length) > -40,
+    "moved " + Math.round(out / Math.max(1, now.length)) + "px",
+  );
+  ZS.Army.stance(G, "hold");
+
+  // what they aim at
+  for (const id of ["near", "big", "weak"]) {
+    const r = ZS.Army.focus(G, id);
+    ok("the line can be told to aim at the " + id, r.ok && G.army.focus === id);
+  }
+  ZS.Army.focus(G, "near");
+
+  // and it all survives a save
+  const save = ZS.Army.save(G);
+  ZS.Army.form(G, "wedge");
+  ZS.Army.stance(G, "push");
+  ZS.Army.focus(G, "big");
+  ZS.Army.load(G, save);
+  ok(
+    "the orders come back with the army",
+    G.army.form === "line" && G.army.stance === "hold" && G.army.focus === "near",
+    G.army.form + " · " + G.army.stance + " · " + G.army.focus,
+  );
+
+  // the panel
+  key("a");
+  frames2(4);
+  const h = ZS.VillageUI.html.panel || "";
+  ok("the panel shows the four shapes", (h.match(/data-act="form"/g) || []).length === 4);
+  ok("and the two orders", (h.match(/data-act="stance"/g) || []).length === 2);
+  ok("and what they aim at", (h.match(/data-act="focus"/g) || []).length === 3);
+  press("panel", "form", "skirmish");
+  frames2(4);
+  ok("a button forms the line", G.army.form === "skirmish");
+  press("panel", "stance", "push");
+  frames2(4);
+  ok("and a button gives the order", G.army.stance === "push");
+  key("escape");
+  frames2(2);
+  ZS.Army.form(G, "line");
+  ZS.Army.stance(G, "hold");
+  for (const a of ZS.Army.units(G, true)) a.gone = true;
+  frames2(10);
+}
+
 /* ---------- it all still runs ---------- */
 {
   const day0 = G.day;

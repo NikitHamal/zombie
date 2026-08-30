@@ -27,6 +27,7 @@
     SHOT_T: 0.5, // how long a shell is in the air
     BOMB_T: 0.7, // ...and a bomb
     DESERT: 0.22, // below this fraction of its health a starving unit walks home
+    PUSH_PX: 150, // how far past its ground a line goes out to meet them
   };
 
   const dist2 = (ax, ay, bx, by) => (ax - bx) * (ax - bx) + (ay - by) * (ay - by);
@@ -116,11 +117,62 @@
   /* ---------- the line ---------- */
 
   // a rank of six, shoulder to shoulder, behind the first
-  function slotAt(goal, i) {
-    const per = 6;
-    const col = i % per,
-      row = (i / per) | 0;
-    return { x: goal.x + (col - (per - 1) / 2) * 30, y: goal.y + row * 28 };
+  /* Formations. A line holds a field; a wedge breaks one; a column gets
+     down a road; a skirmish line spreads out and shoots. */
+  const FOCUS = {
+    near: { name: "nearest", desc: "whatever is closest" },
+    big: { name: "heaviest", desc: "the big ones first — the brutes, the tanks" },
+    weak: { name: "wounded", desc: "finish what is already going down" },
+  };
+
+  const FORMS = {
+    line: { name: "line", per: 6, dx: 30, dy: 28, desc: "shoulder to shoulder, row behind row" },
+    wedge: { name: "wedge", per: 5, dx: 32, dy: 26, desc: "a point, and weight behind it" },
+    column: {
+      name: "column",
+      per: 2,
+      dx: 26,
+      dy: 24,
+      desc: "two abreast — narrow, and slow to turn",
+    },
+    skirmish: { name: "skirmish", per: 8, dx: 46, dy: 46, desc: "spread out, and shooting" },
+  };
+
+  function slotAt(goal, i, form) {
+    const f = FORMS[form] || FORMS.line;
+    if (form === "wedge") {
+      // each rank behind the point is two men narrower than the one before
+      let left = i,
+        row = 0;
+      for (;;) {
+        const per = Math.max(1, f.per - row * 2);
+        if (left < per || per === 1) break;
+        left -= per;
+        row++;
+      }
+      const per = Math.max(1, f.per - row * 2);
+      const col = Math.min(left, per - 1);
+      return { x: goal.x + (col - (per - 1) / 2) * f.dx, y: goal.y + row * f.dy };
+    }
+    const col = i % f.per,
+      row = (i / f.per) | 0;
+    return { x: goal.x + (col - (f.per - 1) / 2) * f.dx, y: goal.y + row * f.dy };
+  }
+
+  // what the line shoots at: the nearest thing, the heaviest thing, or
+  // the one that is nearly down
+  function targetScore(scen, a, o) {
+    const dd = dist2(a.x, a.y, o.x, o.y);
+    const focus = (scen.army && scen.army.focus) || "near";
+    if (focus === "big") {
+      const w = o.maxHp || 40;
+      return dd / (0.4 + w / 60);
+    }
+    if (focus === "weak") {
+      const hurt = 1 - (o.hp || 1) / (o.maxHp || 1);
+      return dd / (0.4 + hurt * 1.6);
+    }
+    return dd;
   }
 
   function homePoint(scen) {
@@ -170,8 +222,9 @@
   }
 
   function find(scen, a, r, grid) {
+    const focus = scen.army && scen.army.focus;
     let best = null,
-      bd = r * r;
+      bd = focus && focus !== "near" ? 1e18 : r * r;
     const f = (o) => {
       if (o === a || !opposed(a, o)) return;
       if (!reachable(a, o)) return;
@@ -179,8 +232,10 @@
       // that wants them starts on what is keeping them out
       if (o.st === 0 && o.bld >= 0) return;
       const d = dist2(a.x, a.y, o.x, o.y);
-      if (d < bd) {
-        bd = d;
+      if (d > r * r) return;
+      const sc = focus && focus !== "near" ? targetScore(scen, a, o) : d;
+      if (sc < bd) {
+        bd = sc;
         best = o;
       }
     };
@@ -226,11 +281,25 @@
   function goalFor(scen, a) {
     if (a.goal) return a.goal;
     if (a.foe) return homePoint(scen);
-    return slotAt(post(scen), a.slot || 0);
+    return slotAt(post(scen), a.slot || 0, scen.army && scen.army.form);
   }
 
   function hold(scen, a, d, dt, t, nav) {
-    const p = goalFor(scen, a);
+    let p = goalFor(scen, a);
+    // "push": the line walks out past its ground to meet them, rather
+    // than waiting to be come at
+    const A = scen.army;
+    if (A && A.stance === "push" && !a.foe && !a.goal) {
+      const out = A.threat || A.rally || null;
+      if (out) {
+        const h = homePoint(scen);
+        const dx = out.x - h.x,
+          dy = out.y - h.y;
+        const m = Math.hypot(dx, dy) || 1;
+        const step = BAL.PUSH_PX;
+        p = { x: p.x + (dx / m) * step, y: p.y + (dy / m) * step };
+      }
+    }
     const sp = d.spd * speedMul(scen, a);
     if (dist2(a.x, a.y, p.x, p.y) > BAL.SLOT_R * BAL.SLOT_R) {
       a.wantMove = true;
@@ -374,6 +443,8 @@
 
   const Army = {
     BAL,
+    FORMS,
+    FOCUS,
 
     create() {
       return {
@@ -387,6 +458,9 @@
         slotT: 0,
         supT: 0,
         unit: 0, // how many are under arms right now (kept by tick)
+        form: "line", // line · wedge · column · skirmish
+        stance: "hold", // hold · push
+        focus: "near", // near · big · weak — what they aim at
       };
     },
 
@@ -517,6 +591,48 @@
       }
       if (ZS.VillageUI) ZS.VillageUI.toast("the line forms there");
       if (ZS.VillageUI) ZS.VillageUI.refresh(true);
+    },
+
+    // the shape of the line, and what it is told to shoot at
+    form(scen, id) {
+      const A = scen.army;
+      if (!A || !FORMS[id]) return { ok: false, err: "no such formation" };
+      A.form = id;
+      for (const a of this.units(scen, false)) {
+        a.path = null;
+        a.gx = null;
+      }
+      if (ZS.VillageUI) {
+        ZS.VillageUI.toast("the line forms a " + FORMS[id].name);
+        ZS.VillageUI.refresh(true);
+      }
+      return { ok: true };
+    },
+
+    stance(scen, id) {
+      const A = scen.army;
+      if (!A || (id !== "hold" && id !== "push")) return { ok: false, err: "no such order" };
+      A.stance = id;
+      for (const a of this.units(scen, false)) {
+        a.path = null;
+        a.gx = null;
+      }
+      if (ZS.VillageUI) {
+        ZS.VillageUI.toast(id === "push" ? "they go out to meet it" : "they stand on their ground");
+        ZS.VillageUI.refresh(true);
+      }
+      return { ok: true };
+    },
+
+    focus(scen, id) {
+      const A = scen.army;
+      if (!A || !FOCUS[id]) return { ok: false, err: "no such order" };
+      A.focus = id;
+      if (ZS.VillageUI) {
+        ZS.VillageUI.toast("aim at the " + FOCUS[id].name);
+        ZS.VillageUI.refresh(true);
+      }
+      return { ok: true };
     },
 
     dismiss(scen) {
@@ -710,6 +826,9 @@
       return {
         q: A.queue.map((x) => [x.id, Math.round(x.p * 100) / 100]),
         r: A.rally ? [Math.round(A.rally.x), Math.round(A.rally.y)] : null,
+        f: A.form || "line",
+        st: A.stance || "hold",
+        fc: A.focus || "near",
         k: A.kills,
         l: A.lost,
         t: A.trained,
@@ -727,6 +846,9 @@
       if (!d) return;
       A.queue = (d.q || []).map((x) => ({ id: x[0], p: x[1] || 0 }));
       A.rally = d.r ? { x: d.r[0], y: d.r[1] } : null;
+      A.form = FORMS[d.f] ? d.f : "line";
+      A.stance = d.st === "push" ? "push" : "hold";
+      A.focus = FOCUS[d.fc] ? d.fc : "near";
       A.kills = d.k || 0;
       A.lost = d.l || 0;
       A.trained = d.t || 0;

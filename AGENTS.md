@@ -261,6 +261,17 @@ hands — and nothing on the ground can reach them.
 is within `CART_R` 220 px of it; starving units lose health, and one below
 `DESERT` 22% walks home for good.
 
+**Tactics** (the field panel): the line takes one of four shapes —
+`line` (six shoulder to shoulder, row behind row), `wedge` (a point, each
+rank two men narrower than the one in front), `column` (two abreast, for a
+road), `skirmish` (spread wide, for shooters) — one of two orders, `hold`
+or `push` (`push` walks the line `PUSH_PX` 150 past its ground, out along
+the bearing from home to the threat), and one of three things to aim at:
+`near`, `big` (heaviest first), `weak` (finish the wounded). All three are
+`scen.army.form/stance/focus`, saved with the army, and the steward sets
+them himself (skirmish when half the line shoots, a wedge when
+outnumbered, `push` when there are more of ours).
+
 **Arms** are a fifth store: the armourer (job `smith`, key `O`) turns
 scrap into arms at the smithy (1 → 1) or the foundry (2 → 3), and the
 rack is capped at half of what the stores hold.
@@ -581,6 +592,16 @@ Things that have cost real time, so they do not cost it twice:
 - **`Structs.make()` is top-left, `_placeAt()` is centre.**
 - **Object literals take commas; class bodies do not.** Everything in
   `js/village/` is an object literal on `window.ZS`.
+- **`_placeAt(x, y)` takes the centre**, the way the pointer gives it,
+  while `Structs.make()` takes the top-left. Hand a top-left to
+  `_placeAt` and half your sites silently fail to place — including the
+  one building you were checking for.
+- **A constant declared as a property of the module object
+  (`ARMS_ORDER: [...]`) is not in scope for the module's own functions.**
+  Declare it `const` beside them and reference it from the object too.
+- **`str(null)` in `_findWork`** — a work target with no ground under it
+  (a plot whose numbers went bad) used to crash the frame. Guarded, but
+  the lesson stands: anything a villager walks to can be null.
 - **After a sandbox reset `node_modules` is gone** (`npm i` again) and the
   git objects may be gone too: if `git log` shows only the upstream base,
   `git fetch origin <branch> && git reset --mixed FETCH_HEAD` puts the
@@ -642,7 +663,9 @@ the valley in one piece, and the steward (`P`) who plays it for you.
 Tier B — B4 interiors and rooms · B5 items, wear, winter clothes ·
 B6 walk the valley (an open map, not a panel).
 
-Tier C — C8 squad tactics. (C1 horde ecology was left out by request.)
+Tier C — C8 squad tactics (**shipped**: formations, hold/push, focus
+fire; the steward picks them himself). C1 horde ecology was left out by
+request.
 
 Tier D — D9 generations and legacy · D10 meta progression and challenge
 modes.

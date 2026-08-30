@@ -300,6 +300,21 @@
         case "dismiss":
           ZS.Army.dismiss(s);
           break;
+        case "form": {
+          const r = ZS.Army.form(s, arg);
+          if (!r.ok) this.toast(r.err);
+          break;
+        }
+        case "stance": {
+          const r = ZS.Army.stance(s, arg);
+          if (!r.ok) this.toast(r.err);
+          break;
+        }
+        case "focus": {
+          const r = ZS.Army.focus(s, arg);
+          if (!r.ok) this.toast(r.err);
+          break;
+        }
         case "pick-unit": {
           const a = who && s.unitByUid(who);
           if (a) {
@@ -592,7 +607,17 @@
         return f;
       }
       if (s.mode === "army") {
-        let f = "a|" + ZS.Units.crew(s) + "|" + ZS.Ages.index(s) + "|" + (s.army.rally ? 1 : 0);
+        let f =
+          "a|" +
+          ZS.Units.crew(s) +
+          "|" +
+          ZS.Ages.index(s) +
+          "|" +
+          (s.army.rally ? 1 : 0) +
+          "|" +
+          s.army.form +
+          s.army.stance +
+          s.army.focus;
         f += "|" + s.army.queue.map((q) => q.id + Math.floor(q.p * 20)).join(",");
         for (const a of ZS.Army.units(s, false))
           f += ";" + a.uid + Math.ceil(a.hp / 8) + (a.sup > 0 ? 1 : 0);
@@ -1053,6 +1078,47 @@
         " food a day" +
         (s.army.hungry ? " · <em>" + s.army.hungry + " out of bread</em>" : "") +
         "</div>";
+      /* how they stand, and what they are told: the four shapes, the two
+         orders, and what the line aims at */
+      const A = s.army;
+      const F = ZS.Army.FORMS,
+        FO = ZS.Army.FOCUS;
+      h += '<div class="pfoot">they form a ' + (F[A.form] || F.line).name + "</div>";
+      h += '<div class="tray">';
+      for (const id in F)
+        h +=
+          '<button data-act="form" data-arg="' +
+          id +
+          '"' +
+          (A.form === id ? ' class="on"' : "") +
+          ' title="' +
+          F[id].desc +
+          '">' +
+          F[id].name +
+          "</button>";
+      h += "</div>";
+      h += '<div class="tray">';
+      h +=
+        '<button data-act="stance" data-arg="hold"' +
+        (A.stance === "hold" ? ' class="on"' : "") +
+        ' title="stand on the ground they have been given">hold</button>';
+      h +=
+        '<button data-act="stance" data-arg="push"' +
+        (A.stance === "push" ? ' class="on"' : "") +
+        ' title="walk out past it and meet them">push</button>';
+      h += '<span class="sep"></span>';
+      for (const id in FO)
+        h +=
+          '<button data-act="focus" data-arg="' +
+          id +
+          '"' +
+          (A.focus === id ? ' class="on"' : "") +
+          ' title="' +
+          FO[id].desc +
+          '">' +
+          FO[id].name +
+          "</button>";
+      h += "</div>";
       // what is in the field right now
       const mine = U.ORDER.filter((id) => U.count(s, id));
       if (mine.length)

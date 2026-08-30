@@ -578,6 +578,36 @@
     return "a party goes to " + (ZS.Overworld.def(pick.id) || {}).name;
   }
 
+  // how the line stands: a skirmish line if most of it shoots, a wedge if
+  // it is outnumbered, a line otherwise — and out to meet them when there
+  // are more of ours than there are of theirs
+  function tactics(scen, r) {
+    const A = scen.army;
+    if (!A || !ZS.Army || !r.crew) return null;
+    let shoot = 0;
+    for (const a of ZS.Army.units(scen, false)) {
+      const d = ZS.Units.CAT[a.unit];
+      if (d && (d.rng || 0) > 40) shoot++;
+    }
+    const form = shoot * 2 >= r.crew ? "skirmish" : r.foes > r.crew ? "wedge" : "line";
+    const stance = r.foes && r.crew > r.foes ? "push" : "hold";
+    const focus = r.foes > r.crew ? "weak" : "near";
+    const did = [];
+    if (A.form !== form) {
+      ZS.Army.form(scen, form);
+      did.push("a " + form);
+    }
+    if (A.stance !== stance) {
+      ZS.Army.stance(scen, stance);
+      did.push(stance === "push" ? "out to meet them" : "back on their ground");
+    }
+    if (A.focus !== focus) {
+      ZS.Army.focus(scen, focus);
+      did.push("aim at the " + (focus === "weak" ? "wounded" : "nearest"));
+    }
+    return did.length ? "the line forms " + did.join(", ") : null;
+  }
+
   /* ---------- the module ---------- */
 
   const Autopilot = {
@@ -662,6 +692,8 @@
       if (took) did.push(took === 1 ? "a bed given" : took + " beds given");
       const arms = field(scen, r);
       if (arms) did.push(arms + " under arms");
+      const shape = tactics(scen, r);
+      if (shape) did.push(shape);
       const beyond = world(scen, r);
       if (beyond) did.push(beyond);
       const out = party(scen, r);
@@ -692,6 +724,9 @@
       if (!r.night && (r.morale < BAL.FEAST_MORALE || r.despair > 0.4) && ZS.Hazards) {
         if (ZS.Hazards.feast(scen).ok) this.say(scen, "a hot meal for everybody");
       }
+      // how the line stands, as the field changes
+      const shape = tactics(scen, r);
+      if (shape) this.say(scen, shape);
       // and anything worth raising, if the morning's plan has run dry
       if (!r.sites && !r.night) {
         const marked = build(scen, r);
