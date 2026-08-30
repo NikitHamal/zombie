@@ -758,6 +758,7 @@
           if (ZS.sound) ZS.sound.event("moan", z.x, z.y);
         }
       }
+      if (!this._hoverBound) this._bindHover();
       for (const b of this.world.buildings) if (b.want && !b.mat && b.hp < b.maxHp) this._topUp(b);
       if (ZS.Figures) ZS.Figures.opt.zoom = ZS.debug && ZS.debug.cam ? ZS.debug.cam.zoom : 1;
       if (ZS.VillageUI) {
@@ -2491,6 +2492,11 @@
       this.sel = null;
     }
 
+    openVillagers() {
+      this.mode = "villagers";
+      this.armed = null;
+    }
+
     cancelMode() {
       this.mode = null;
       this.armed = null;
@@ -2704,7 +2710,27 @@
     }
 
     pointerMove(x, y) {
-      this.hover = { x, y };
+      this._hoverAt(x, y);
+    }
+
+    _hoverAt(x, y) {
+      if (!this.hover) this.hover = { x: 0, y: 0 };
+      this.hover.x = x;
+      this.hover.y = y;
+    }
+
+    _bindHover() {
+      this._hoverBound = 1;
+      const cv = document.getElementById("c");
+      if (!cv) return;
+      const at = (e) => {
+        const cam = ZS.debug && ZS.debug.cam;
+        if (!cam) return;
+        const p = cam.toWorld(e.clientX, e.clientY, window.innerWidth, window.innerHeight);
+        this._hoverAt(p.x, p.y);
+      };
+      cv.addEventListener("pointermove", at, { passive: true });
+      cv.addEventListener("pointerleave", () => (this.hover = null));
     }
 
     dismissCard() {
@@ -2743,6 +2769,20 @@
       this.muted = !this.muted;
       if (ZS.sound) ZS.sound.enabled = !this.muted;
       if (ZS.VillageUI) ZS.VillageUI.toast(this.muted ? "sound off" : "sound on");
+    }
+
+    villagerByUid(uid) {
+      for (const a of this.villagers()) if (a.uid === +uid) return a;
+      return null;
+    }
+
+    // bring somebody into view without dragging the camera off the village
+    focusOn(x, y) {
+      const cam = ZS.debug.cam;
+      cam.auto = false;
+      cam.x = x;
+      cam.y = y;
+      cam.clamp(window.innerWidth, window.innerHeight);
     }
 
     cycleVillager(d) {
@@ -2841,13 +2881,7 @@
           "click the ground to place the " + ZS.Structs.CAT[this.armed].name + " · esc to cancel"
         );
       if (this.phase === "night") return "the dead are in the village · space to pause";
-      const bits = [
-        "click a villager to give them work",
-        "B build",
-        "T workshop",
-        "H the hall",
-        "space pause",
-      ];
+      const bits = ["V the roster", "B build", "T workshop", "H the hall", "space pause"];
       return bits.join("  ·  ");
     }
 
@@ -2858,7 +2892,7 @@
     }
 
     // the ground pass: the rock, the brambles and the wreckage
-    drawGround(c, _world, _t) {
+    drawGround(c, _world, t) {
       for (const n of this.nodes) {
         if (n.amt <= 0 && n.kind !== "bush") continue;
         const s = n.seed;
@@ -2935,32 +2969,73 @@
           ZS.wline(c, n.x - 12, n.y - 4, n.x + 6, n.y - 8, s + 8, 0.6);
         }
       }
-      // the placement ghost
+      // the placement ghost: the site itself, drawn in the sketch hand, so
+      // what sits under the cursor is what the builders will raise
       if (this.armed && this.hover) {
         const kind = this.armed;
         const cat = ZS.Structs.CAT[kind];
         const chk = ZS.Structs.canPlace(this.world, this.nav, kind, this.hover.x, this.hover.y);
-        const x = this.hover.x - cat.w / 2,
-          y = this.hover.y - cat.h / 2;
+        const g =
+          this._ghost ||
+          (this._ghost = {
+            lvl: 1,
+            built: false,
+            ruined: false,
+            prog: 0,
+            seed: 3,
+            hp: 1,
+            maxHp: 1,
+            plot: null,
+            kind: kind,
+            x: 0,
+            y: 0,
+            w: 0,
+            h: 0,
+          });
+        g.kind = kind;
+        g.w = cat.w;
+        g.h = cat.h;
+        g.x = this.hover.x - cat.w / 2;
+        g.y = this.hover.y - cat.h / 2;
+        const cost = this.buildCost(kind);
+        const pay = this.canPay(cost);
+        const ok = chk.ok && pay;
         c.save();
-        c.globalAlpha = 0.9;
+        c.globalAlpha = 0.55;
+        ZS.Structs.draw(c, g, t, { night: 0, t: t });
+        c.restore();
+        c.save();
+        // the footprint: green where it may stand, red where it may not
         ZS.wpoly(
           c,
           [
-            { x, y },
-            { x: x + cat.w, y },
-            { x: x + cat.w, y: y + cat.h },
-            { x, y: y + cat.h },
+            { x: g.x, y: g.y },
+            { x: g.x + cat.w, y: g.y },
+            { x: g.x + cat.w, y: g.y + cat.h },
+            { x: g.x, y: g.y + cat.h },
           ],
           17,
-          1.4,
+          1.3,
           true,
         );
-        c.fillStyle = chk.ok ? "rgba(112,148,72,0.2)" : "rgba(150,60,40,0.2)";
+        c.fillStyle = ok ? "rgba(112,148,72,0.16)" : "rgba(150,60,40,0.18)";
         c.fill();
-        c.strokeStyle = chk.ok ? "rgba(92,122,58,0.95)" : "rgba(150,60,40,0.95)";
-        c.lineWidth = 2;
+        c.strokeStyle = ok ? "rgba(92,122,58,0.9)" : "rgba(150,60,40,0.9)";
+        c.lineWidth = 1.8;
         c.stroke();
+        // the price, or the reason it cannot stand here
+        c.font = 'italic 11px "Segoe Script","Bradley Hand","Comic Sans MS",cursive';
+        c.textAlign = "center";
+        c.fillStyle = ok ? "rgba(64,84,44,0.92)" : "rgba(150,60,40,0.92)";
+        c.fillText(
+          !pay
+            ? "not enough: " + ZS.VillageUI.costText(cost)
+            : chk.ok
+              ? ZS.VillageUI.costText(cost)
+              : chk.err || "it will not go here",
+          this.hover.x,
+          g.y - 7,
+        );
         c.restore();
       }
     }

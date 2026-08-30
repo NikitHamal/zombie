@@ -27,7 +27,8 @@
   const UI = {
     scen: null,
     el: {},
-    sig: "",
+    sig: {},
+    html: { sel: "", panel: "", res: "" },
     toastT: 0,
 
     init(scen) {
@@ -51,6 +52,9 @@
       click("sp1", () => scen.setSpeed(1));
       click("sp2", () => scen.setSpeed(2));
       click("sp3", () => scen.setSpeed(3));
+      click("roles", () => this.act("villagers-panel"));
+      click("buildb", () => this.act("build-panel"));
+      click("workb", () => this.act("research-panel"));
       click("home", () => scen.focusHall());
       click("fit", () => scen.fitView());
       click("bell", () => scen.callNight());
@@ -58,15 +62,19 @@
       click("helpb", () => this.toggleHelp());
       click("helpwrap", () => this.toggleHelp(false));
       window.addEventListener("keydown", (e) => this.key(e));
-      // the panel's rows are rebuilt often: delegate the clicks
-      this.el.panel.addEventListener("click", (e) => {
-        const row = e.target.closest("[data-act]");
-        if (row) this.act(row.dataset.act, row.dataset.arg);
-      });
-      this.el.sel.addEventListener("click", (e) => {
-        const row = e.target.closest("[data-act]");
-        if (row) this.act(row.dataset.act, row.dataset.arg);
-      });
+      // The panel's rows are rebuilt whenever the village changes, so the
+      // clicks are delegated — and taken on *press*: a node that is replaced
+      // between press and release never fires a click, and that was why the
+      // cards only ever answered the keyboard.
+      const press = (el) =>
+        el.addEventListener("pointerdown", (e) => {
+          const row = e.target.closest("[data-act]");
+          if (!row) return;
+          e.preventDefault();
+          this.act(row.dataset.act, row.dataset.arg, row.dataset.who);
+        });
+      press(this.el.panel);
+      press(this.el.sel);
       return this;
     },
 
@@ -126,8 +134,10 @@
           this.toast(ZS.Figures.opt.jobs ? "job icons on" : "job icons off");
           return;
         case "v":
-          ZS.Figures.opt.names = !ZS.Figures.opt.names;
-          this.toast(ZS.Figures.opt.names ? "names on" : "names off");
+          if (e.shiftKey) {
+            ZS.Figures.opt.names = !ZS.Figures.opt.names;
+            this.toast(ZS.Figures.opt.names ? "names on" : "names off");
+          } else this.act("villagers-panel");
           return;
         case "tab":
           s.cycleVillager(e.shiftKey ? -1 : 1);
@@ -150,6 +160,7 @@
       }
       if (lower === "t") return this.act("research-panel");
       if (lower === "b") return this.act("build-panel");
+      if (lower === "v") return this.act("villagers-panel");
       if (lower === "h") return this.act("home");
       if (lower === "f") return this.act("fit");
       if (lower === "n") return this.act("bell");
@@ -157,15 +168,25 @@
       if (lower === "?") return this.act("help");
     },
 
-    act(what, arg) {
+    act(what, arg, who) {
       const s = this.scen;
       switch (what) {
         case "build":
           s.armBuild(arg);
           break;
-        case "job":
-          if (s.sel && s.sel.k === "v") s.setJob(s.sel.o, arg);
+        case "job": {
+          const a = (who && s.villagerByUid(who)) || (s.sel && s.sel.k === "v" ? s.sel.o : null);
+          if (a) s.setJob(a, arg);
           break;
+        }
+        case "pick": {
+          const a = who && s.villagerByUid(who);
+          if (a) {
+            s.selectVillager(a);
+            s.focusOn(a.x, a.y);
+          }
+          break;
+        }
         case "upgrade":
           if (s.sel && s.sel.k === "s") s.upgrade(s.sel.o);
           break;
@@ -185,6 +206,10 @@
         case "research-panel":
           if (s.mode === "research") s.cancelMode();
           else s.openResearch();
+          break;
+        case "villagers-panel":
+          if (s.mode === "villagers") s.cancelMode();
+          else s.openVillagers();
           break;
         case "research":
           s.startResearch(arg);
@@ -229,37 +254,136 @@
 
     /* ---------- painting ---------- */
 
+    // One signature per region. The clock ticks, the stores fill and the
+    // villagers walk about every frame; the buttons only need repainting when
+    // *their* numbers move. Repainting a button under the cursor throws away
+    // its hover and eats the click, so each region guards its own.
     refresh(force) {
       const s = this.scen;
       if (!s) return;
-      const sig = [
-        s.day,
-        s.phase,
-        Math.floor(s.clockMins()),
-        s.speed,
-        s.weather.id,
-        s.season.id,
-        Math.floor(s.res.wood),
-        Math.floor(s.res.stone),
-        Math.floor(s.res.food),
-        Math.floor(s.res.scrap),
-        s.villagers().length,
-        s.guards().length,
-        s.popCap(),
-        s.storeCap(),
-        s.storeTotal(),
-        s.sel ? s.sel.k + (s.sel.o.uid || s.sel.o.cx | 0) : "-",
-        s.mode,
-        s.armed,
-        s.research ? s.research.id + Math.floor(s.research.p * 20) : "-",
-        s.armed && s.sel === null ? 0 : 1,
-      ].join("|");
-      if (sig === this.sig && !force) return;
-      this.sig = sig;
-      this.paintBar();
-      this.paintRes();
-      this.paintSel();
-      this.paintPanel();
+      if (force) this.sig = {};
+      const sig = (this.sig = this.sig || {});
+      const bar =
+        s.day +
+        "|" +
+        s.phase +
+        "|" +
+        Math.floor(s.clockMins()) +
+        "|" +
+        s.speed +
+        "|" +
+        s.weather.id +
+        "|" +
+        s.season.id;
+      if (bar !== sig.bar) {
+        sig.bar = bar;
+        this.paintBar();
+      }
+      const res =
+        Math.floor(s.res.wood / 2) +
+        "|" +
+        Math.floor(s.res.stone / 2) +
+        "|" +
+        Math.floor(s.res.food / 2) +
+        "|" +
+        Math.floor(s.res.scrap / 2) +
+        "|" +
+        s.villagers().length +
+        "|" +
+        s.guards().length +
+        "|" +
+        s.popCap() +
+        "|" +
+        s.storeCap();
+      if (res !== sig.res) {
+        sig.res = res;
+        this.paintRes();
+      }
+      const sel = this.selSig();
+      if (sel !== sig.sel) {
+        sig.sel = sel;
+        this.paintSel();
+      }
+      const pan = this.panelSig();
+      if (pan !== sig.pan) {
+        sig.pan = pan;
+        this.paintPanel();
+      }
+    },
+
+    // the number in a resource pill moves all day; whether a button is
+    // affordable only flips now and then. Panels watch the flip, not the
+    // number, so they stay still long enough to be clicked.
+    afford(list) {
+      let f = "";
+      for (const c of list) f += c ? "1" : "0";
+      return f;
+    },
+
+    selSig() {
+      const s = this.scen;
+      const sel = s.sel;
+      if (!sel) return "-";
+      const o = sel.o;
+      if (sel.k === "v")
+        return (
+          "v" +
+          o.uid +
+          ":" +
+          o.job +
+          ":" +
+          Math.ceil(o.hp / 6) +
+          ":" +
+          (o.inf > 0 ? 1 : 0) +
+          ":" +
+          (o.carry ? o.carry.n : 0) +
+          ":" +
+          (o.gun || o.tool || "-")
+        );
+      if (!o || o.dead) return "-";
+      return (
+        "s" +
+        (o.uid || 0) +
+        ":" +
+        Math.round((o.hp / o.maxHp) * 20) +
+        ":" +
+        o.lvl +
+        ":" +
+        (o.plot ? o.plot.stage : "-") +
+        ":" +
+        (o.mat ? 1 : 0) +
+        ":" +
+        (o.want ? 1 : 0) +
+        ":" +
+        (o.built ? 1 : 0) +
+        ":" +
+        (o.ruined ? 1 : 0)
+      );
+    },
+
+    panelSig() {
+      const s = this.scen;
+      if (s.mode === "build")
+        return (
+          "b|" + s.armed + "|" + this.afford(ZS.Structs.ORDER.map((k) => s.canPay(s.buildCost(k))))
+        );
+      if (s.mode === "research") {
+        const l = s.researchList();
+        return (
+          "r|" +
+          (s.has("shop") ? 1 : 0) +
+          "|" +
+          (s.research ? s.research.id + Math.floor(s.research.p * 25) : "-") +
+          "|" +
+          this.afford(l.map((r) => s.canPay(r.def.cost)))
+        );
+      }
+      if (s.mode === "villagers") {
+        let f = "v|" + s.guardCap() + "|" + (s.sel && s.sel.k === "v" ? s.sel.o.uid : 0);
+        for (const a of s.villagers()) f += ";" + a.uid + a.job + Math.ceil(a.hp / 8);
+        return f;
+      }
+      return "none";
     },
 
     paintBar() {
@@ -273,6 +397,7 @@
 
     paintRes() {
       const s = this.scen;
+      if (!s) return;
       const r = s.res;
       const v = s.villagers().length;
       const cap = s.storeCap();
@@ -306,13 +431,18 @@
       const s = this.scen;
       const sel = s.sel;
       const e = this.el.sel;
-      if (!sel) {
+      if (!sel || (sel.k === "s" && (!sel.o || sel.o.dead))) {
         e.classList.remove("on");
+        this.html.sel = "";
         return;
       }
+      const html = sel.k === "v" ? this.villagerCard(sel.o) : this.structCard(sel.o);
       e.classList.add("on");
-      if (sel.k === "v") e.innerHTML = this.villagerCard(sel.o);
-      else e.innerHTML = this.structCard(sel.o);
+      if (html !== this.html.sel) {
+        this.html.sel = html;
+        e.innerHTML = html;
+        this.selTask = e.querySelector('[data-role="task"]');
+      }
     },
 
     villagerCard(a) {
@@ -426,11 +556,9 @@
           s.villagers().length +
           "/" +
           s.popCap() +
-          " · stores " +
-          Math.floor(s.storeTotal()) +
-          "/" +
+          " · holds " +
           s.storeCap() +
-          "</div>";
+          " of each</div>";
       } else h += '<button data-act="demolish" class="danger">dismantle<kbd>X</kbd></button>';
       h += "</div>";
       return h;
@@ -439,13 +567,21 @@
     paintPanel() {
       const s = this.scen;
       const e = this.el.panel;
-      if (s.mode === "build") e.innerHTML = this.buildPanel();
-      else if (s.mode === "research") e.innerHTML = this.researchPanel();
-      else {
+      let html = "";
+      if (s.mode === "build") html = this.buildPanel();
+      else if (s.mode === "research") html = this.researchPanel();
+      else if (s.mode === "villagers") html = this.villagersPanel();
+      if (!html) {
         e.classList.remove("on");
+        this.html.panel = "";
         return;
       }
       e.classList.add("on");
+      if (html !== this.html.panel) {
+        this.html.panel = html;
+        e.innerHTML = html;
+        this.taskNode = e.querySelector('[data-role="task"]');
+      }
     },
 
     buildPanel() {
@@ -470,6 +606,68 @@
           "</span></div>";
       }
       h += '<div class="pfoot">pick a thing, then click the ground · esc to stop</div>';
+      return h;
+    },
+
+    // the roster: who is out there, what they are doing, and the row of
+    // jobs under the one you picked
+    villagersPanel() {
+      const s = this.scen;
+      const v = s.villagers();
+      let h = '<div class="ptitle">villagers <kbd>esc</kbd></div>';
+      if (!v.length) {
+        h += '<div class="pfoot">nobody left.</div>';
+        return h;
+      }
+      const pick = s.sel && s.sel.k === "v" ? s.sel.o : null;
+      for (const a of v) {
+        const job = JOBS.find((j) => j.id === a.job) || JOBS[0];
+        const hp = Math.max(0, Math.min(100, Math.round((a.hp / a.maxHp) * 100)));
+        h +=
+          '<div class="row' +
+          (a === pick ? " on" : "") +
+          '" data-act="pick" data-who="' +
+          a.uid +
+          '" title="click to find ' +
+          a.name +
+          '"><span>' +
+          a.name +
+          '</span><span class="hp"><i style="width:' +
+          hp +
+          '%"></i></span><span class="who">' +
+          (a.inf > 0 ? "<em>bitten</em>" : job.name) +
+          "</span></div>";
+        if (a === pick) {
+          h += '<div class="tray">';
+          for (const j of JOBS)
+            h +=
+              '<button data-act="job" data-arg="' +
+              j.id +
+              '" data-who="' +
+              a.uid +
+              '"' +
+              (a.job === j.id ? ' class="on"' : "") +
+              ' title="' +
+              j.hint +
+              '">' +
+              j.name +
+              " <kbd>" +
+              j.key +
+              "</kbd></button>";
+          h += "</div>";
+          h += '<div class="pfoot" data-role="task"></div>';
+        }
+      }
+      h +=
+        '<div class="pfoot">' +
+        v.length +
+        " of " +
+        s.popCap() +
+        " beds · " +
+        s.guards().length +
+        " of " +
+        s.guardCap() +
+        " on the watch · pick a name and give them work</div>";
       return h;
     },
 
@@ -516,6 +714,16 @@
         this.toastT -= dt;
         if (this.toastT <= 0) this.el.toast.classList.remove("on");
       }
+      // "what they are doing" changes every few seconds; it lives in one
+      // text node we retype in place, so the buttons around it never move
+      const s = this.scen;
+      const a = s && s.sel && s.sel.k === "v" ? s.sel.o : null;
+      const line = a
+        ? (a.task || "standing about") +
+          (a.carry && a.carry.n ? " · carrying " + a.carry.n + " " + a.carry.kind : "")
+        : "";
+      if (this.selTask && this.selTask.textContent !== line) this.selTask.textContent = line;
+      if (this.taskNode && this.taskNode.textContent !== line) this.taskNode.textContent = line;
     },
   };
 

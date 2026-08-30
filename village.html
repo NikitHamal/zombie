@@ -143,6 +143,7 @@
 
       /* the selection card, bottom left */
       #sel {
+        pointer-events: auto;
         left: 12px;
         bottom: 12px;
         width: 268px;
@@ -208,9 +209,13 @@
 
       /* the build / research panel, right */
       #panel {
+        pointer-events: auto;
         top: 96px;
         right: 12px;
         width: 232px;
+        max-height: calc(100vh - 130px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
         padding: 7px 10px 9px;
         transform: rotate(0.3deg);
         display: none;
@@ -243,6 +248,42 @@
       }
       #panel .row.no {
         opacity: 0.42;
+      }
+      #panel .row .hp {
+        flex: 0 0 38px;
+        height: 6px;
+        border: 1px solid rgba(60, 50, 40, 0.35);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      #panel .row .hp i {
+        display: block;
+        height: 100%;
+        background: rgba(112, 148, 72, 0.8);
+      }
+      #panel .row .who {
+        font-size: 12.5px;
+        opacity: 0.72;
+        min-width: 76px;
+        text-align: right;
+      }
+      #panel .row .who em {
+        color: #a04030;
+        font-style: normal;
+      }
+      #panel .tray {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 3px;
+        padding: 2px 4px 6px;
+      }
+      #panel .tray button {
+        font-size: 12px;
+        padding: 0 5px;
+      }
+      #panel .tray button kbd {
+        font-size: 10px;
+        margin-left: 3px;
       }
       #panel .pfoot {
         margin-top: 6px;
@@ -315,6 +356,10 @@
         <button id="sp2" title="fast (2)">&#9654;&#9654;</button>
         <button id="sp3" title="faster (3)">&#9654;&#9654;&#9654;</button>
         <span class="sep"></span>
+        <button id="roles" title="the roster — who does what (V)">roles</button>
+        <button id="buildb" title="build something (B)">build</button>
+        <button id="workb" title="the workshop — what the village learns (T)">workshop</button>
+        <span class="sep"></span>
         <button id="home" title="centre on the hall (H)">hall</button>
         <button id="fit" title="fit the whole map (F)">map</button>
         <button id="bell" title="ring the bell — call the night early (N)">bell</button>
@@ -333,18 +378,19 @@
           Nothing here is yours to control directly — only to direct. The
           village works by day and hides by night.
           <div style="margin-top: 8px">
+            <div><span class="k">V</span>the roster — everybody, and the work you give them</div>
             <div><span class="k">click</span>a villager, then pick their work</div>
             <div><span class="k">L W S F</span>labourer · wood · stone · forage</div>
             <div><span class="k">M B R G</span>farm · build · repair · guard</div>
             <div><span class="k">C X</span>heal · idle</div>
             <div><span class="k">tab</span>next villager</div>
-            <div><span class="k">B</span>build menu — then click the ground</div>
+            <div><span class="k">B</span>build menu — the ghost follows the cursor, click to set it down</div>
             <div><span class="k">T</span>the workshop's research</div>
-            <div><span class="k">U R X</span>on a building: upgrade · repair · dismantle</div>
+            <div><span class="k">U R X</span>on a building: upgrade · rebuild · dismantle</div>
             <div><span class="k">space</span>pause · <span class="k">1 2 3</span>speed</div>
             <div><span class="k">H F</span>centre on the hall · fit the map</div>
             <div><span class="k">N</span>ring the bell, call the night early</div>
-            <div><span class="k">J V</span>job icons · names</div>
+            <div><span class="k">J</span>job icons · <span class="k">shift+V</span>names</div>
             <div><span class="k">M</span>mute · <span class="k">esc</span>cancel</div>
           </div>
           <div class="foot">
