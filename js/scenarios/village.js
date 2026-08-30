@@ -825,6 +825,8 @@
       this._tickSystems(agents, dt);
       // the steward's small looks round, between the dawns
       if (ZS.Autopilot) ZS.Autopilot.tick(this, dt);
+      // and the watch: whether the clock can run on for a bit
+      if (ZS.Watch) ZS.Watch.tick(this, dt);
       if (ZS.Army && this.army) ZS.Army.tick(this, dt);
       if (this.phase === "day") {
         if (this.phaseT >= BAL.DAY_LEN) this._startNight(false);
@@ -1451,6 +1453,7 @@
       }
       this.pilot = ZS.Autopilot ? ZS.Autopilot.load(this, s && s.pilot) : null;
       this.coach = ZS.Coach ? ZS.Coach.load(this, s && s.coach) : null;
+      this.watch = ZS.Watch ? ZS.Watch.load(this, s && s.watch) : null;
       this.fac = s && s.fac ? s.fac : ZS.Factions.create(this.world.seed);
       if (ZS.Nations) this.nat = ZS.Nations.load(this, s && s.nat);
       this.cure = s && s.cure ? s.cure : ZS.Cure.create();
@@ -1857,6 +1860,7 @@
         nat: ZS.Nations ? ZS.Nations.save(this) : null,
         pilot: ZS.Autopilot ? ZS.Autopilot.save(this) : null,
         coach: ZS.Coach ? ZS.Coach.save(this) : null,
+        watch: ZS.Watch ? ZS.Watch.save(this) : null,
       };
     }
 
@@ -4133,7 +4137,12 @@
 
     /* ================= camera ================= */
 
-    camInterest() {
+    camInterest(_dt) {
+      // watching: whatever is happening, before anything else
+      if (ZS.Watch && ZS.Watch.on(this)) {
+        const p = ZS.Watch.point(this);
+        if (p) return { x: p.x, y: p.y, zoom: p.zoom, ease: ZS.Watch.BAL.EASE };
+      }
       const hx = this.hall.x + this.hall.w / 2,
         hy = this.hall.y + this.hall.h / 2;
       let x = hx,

@@ -507,6 +507,40 @@ three named save slots plus an autosave at every dawn. The save is
 condition and materials, every person with their trait and memories, the
 props, the parties, the ledger. v1 saves (the old format) still load.
 
+### The watch (js/village/watch.js)
+
+`W`, or the *watch* button: the camera follows the trouble and the clock
+runs on through the quiet. `Watch.point(scen)` answers "what is worth
+looking at?" — a fire first, then somebody with a dead one on them (a
+guard or a soldier outranks a villager), then theirs in the field, then
+the bitten and the badly hurt — and returns `{ x, y, zoom, why }`, or null
+when the village is simply getting on with it. `scen.camInterest(dt)`
+returns it whenever the watch is on; the page's auto camera already
+follows that, and panning by hand still takes the camera away.
+
+`Watch.tick(scen, dt)` (from `maintain`) is the timelapse: after
+`BAL.QUIET` 3.5 s with nothing to see, the clock goes to speed 3; the
+moment there is something, it comes back to 1. The player's speed is kept
+as `watch.base` and restored when the watch is switched off. `scen.watch`
+is saved (`on`, `base`).
+
+### The watch (js/village/watch.js)
+
+`W`, or the *watch* button: the camera follows the trouble and the clock
+runs on through the quiet. `Watch.point(scen)` answers "what is worth
+looking at?" — a fire first, then somebody with a dead one on them (a
+guard or a soldier outranks a villager), then theirs in the field, then
+the bitten and the badly hurt — and returns `{ x, y, zoom, why }`, or null
+when the village is simply getting on with it. `scen.camInterest(dt)`
+returns it whenever the watch is on; the page's auto camera already
+follows that, and panning by hand still takes the camera away.
+
+`Watch.tick(scen, dt)` (from `maintain`) is the timelapse: after
+`BAL.QUIET` 3.5 s with nothing to see, the clock goes to speed 3; the
+moment there is something, it comes back to 1. The player's speed is kept
+as `watch.base` and restored when the watch is switched off. `scen.watch`
+is saved (`on`, `base`).
+
 ### The run card
 
 When it ends, the card reads like a run: how long the village lasted,

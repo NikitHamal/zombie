@@ -65,6 +65,7 @@
       click("mapb", () => this.act("world-panel"));
       click("bookb", () => this.act("chron-panel"));
       click("pilotb", () => this.act("pilot"));
+      click("watchb", () => this.act("watch"));
       click("qualb", () => this.act("quality"));
       click("home", () => scen.focusHall());
       click("fit", () => scen.fitView());
@@ -205,6 +206,7 @@
       if (lower === "k") return this.act("sound");
       if (lower === "l") return this.act("chron-panel");
       if (lower === "p") return this.act("pilot");
+      if (lower === "w" && !s.sel) return this.act("watch");
       if (lower === "q") return this.act("quality");
       if (lower === "?") return this.act("help");
     },
@@ -330,6 +332,12 @@
         case "chron-panel":
           if (s.mode === "chron") s.cancelMode();
           else s.openChron();
+          break;
+        case "watch":
+          if (ZS.Watch) {
+            const on = ZS.Watch.toggle(s);
+            if (on && ZS.debug && ZS.debug.cam) ZS.debug.cam.auto = true;
+          }
           break;
         case "pilot": {
           if (!ZS.Autopilot) break;
@@ -651,6 +659,7 @@
       this.el.wx.title = s.season.desc + " · " + s.weather.desc;
       for (let i = 0; i < 4; i++) this.el.speeds[i].classList.toggle("on", s.speed === i);
       if (this.el.pilotb && ZS.Autopilot) this.el.pilotb.classList.toggle("on", ZS.Autopilot.on(s));
+      if (this.el.watchb && ZS.Watch) this.el.watchb.classList.toggle("on", ZS.Watch.on(s));
       document.body.classList.toggle("night", s.phase !== "day");
     },
 
