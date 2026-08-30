@@ -62,13 +62,17 @@ index.html
     js/stains.js         persistent-stamp layer (splats, corpses, decals)
     js/village/art.js    props, livestock, weather, ground decoration
     js/village/figures.js  the figures (frozen base + additive layers)
-    js/village/structs.js  19 building kinds: cost, time, hp, and their art
+    js/village/structs.js  23 building kinds: cost, time, hp, and their art
     js/village/kin.js    named people: traits, memory, morale, birth, grief
     js/village/hazards.js  fire, fever, rats, cold, despair
     js/village/overworld.js  the valley: 10 places, parties, fog, loot tables
     js/village/people.js    other people: trade, tribute, raids (st === 3)
     js/village/cure.js      the four steps, the dose, and the end of it
     js/village/chronicle.js  the ledger and the three save slots
+    js/village/ages.js    the five ages: what the village has become
+    js/village/units.js   the roster: 13 things that fight, and their art
+    js/village/fx.js      the noise of a battle: arrows, shells, smoke, dust
+    js/village/army.js    the field: training, orders, the line, the bread
     js/agents.js         generic entity engine (AI pass, separation, clamp)
     js/sim.js            game clock (day/night, tap)
     js/scenarios/village.js  THE GAME: jobs, tasks, buildings, research, night
@@ -219,6 +223,51 @@ the map with a scribbled cloud over everything you have not walked to.
 
 `serialize()` carries parties in the field, so closing the browser does
 not strand anybody out there.
+
+### The ages and the field (js/village/{ages,units,fx,army}.js)
+
+A village becomes a civilisation in five steps, and each step is something
+you can see from the green:
+
+| age | what it takes | what it opens |
+| --- | --- | --- |
+| a refuge | — | militia, spearmen |
+| a manor | hall level 2 + a barracks | cart, archer, knight, lancer, mounted knight, stable |
+| a forge | a smithy + `gunpowder` | musketeer, cannon, foundry |
+| a foundry | a foundry + `mechanised` | machine gun team, tank |
+| an airfield | an airfield + `flight` | helicopter, fighter |
+
+`Ages.of(scen)` is read by the build menu (`armBuild` refuses what is ahead
+of the age), by the field panel, and by `Army.order`. `Ages.next(scen)`
+says what is still missing, in the village's own words.
+
+**Soldiers are `st === 4`**, `a.unit` is an id from `Units.CAT`, and
+`a.foe` marks the other side. They are agents like anybody else: the core
+moves them, separates them, y-sorts them and lifts them from the field.
+`scen.update` hands them to `ZS.Army.update`, which finds something to
+fight (`opposed`: ours shoot the dead, raiders and theirs; theirs shoot
+the living and ours) or walks them to their place in the rank
+(`slotAt(post(scen), a.slot)` — six shoulder to shoulder, row behind row).
+
+Shooting is `shot` in the catalog: `melee` · `arrow` · `ball` · `burst`
+land at once, `shell` and `bomb` are scheduled (`army.shots`) and go off
+under `Army.land` with a splash and a siege multiplier against walls.
+Flyers (`fly: 1`) set `a.free`, so they go over walls, water and the dead's
+hands — and nothing on the ground can reach them.
+
+**Bread.** Every unit eats `d.eat` a day, charged at dawn
+(`Army.dawn`) before the village's own upkeep. Fight further than
+`SUPPLY_R` 430 px from the stores and the army starves unless a **cart**
+is within `CART_R` 220 px of it; starving units lose health, and one below
+`DESERT` 22% walks home for good.
+
+**Arms** are a fifth store: the armourer (job `smith`, key `O`) turns
+scrap into arms at the smithy (1 → 1) or the foundry (2 → 3), and the
+rack is capped at half of what the stores hold.
+
+New buildings: **barracks** `r` (+4 beds a level), **stable** `g` (+3),
+**foundry** `p` (+2), **airfield** `z` (+2). New studies: `gunpowder`
+(`rifles`), `mechanised`, `flight`.
 
 ### Other people (js/village/people.js)
 

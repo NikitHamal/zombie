@@ -41,6 +41,8 @@ const WANT = [
   ["kennel", 1],
   ["shrine", 1],
   ["hut", 6],
+  ["barracks", 1],
+  ["stable", 1],
 ];
 
 function freeSpot(kind) {
@@ -165,6 +167,14 @@ function dawn() {
     if (!pick) for (const r of list) if (G.canPay(r.def.cost)) pick = r.id;
     if (pick) G.startResearch(pick);
   }
+  // the field: once there is a barracks, put people under arms — the
+  // cheapest thing that can hold a line first, and only with food to spare
+  if (G.has("barracks") && G.res.food > 220 && ZS.Units.crew(G) < ZS.Units.cap(G)) {
+    for (const id of ["spearman", "archer", "militia", "cart"]) {
+      const r = ZS.Army.order(G, id);
+      if (r.ok) break;
+    }
+  }
   // a bed and a bite: take in a survivor
   while (G.villagers().length < G.popCap() && G.res.food > 110 && G.res.wood > 30) {
     if (!G.recruit()) break;
@@ -242,7 +252,7 @@ console.log(
     G.world.buildings.filter((b) => b.built && !b.ruined).length +
     " · ruined " +
     G.world.buildings.filter((b) => b.ruined).length +
-    " · researched " +
+    " · field: " + ZS.Army.line(G) + "\n" + " · researched " +
     Object.keys(G.done).length +
     " · souls " +
     G.souls,

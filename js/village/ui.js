@@ -21,6 +21,7 @@
     { id: "repair", key: "R", name: "repairer", hint: "patch walls and roofs" },
     { id: "guard", key: "G", name: "guard", hint: "stand the watch, hold the line" },
     { id: "heal", key: "C", name: "healer", hint: "tend the wounded and the bitten" },
+    { id: "smith", key: "O", name: "armourer", hint: "turn scrap into arms at the forge" },
     { id: "idle", key: "X", name: "idle", hint: "rest, wander, stay out of trouble" },
   ];
 
@@ -59,6 +60,7 @@
       click("roles", () => this.act("villagers-panel"));
       click("buildb", () => this.act("build-panel"));
       click("workb", () => this.act("research-panel"));
+      click("armyb", () => this.act("army-panel"));
       click("mapb", () => this.act("world-panel"));
       click("bookb", () => this.act("chron-panel"));
       click("qualb", () => this.act("quality"));
@@ -131,6 +133,9 @@
         return;
       }
       switch (lower) {
+        case "a":
+          this.act("army-panel");
+          return;
         case " ":
           s.setSpeed(s.speed ? 0 : 1);
           e.preventDefault();
@@ -242,6 +247,39 @@
           if (s.mode === "villagers") s.cancelMode();
           else s.openVillagers();
           break;
+        case "army-panel":
+          if (s.mode === "army") s.cancelMode();
+          else s.openArmy();
+          break;
+        case "train": {
+          const r = ZS.Army.order(s, arg);
+          if (!r.ok) this.toast(r.err);
+          else this.toast("training " + ZS.Units.def(arg).name);
+          break;
+        }
+        case "untrain":
+          ZS.Army.cancel(s, +arg);
+          break;
+        case "rally":
+          if (!ZS.Units.count(s)) {
+            this.toast("nobody under arms yet");
+            break;
+          }
+          s.cancelMode(); // ...and then arm the cursor, or cancel eats it
+          s.rallying = true;
+          this.toast("click the ground — the line forms where you point");
+          break;
+        case "dismiss":
+          ZS.Army.dismiss(s);
+          break;
+        case "pick-unit": {
+          const a = who && s.unitByUid(who);
+          if (a) {
+            s.selectUnit(a);
+            s.focusOn(a.x, a.y);
+          }
+          break;
+        }
         case "world-panel":
           if (s.mode === "world") s.cancelMode();
           else s.openWorld();
@@ -401,6 +439,8 @@
         "|" +
         Math.floor(s.res.scrap / 2) +
         "|" +
+        Math.floor((s.res.arms || 0) / 2) +
+        "|" +
         s.villagers().length +
         "|" +
         s.guards().length +
@@ -453,6 +493,8 @@
           ":" +
           (o.gun || o.tool || "-")
         );
+      if (sel.k === "u")
+        return "u" + o.uid + ":" + Math.round((o.hp / o.maxHp) * 20) + ":" + (o.sup > 0 ? 1 : 0);
       if (!o || o.dead) return "-";
       return (
         "s" +
@@ -505,6 +547,14 @@
           for (const p of s.ow.parties) f += "|" + p.id + Math.floor(ZS.Overworld.progress(p) * 20);
         return f;
       }
+      if (s.mode === "army") {
+        let f = "a|" + ZS.Units.crew(s) + "|" + ZS.Ages.index(s) + "|" + (s.army.rally ? 1 : 0);
+        f += "|" + s.army.queue.map((q) => q.id + Math.floor(q.p * 20)).join(",");
+        for (const a of ZS.Army.units(s, false))
+          f += ";" + a.uid + Math.ceil(a.hp / 8) + (a.sup > 0 ? 1 : 0);
+        f += "|" + this.afford(ZS.Units.ORDER.map((id) => s.canPay(ZS.Units.cost(s, id))));
+        return f;
+      }
       if (s.mode === "chron") return "c|" + (s.chron ? s.chron.length : 0) + "|" + s.day;
       return "none";
     },
@@ -539,7 +589,7 @@
         row("stone", r.stone, "#8b8779") +
         row("food", r.food, "#b1963e") +
         row("scrap", r.scrap, "#6f7681") +
-        (r.cloth > 0.5 ? row("cloth", r.cloth, "#a89878") : "") +
+        (r.arms > 0.5 || s.has("smith") ? row("arms", r.arms, "#7d7a86") : "") +
         (s.winterWood
           ? '<span class="chip wide">winter burn <b>' + s.winterWood + "</b> wood a day</span>"
           : "") +
@@ -549,7 +599,9 @@
         s.popCap() +
         " · guards <b>" +
         s.guards().length +
-        "</b> · holds " +
+        "</b>" +
+        (ZS.Units && ZS.Units.count(s) ? " · field <b>" + ZS.Units.count(s) + "</b>" : "") +
+        " · holds " +
         cap +
         " of each</span>";
     },
@@ -563,7 +615,12 @@
         this.html.sel = "";
         return;
       }
-      const html = sel.k === "v" ? this.villagerCard(sel.o) : this.structCard(sel.o);
+      const html =
+        sel.k === "v"
+          ? this.villagerCard(sel.o)
+          : sel.k === "u"
+            ? this.unitCard(sel.o)
+            : this.structCard(sel.o);
       e.classList.add("on");
       if (html !== this.html.sel) {
         this.html.sel = html;
@@ -580,6 +637,8 @@
       h += '<i data-act="close">×</i></div>';
       h +=
         '<div class="line">health <b>' +
+        Math.round((a.hp / a.maxHp) * 100) +
+        "%</b> (" +
         Math.ceil(a.hp) +
         "/" +
         Math.round(a.maxHp) +
@@ -607,6 +666,40 @@
           j.key +
           "</kbd></button>";
       }
+      h += "</div>";
+      return h;
+    },
+
+    unitCard(a) {
+      const d = ZS.Units.def(a.unit);
+      let h =
+        '<div class="head"><b>' +
+        d.name +
+        "</b><span>" +
+        (a.foe ? "the enemy" : "the field") +
+        '</span><i data-act="close">×</i></div>';
+      h += '<div class="line">' + d.desc + "</div>";
+      h +=
+        '<div class="line">health <b>' +
+        Math.ceil(a.hp) +
+        "/" +
+        Math.round(a.maxHp) +
+        ")</b> · reaches " +
+        (d.rng > 40 ? Math.round(d.rng) : "arm's length") +
+        (d.dmg ? " · hits for " + d.dmg : "") +
+        (d.armour ? " · armour " + Math.round(d.armour * 100) + "%" : "") +
+        "</div>";
+      if (!a.foe)
+        h +=
+          '<div class="line ' +
+          (a.sup <= 0 ? "warn" : "dim") +
+          '">' +
+          (a.sup <= 0 ? "out of bread" : "fed") +
+          " · eats " +
+          d.eat +
+          " a day</div>";
+      h += '<div class="jobs">';
+      if (!a.foe) h += '<button data-act="pick-unit" data-who="' + a.uid + '">find it</button>';
       h += "</div>";
       return h;
     },
@@ -698,6 +791,7 @@
       if (s.mode === "build") html = this.buildPanel();
       else if (s.mode === "research") html = this.researchPanel();
       else if (s.mode === "villagers") html = this.villagersPanel();
+      else if (s.mode === "army") html = this.armyPanel();
       else if (s.mode === "world") html = this.worldPanel();
       else if (s.mode === "chron") html = this.chronPanel();
       if (!html) {
@@ -736,6 +830,117 @@
           "</span></div>";
       }
       h += '<div class="pfoot">pick a thing, then click the ground · esc to stop</div>';
+      return h;
+    },
+
+    // the field: what the village has become, what it may put in the
+    // field, and what is being trained right now
+    armyPanel() {
+      const s = this.scen;
+      const U = ZS.Units;
+      let h = '<div class="ptitle">the field <kbd>esc</kbd></div>';
+      const age = ZS.Ages.of(s);
+      h += '<div class="pfoot">' + age.name + " — " + age.desc + "</div>";
+      const nx = ZS.Ages.next(s);
+      if (nx) {
+        h +=
+          '<div class="pfoot">to reach ' +
+          nx.def.name +
+          ": " +
+          (nx.want.length ? nx.want.join(", ") : "nothing — it is there") +
+          "</div>";
+      }
+      const crew = U.crew(s),
+        cap = U.cap(s);
+      h +=
+        '<div class="pfoot"><b>' +
+        U.count(s) +
+        "</b> under arms · " +
+        crew +
+        "/" +
+        cap +
+        " beds · " +
+        Math.round(U.upkeep(s)) +
+        " food a day" +
+        (s.army.hungry ? " · <em>" + s.army.hungry + " out of bread</em>" : "") +
+        "</div>";
+      // what is in the field right now
+      const mine = U.ORDER.filter((id) => U.count(s, id));
+      if (mine.length)
+        h +=
+          '<div class="pfoot">' +
+          mine.map((id) => U.count(s, id) + "× " + U.def(id).name).join(" · ") +
+          "</div>";
+      // the training queue
+      if (s.army.queue.length) {
+        for (let i = 0; i < s.army.queue.length; i++) {
+          const q = s.army.queue[i];
+          h +=
+            '<div class="row on" data-act="untrain" data-arg="' +
+            i +
+            '"><span>' +
+            U.def(q.id).name +
+            "</span><span>" +
+            Math.round(q.p * 100) +
+            "%</span></div>";
+        }
+      }
+      // who is out there, so you can go and look at them
+      const mine2 = ZS.Army.units(s, false);
+      if (mine2.length) {
+        h += '<div class="ptitle" style="margin-top:5px">in the field</div>';
+        for (const a of mine2) {
+          const d = U.def(a.unit);
+          h +=
+            '<div class="row" data-act="pick-unit" data-who="' +
+            a.uid +
+            '"><span>' +
+            d.name +
+            (a.sup <= 0 ? " <em>· out of bread</em>" : "") +
+            '</span><span class="hp"><i style="width:' +
+            Math.round((a.hp / a.maxHp) * 100) +
+            '%"></i></span></div>';
+        }
+      }
+      h += '<div class="tray">';
+      h +=
+        '<button data-act="rally"' +
+        (U.count(s) ? "" : ' class="no"') +
+        ">rally<kbd>click the ground</kbd></button>";
+      h +=
+        '<button data-act="dismiss"' + (s.army.rally ? "" : ' class="no"') + ">fall back</button>";
+      h += "</div>";
+      // the roster: everything the village could train, in order
+      for (const id of U.ORDER) {
+        const d = U.def(id);
+        const open = ZS.Ages.at(s, d.age);
+        const cost = U.cost(s, id);
+        const room = U.crew(s) + (d.crew || 1) <= U.cap(s);
+        const ok = open && room && s.canPay(cost);
+        let why = "";
+        if (!open) why = "needs " + ZS.Ages.def(d.age).name;
+        else if (!room) why = "no beds";
+        h +=
+          '<div class="row ' +
+          (ok ? "" : "no") +
+          '" data-act="train" data-arg="' +
+          id +
+          '"><span>' +
+          d.name +
+          (d.crew > 1 ? " ×" + d.crew : "") +
+          "</span><span>" +
+          (why || costText(cost)) +
+          "</span></div>";
+        h +=
+          '<div class="pfoot">' +
+          d.desc +
+          " · " +
+          Math.round(U.time(s, id)) +
+          "s to train · eats " +
+          d.eat +
+          "</div>";
+      }
+      h += '<div class="pfoot">the smithy and the foundry turn scrap into arms.</div>';
       return h;
     },
 
@@ -1208,6 +1413,8 @@
         const f = ZS.Factions.alert(s);
         if (f) list.unshift(f);
       }
+      // the army shouts for itself (an army out of bread is an army going home)
+      if (s.alerts) for (const a of s.alerts) if (a.t > 0) list.push([a.kind, a.txt]);
       // the door is the whole defence, so it says so
       if (s.hall && s.hall.ruined)
         list.unshift(["door", "the hall is a ruin — there is no door to hold"]);
@@ -1277,6 +1484,7 @@
     if (c.w) p.push(c.w + "w");
     if (c.s) p.push(c.s + "s");
     if (c.c) p.push(c.c + "c");
+    if (c.a) p.push(c.a + " arms");
     return p.length ? p.join(" ") : "free";
   }
 

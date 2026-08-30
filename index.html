@@ -329,6 +329,12 @@
       #alerts .al.trade {
         color: #6a5a2c;
       }
+      #alerts .al.supply {
+        color: #8a6a2c;
+      }
+      #alerts .al.field {
+        color: #4a6a34;
+      }
       #alerts button {
         margin-top: 4px;
       }
@@ -418,6 +424,7 @@
         <button id="roles" title="the roster — who does what (V)">roles</button>
         <button id="buildb" title="build something (B)">build</button>
         <button id="workb" title="the workshop — what the village learns (T)">workshop</button>
+        <button id="armyb" title="the field — train and order the army (A)">field</button>
         <button id="mapb" title="the valley — send parties out (M)">valley</button>
         <button id="bookb" title="the record — what has happened, and saving (L)">record</button>
         <span class="sep"></span>
@@ -452,6 +459,10 @@
             <div><span class="k">tab</span>next villager</div>
             <div><span class="k">B</span>build menu — the ghost follows the cursor, click to set it down</div>
             <div><span class="k">T</span>the workshop's research</div>
+            <div>
+              <span class="k">A</span>the field — train soldiers, carts, cannon, wings
+            </div>
+            <div><span class="k">A</span>then <i>rally</i>, and click the ground to place it</div>
             <div><span class="k">U R X</span>on a building: upgrade · rebuild · dismantle</div>
             <div><span class="k">space</span>pause · <span class="k">1 2 3</span>speed</div>
             <div><span class="k">H F</span>centre on the hall · fit the map</div>
@@ -488,6 +499,10 @@
     <script src="js/village/people.js"></script>
     <script src="js/village/cure.js"></script>
     <script src="js/village/chronicle.js"></script>
+    <script src="js/village/ages.js"></script>
+    <script src="js/village/units.js"></script>
+    <script src="js/village/fx.js"></script>
+    <script src="js/village/army.js"></script>
     <script src="js/agents.js"></script>
     <script src="js/sim.js"></script>
     <script src="js/scenarios/village.js"></script>

@@ -42,7 +42,7 @@
     DUSK: 9, // the warning: the horn, the sky, everyone home
     NIGHT_LEN: 70, // 19:00 → 06:00
     DAWN: 3,
-    START: { wood: 60, stone: 30, food: 90, scrap: 14, cloth: 0 },
+    START: { wood: 60, stone: 30, food: 90, scrap: 14, cloth: 0, arms: 0 },
     POP0: 4,
     STORE0: 260, // the hall's own corner, per good, before any storehouse
     HOMES0: 4,
@@ -228,6 +228,27 @@
       time: 90,
       desc: "guards carry SMGs",
       req: ["shotguns"],
+    },
+    gunpowder: {
+      name: "powder that keeps",
+      cost: { s: 50, c: 60 },
+      time: 85,
+      desc: "muskets and cannon · the village becomes a forge",
+      req: ["rifles"],
+    },
+    mechanised: {
+      name: "engines",
+      cost: { s: 110, c: 110 },
+      time: 110,
+      desc: "machine guns, and a tank in the yard · the village becomes a foundry",
+      req: ["gunpowder"],
+    },
+    flight: {
+      name: "heavier than air",
+      cost: { s: 140, c: 160 },
+      time: 130,
+      desc: "a machine that leaves the ground · the village becomes an airfield",
+      req: ["mechanised"],
     },
   };
 
@@ -434,6 +455,9 @@
       this.souls = 0; // candles on the shrine
       this.drag = null; // a line of barricades being dragged out
       this.seasonI = 0;
+      this.army = null; // the field: who is under arms (js/village/army.js)
+      this._units = []; // today's roll of them, rebuilt each frame
+      this.rallying = false; // clicking the ground to place the rally flag
       this.loaded = this._load();
     }
 
@@ -656,6 +680,7 @@
       // the people: a trait, an age, a temper
       for (const a of agents) if (!a.kin) a.kin = ZS.Kin.make(Math.random, this.day);
       this._startSystems(s);
+      if (ZS.Army) ZS.Army.load(this, s && s.army);
       this._recalc();
     }
 
@@ -668,7 +693,7 @@
     }
 
     hostile(a) {
-      return a.st === 2 || a.st === 3;
+      return a.st === 2 || a.st === 3 || (a.st === 4 && a.foe);
     }
 
     walkBlocked(a) {
@@ -677,6 +702,13 @@
 
     maxSpeed(a) {
       if (a.st === 2) return a.spd;
+      if (a.st === 4) {
+        const d = ZS.Units.def(a.unit);
+        let sp = d.spd * (0.9 + 0.2 * this.morale);
+        if (a.hp < a.maxHp * 0.35) sp *= 0.78;
+        if (a.sup <= 0) sp *= 0.8;
+        return sp;
+      }
       if (a.panic > 0) return BAL.SPEED.panic;
       let s =
         a.job === "guard"
@@ -781,6 +813,7 @@
       this._sdT = Math.max(0, (this._sdT || 0) - dt);
       this._tickResearch(dt);
       this._tickSystems(agents, dt);
+      if (ZS.Army && this.army) ZS.Army.tick(this, dt);
       if (this.phase === "day") {
         if (this.phaseT >= BAL.DAY_LEN) this._startNight(false);
       } else if (this.phase === "dusk") {
@@ -818,6 +851,13 @@
 
     frame(agents, dt, _t, _grid, _nav) {
       const sh = this._shelter();
+      // the roll: whoever is standing under arms on our side right now
+      if (ZS.Army) {
+        const u = this._units;
+        u.length = 0;
+        for (const a of agents)
+          if (a.st === 4 && !a.foe && !a.dead && !ZS.Units.def(a.unit).fly) u.push(a);
+      }
       for (const a of agents) {
         if (a.muzzle > 0) a.muzzle = Math.max(0, a.muzzle - dt);
         if (a.panic > 0) a.panic = Math.max(0, a.panic - dt);
@@ -886,6 +926,7 @@
       const wf = this.weather.farm * this.season.farm;
       const well = this.has("well");
       for (const b of this.world.buildings) {
+        if (b.workT > 0) b.workT = Math.max(0, b.workT - dt);
         if (b.kind === "farm" && b.plot && b.built && !b.ruined) {
           const p = b.plot;
           if (p.wet > 0) p.wet = Math.max(0, p.wet - dt);
@@ -1141,6 +1182,8 @@
       if (ZS.Kin) ZS.Kin.daily(this);
       // everything else that can go wrong, rolled at dawn
       if (ZS.Hazards && this.haz) ZS.Hazards.daily(this);
+      // the army eats before anybody else does
+      if (ZS.Army && this.army) ZS.Army.dawn(this);
       // the other people out there: opinions, caravans, demands, raids
       if (ZS.Factions && this.fac) ZS.Factions.daily(this);
       // and the cure, if the village has the makings of it
@@ -1782,6 +1825,7 @@
         fac: this.fac,
         cure: this.cure,
         cured: this.cured,
+        army: ZS.Army ? ZS.Army.save(this) : null,
       };
     }
 
@@ -1829,7 +1873,7 @@
                 ? "basket"
                 : a.job === "farm"
                   ? "hoe"
-                  : a.job === "build" || a.job === "repair"
+                  : a.job === "build" || a.job === "repair" || a.job === "smith"
                     ? "hammer"
                     : a.job === "heal"
                       ? "pail"
@@ -1863,6 +1907,7 @@
       a.noPush = false; // set by the states that hold a spot (see js/agents.js)
       if (a.st === 2) this._updateZombie(a, dt, t, grid, nav);
       else if (a.st === 3) this._updateRaider(a, dt, t, grid, nav);
+      else if (a.st === 4) ZS.Army.update(this, a, dt, t, grid, nav);
       else if (a.job === "guard") this._updateGuard(a, dt, t, grid, nav);
       else this._updateVillager(a, dt, t, grid, nav);
     }
@@ -2228,6 +2273,25 @@
         if (ripe.length) return str(this._nearest(a, ripe), "reap", BAL.WORK.reap);
         return null;
       }
+      if (job === "smith") {
+        // scrap into arms: a forge takes one a time, a foundry takes two
+        const fires = this.world.buildings.filter(
+          (b) =>
+            (b.kind === "smith" || b.kind === "foundry") &&
+            b.built &&
+            !b.ruined &&
+            busy(b) < 2 &&
+            this.res.scrap >= (b.kind === "foundry" ? 2 : 1) &&
+            this.res.arms < this.storeCap("arms") - 0.5,
+        );
+        if (fires.length) {
+          const b = this._nearest(a, fires);
+          return str(b, b.kind === "foundry" ? "cast" : "forge", 0, true);
+        }
+        // nothing to make it from: go and find some
+        const n = room("scrap") ? this._nearestNode(a, "wreck") : null;
+        return n ? node(n, "wreck") : null;
+      }
       if (job === "idle") return null;
       // the labourer: whatever the village needs most, and food before all else
       const pop = this.villagers().length;
@@ -2574,6 +2638,33 @@
         }
         a.mode = "idle";
         a.tgt = null;
+        return;
+      }
+      if (tg.sub === "forge" || tg.sub === "cast") {
+        const b = tg.o;
+        const take = tg.sub === "cast" ? 2 : 1;
+        const make = tg.sub === "cast" ? 3 : 1;
+        const room = Math.floor(this.storeCap("arms") - this.res.arms);
+        if (!b.built || b.ruined || this.res.scrap < take || room < 1) {
+          a.mode = "idle";
+          a.tgt = null;
+          return;
+        }
+        b.workT = 1.2; // the fire is up: sparks, and the pour glows
+        a.workT += dt * sp;
+        if (a.workT < (tg.sub === "cast" ? 3.4 : 4.6)) return;
+        a.workT = 0;
+        this.res.scrap -= take;
+        const got = this._add("arms", make);
+        if (!got) {
+          this.res.scrap += take;
+          a.mode = "idle";
+          a.tgt = null;
+          return;
+        }
+        this._pop(b.x + b.w / 2, b.y, "+" + got + " arms", "#6f7681");
+        if (Math.random() < 0.25)
+          this.fx.push({ x: b.x + b.w / 2, y: b.y + 6, t: 0.4, chip: 1, seed: a.seed });
         return;
       }
       if (tg.sub === "heal") {
@@ -3005,12 +3096,13 @@
       ZS.planAndFollow(a, box, false, B.RAID_SPD, dt, t, nav);
     }
 
-    // the nearest living person who is not one of them
+    // the nearest living person who is not one of them (the line counts)
     _nearestPrey(a, r, grid) {
       let best = null,
         bd = r * r;
       const f = (o) => {
-        if (o.st !== 0 || o.dead || o.gone) return;
+        if (o.dead || o.gone) return;
+        if (o.st !== 0 && !(o.st === 4 && !o.foe)) return;
         const d = dist2(a.x, a.y, o.x, o.y);
         if (d < bd) {
           bd = d;
@@ -3129,7 +3221,11 @@
       const sh = this._shelter();
       let prey = null,
         bd = 1e18;
-      for (const v of this.villagers()) {
+      const folk = this._unt || (this._unt = []);
+      folk.length = 0;
+      for (const v of this.villagers()) folk.push(v);
+      if (this._units) for (const v of this._units) folk.push(v);
+      for (const v of folk) {
         const d = dist2(a.x, a.y, v.x, v.y);
         if (d > sight * sight || d >= bd) continue;
         if (!nav.los(a.x, a.y, v.x, v.y, true)) continue;
@@ -3225,6 +3321,11 @@
       this.fx.push({ x: v.x, y: v.y - 8, t: 0.3, blood: 2, seed: v.seed });
       if (this.stains) this.stains.splat(v.x, v.y + 2, "blood", v.seed + Math.random() * 99);
       if (ZS.sound) ZS.sound.event("v_gasp", v.x, v.y);
+      // plate and padding: what is under arms does not catch the plague
+      if (v.st === 4) {
+        if (v.hp <= 0) v.dead = true;
+        return;
+      }
       if (v.hp <= 0) {
         this.killVillager(v, "taken by the dead");
         return;
@@ -3388,7 +3489,10 @@
 
     canPay(c) {
       return (
-        this.res.wood >= (c.w || 0) && this.res.stone >= (c.s || 0) && this.res.scrap >= (c.c || 0)
+        this.res.wood >= (c.w || 0) &&
+        this.res.stone >= (c.s || 0) &&
+        this.res.scrap >= (c.c || 0) &&
+        this.res.arms >= (c.a || 0)
       );
     }
 
@@ -3396,6 +3500,7 @@
       this.res.wood -= c.w || 0;
       this.res.stone -= c.s || 0;
       this.res.scrap -= c.c || 0;
+      this.res.arms -= c.a || 0;
     }
 
     _add(kind, n) {
@@ -3413,7 +3518,11 @@
         if (!b.built || b.ruined) continue;
         if (b.kind === "store") c += 150 * b.lvl;
         else if (b.kind === "granary" && kind === "food") c += 220 * b.lvl;
+        else if (b.kind === "barracks" && kind === "arms") c += 40 * b.lvl;
+        else if (b.kind === "foundry" && kind === "arms") c += 90 * b.lvl;
       }
+      // arms are kept in a rack, not a shed: half of what the stores hold
+      if (kind === "arms") c = Math.round(c * 0.5);
       return c;
     }
 
@@ -3551,14 +3660,22 @@
       this.armed = null;
     }
 
+    openArmy() {
+      this.mode = "army";
+      this.sel = null;
+      this.armed = null;
+    }
+
     cancelMode() {
       this.mode = null;
       this.armed = null;
+      this.rallying = false;
     }
 
     clearSel() {
       if (this.sel) {
         if (this.sel.k === "v") this.sel.o.sel = false;
+        else if (this.sel.k === "u" && ZS.Army) for (const u of ZS.Army.units(this)) u.sel = false;
         this.sel = null;
       }
     }
@@ -3576,8 +3693,26 @@
       if (ZS.VillageUI) ZS.VillageUI.refresh(true);
     }
 
+    selectUnit(a) {
+      this.clearSel();
+      this.sel = { k: "u", o: a };
+      for (const u of ZS.Army.units(this)) u.sel = u === a;
+      if (ZS.VillageUI) ZS.VillageUI.refresh(true);
+    }
+
+    unitByUid(uid) {
+      for (const a of ZS.Army.units(this)) if (a.uid === +uid) return a;
+      return null;
+    }
+
     armBuild(kind) {
       this.drag = null;
+      const cat = ZS.Structs.CAT[kind];
+      if (cat && cat.age && ZS.Ages && !ZS.Ages.at(this, cat.age)) {
+        if (ZS.VillageUI)
+          ZS.VillageUI.toast("not until the village is " + ZS.Ages.def(cat.age).name);
+        return;
+      }
       if (kind === "wall" && this.done.stonewall && this.armed !== "wall2") {
         // the stone version is the same row, toggled by pressing it again
       }
@@ -3628,6 +3763,11 @@
 
     // a site is armed: the gesture is ours, so the camera does not pan
     pointerDown(x, y) {
+      if (this.rallying) {
+        this.drag = { x0: x, y0: y, x, y, line: false };
+        this._hoverAt(x, y);
+        return true;
+      }
       if (!this.armed) return false;
       const linish = this.armed === "barricade" || this.armed === "wall";
       this.drag = { x0: x, y0: y, x, y, line: linish };
@@ -3649,6 +3789,11 @@
       this.drag = null;
       d.x = x;
       d.y = y;
+      if (this.rallying) {
+        this.rallying = false;
+        if (ZS.Army) ZS.Army.command(this, x, y);
+        return;
+      }
       if (d.line && Math.hypot(x - d.x0, y - d.y0) > 40) this._placeLine(this.armed, d);
       else this._placeAt(x, y);
     }
@@ -3801,6 +3946,12 @@
         this._placeAt(x, y);
         return;
       }
+      // the army takes its orders from a click on the ground
+      if (this.rallying) {
+        this.rallying = false;
+        if (ZS.Army) ZS.Army.command(this, x, y);
+        return;
+      }
       let best = null,
         bd = 30 * 30;
       for (const a of this.villagers()) {
@@ -3810,8 +3961,19 @@
           best = a;
         }
       }
+      if (!best && this.agents) {
+        for (const a of this.agents) {
+          if (a.st !== 4 || a.dead) continue;
+          const d = dist2(x, y, a.x, a.y - 12);
+          if (d < bd) {
+            bd = d;
+            best = a;
+          }
+        }
+      }
       if (best) {
-        this.selectVillager(best);
+        if (best.st === 4) this.selectUnit(best);
+        else this.selectVillager(best);
         return;
       }
       const s = ZS.Structs.pick(this.world.buildings, x, y);
@@ -4009,7 +4171,8 @@
     /* ================= drawing ================= */
 
     draw(c, a, t) {
-      ZS.Figures.render(c, a, t);
+      if (a.st === 4) ZS.Units.render(c, a, t);
+      else ZS.Figures.render(c, a, t);
     }
 
     // the ground pass: the rock, the brambles and the wreckage
@@ -4091,6 +4254,8 @@
           ZS.wline(c, n.x - 12, n.y - 4, n.x + 6, n.y - 8, s + 8, 0.6);
         }
       }
+      // where the army has been told to stand
+      if (ZS.Army && this.army) ZS.Army.drawFlag(c, this, t);
       // the placement ghost: the site itself, drawn in the sketch hand, so
       // what sits under the cursor is what the builders will raise
       if (this.armed && this.hover) {
@@ -4354,6 +4519,8 @@
 
     drawFX(c, fx) {
       for (const f of fx) {
+        // the field's own noise claims its shapes first
+        if (ZS.Fx && ZS.Fx.draw(c, f)) continue;
         if (f.tracer) {
           c.strokeStyle = "rgba(196,150,70,0.85)";
           c.lineWidth = 1.4;

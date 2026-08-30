@@ -238,6 +238,51 @@
       key: "d",
       desc: "cheap, quick, drag-built · the dead chew through it",
     },
+    /* ---- the road from a refuge to a civilisation ---- */
+    barracks: {
+      name: "barracks",
+      w: 108,
+      h: 74,
+      hp: 360,
+      cost: { w: 70, s: 34, c: 10 },
+      time: 46,
+      lvlMax: 3,
+      key: "r",
+      desc: "+4 soldiers per level · where the line is trained",
+    },
+    stable: {
+      name: "stable",
+      w: 96,
+      h: 68,
+      hp: 280,
+      cost: { w: 58, s: 20, c: 6 },
+      time: 40,
+      lvlMax: 2,
+      key: "g",
+      desc: "+3 riders per level · horses, and the hay to feed them",
+    },
+    foundry: {
+      name: "foundry",
+      w: 116,
+      h: 84,
+      hp: 420,
+      cost: { w: 80, s: 70, c: 34 },
+      time: 62,
+      lvlMax: 2,
+      key: "p",
+      desc: "iron in quantity · +2 to the army, and arms from scrap",
+    },
+    airfield: {
+      name: "airfield",
+      w: 156,
+      h: 92,
+      hp: 320,
+      cost: { w: 90, s: 60, c: 44 },
+      time: 70,
+      lvlMax: 2,
+      key: "z",
+      desc: "a strip of mown grass · +2 to the army, and wings",
+    },
   };
   // the build menu's order (the hall is never built, only repaired)
   const ORDER = [
@@ -251,6 +296,10 @@
     "granary",
     "store",
     "smith",
+    "barracks",
+    "stable",
+    "foundry",
+    "airfield",
     "tower",
     "post",
     "kennel",
@@ -1689,6 +1738,589 @@
     }
   }
 
+  /* ---- the road out of the refuge ---- */
+
+  // the barracks: a long low house with a wide door, a rack of spears
+  // against the wall, a dummy in the yard to hit, and a flag on a pole.
+  // Level 2 puts a dormer in the roof; level 3 walls the yard.
+  function drawBarracks(c, s, t, env) {
+    const x = s.x,
+      y = s.y,
+      w = s.w,
+      h = s.h,
+      yb = y + h;
+    floor(c, s, "rgba(158,142,112,0.2)");
+    // the house: side walls, back wall, a shallow gable
+    seg(c, x, yb, x, y, s.seed + 1, 2.2);
+    seg(c, x + w, yb, x + w, y, s.seed + 2, 2.2);
+    seg(c, x, y + 6, x + w, y + 6, s.seed + 3, 1.8);
+    gable(c, s, 0, "rgba(146,118,66,0.3)");
+    // the wide double door, because it is a hall you march out of
+    const dw = 34;
+    ZS.wpoly(
+      c,
+      [
+        { x: x + w / 2 - dw / 2, y: yb - 1 },
+        { x: x + w / 2 - dw / 2, y: yb - 34 },
+        { x: x + w / 2 + dw / 2, y: yb - 34 },
+        { x: x + w / 2 + dw / 2, y: yb - 1 },
+      ],
+      s.seed + 11,
+      0.9,
+      true,
+    );
+    c.fillStyle = "rgba(96,70,44,0.42)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.6;
+    c.stroke();
+    seg(c, x + w / 2, yb - 34, x + w / 2, yb - 1, s.seed + 12, 1, INK2);
+    windowLit(c, x + 16, y + 24, s.seed + 13, env.night);
+    windowLit(c, x + w - 16, y + 24, s.seed + 14, env.night);
+    // a dormer once it is a proper house of arms
+    if (s.lvl >= 2) {
+      ZS.wpoly(
+        c,
+        [
+          { x: x + w * 0.3, y: y + 4 },
+          { x: x + w * 0.34, y: y - 14 },
+          { x: x + w * 0.62, y: y - 14 },
+          { x: x + w * 0.66, y: y + 4 },
+        ],
+        s.seed + 20,
+        0.7,
+        true,
+      );
+      c.fillStyle = THATCH;
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 1.5;
+      c.stroke();
+      windowLit(c, x + w * 0.48, y - 6, s.seed + 21, env.night);
+    }
+    // the spear rack, leaning
+    for (let i = 0; i < 4; i++) {
+      const px = x + 6 + i * 6;
+      seg(c, px, yb - 2, px + 5, yb - 40, s.seed + 30 + i, 1.2, "rgba(120,92,54,0.92)");
+      c.strokeStyle = "rgba(112,116,124,0.9)";
+      c.lineWidth = 1.1;
+      ZS.wcirc(c, px + 5, yb - 41, 2, s.seed + 40 + i, 0.4);
+    }
+    // the dummy in the yard: a post with two arms, and the marks on it
+    const dx = x + w - 22,
+      dy = yb + 2;
+    seg(c, dx, dy, dx, dy - 30, s.seed + 50, 1.8, "rgba(120,92,54,0.95)");
+    seg(c, dx - 12, dy - 22, dx + 12, dy - 24, s.seed + 51, 1.6, "rgba(120,92,54,0.95)");
+    ZS.wcirc(c, dx, dy - 32, 5, s.seed + 52, 0.9);
+    c.strokeStyle = INK2;
+    c.lineWidth = 0.9;
+    for (let i = 0; i < 3; i++)
+      ZS.wline(c, dx - 6, dy - 26 - i * 4, dx + 6, dy - 27 - i * 4, s.seed + 60 + i, 0.5);
+    // the yard wall, once there is an army worth keeping in
+    if (s.lvl >= 3) {
+      c.strokeStyle = STONEF;
+      c.lineWidth = 1.8;
+      ZS.wpoly(
+        c,
+        [
+          { x: x - 10, y: yb + 18 },
+          { x: x + w + 10, y: yb + 18 },
+          { x: x + w + 10, y: yb + 12 },
+          { x: x - 10, y: yb + 12 },
+        ],
+        s.seed + 70,
+        0.8,
+        true,
+      );
+      c.fillStyle = "rgba(142,138,128,0.3)";
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 1.4;
+      c.stroke();
+    }
+    // the flag: it is the only thing here that moves
+    const fx = x + 8,
+      fy = yb;
+    seg(c, fx, fy, fx, fy - 46, s.seed + 80, 1.5, INK);
+    const fl = Math.sin(t * 2.1 + s.seed) * 2.6;
+    ZS.wpoly(
+      c,
+      [
+        { x: fx, y: fy - 46 },
+        { x: fx + 22, y: fy - 41 + fl },
+        { x: fx, y: fy - 32 },
+      ],
+      s.seed + 81,
+      0.6,
+      true,
+    );
+    c.fillStyle = "rgba(90,122,58,0.34)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.3;
+    c.stroke();
+  }
+
+  // the stable: a timber house with a big door, a paddock rail, a haystack
+  // under a lean-to, and a horse's head over the half-door.
+  function drawStable(c, s, _t, env) {
+    const x = s.x,
+      y = s.y,
+      w = s.w,
+      h = s.h,
+      yb = y + h;
+    floor(c, s, "rgba(176,150,106,0.18)");
+    seg(c, x, yb, x, y, s.seed + 1, 2.2);
+    seg(c, x + w, yb, x + w, y, s.seed + 2, 2.2);
+    seg(c, x, y + 5, x + w, y + 5, s.seed + 3, 1.8);
+    gable(c, s, 3, "rgba(158,124,64,0.28)");
+    // the big door, split across
+    const dw = 40;
+    ZS.wpoly(
+      c,
+      [
+        { x: x + w / 2 - dw / 2, y: yb - 1 },
+        { x: x + w / 2 - dw / 2, y: yb - 40 },
+        { x: x + w / 2 + dw / 2, y: yb - 40 },
+        { x: x + w / 2 + dw / 2, y: yb - 1 },
+      ],
+      s.seed + 11,
+      0.9,
+      true,
+    );
+    c.fillStyle = "rgba(104,76,46,0.4)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.6;
+    c.stroke();
+    seg(c, x + w / 2 - dw / 2, yb - 22, x + w / 2 + dw / 2, yb - 22, s.seed + 12, 1.3, INK2);
+    for (let i = 1; i < 3; i++)
+      seg(
+        c,
+        x + w / 2 - dw / 2 + (i * dw) / 3,
+        yb - 1,
+        x + w / 2 - dw / 2 + (i * dw) / 3,
+        yb - 40,
+        s.seed + 13 + i,
+        0.9,
+        INK2,
+      );
+    windowLit(c, x + 14, y + 22, s.seed + 20, env.night);
+    // a horse's head over the half door, because somebody loves them
+    const hx = x + w / 2,
+      hy = yb - 24;
+    c.strokeStyle = "rgba(88,64,42,0.92)";
+    c.lineWidth = 1.5;
+    ZS.wpoly(
+      c,
+      [
+        { x: hx - 5, y: hy },
+        { x: hx - 3, y: hy - 12 },
+        { x: hx + 3, y: hy - 14 },
+        { x: hx + 5, y: hy - 8 },
+        { x: hx + 3, y: hy },
+      ],
+      s.seed + 25,
+      0.5,
+      true,
+    );
+    c.fillStyle = "rgba(120,92,58,0.3)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.2;
+    c.stroke();
+    ZS.wline(c, hx - 3, hy - 12, hx - 4, hy - 16, s.seed + 26, 0.3);
+    ZS.wline(c, hx + 2, hy - 13, hx + 4, hy - 16, s.seed + 27, 0.3);
+    // the paddock rail along the front
+    for (let k = 0; k < 2; k++) {
+      const yy = yb + 10 + k * 8;
+      seg(c, x - 6, yy, x + w + 6, yy, s.seed + 30 + k, 1.3, "rgba(120,92,54,0.9)");
+    }
+    for (let i = 0; i <= 4; i++)
+      seg(
+        c,
+        x - 4 + (i * (w + 8)) / 4,
+        yb + 4,
+        x - 4 + (i * (w + 8)) / 4,
+        yb + 20,
+        s.seed + 40 + i,
+        1.4,
+        "rgba(120,92,54,0.9)",
+      );
+    // the haystack under a lean-to, and a fork in it
+    const sx = x + w - 16;
+    ZS.wpoly(
+      c,
+      [
+        { x: sx - 14, y: yb + 2 },
+        { x: sx - 8, y: yb - 18 },
+        { x: sx + 8, y: yb - 18 },
+        { x: sx + 14, y: yb + 2 },
+      ],
+      s.seed + 50,
+      0.9,
+      true,
+    );
+    c.fillStyle = "rgba(196,176,104,0.42)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.4;
+    c.stroke();
+    c.strokeStyle = INK2;
+    c.lineWidth = 0.9;
+    for (let i = 0; i < 4; i++)
+      ZS.wline(c, sx - 11 + i * 7, yb + 1, sx - 12 + i * 7, yb - 15, s.seed + 60 + i, 0.5);
+    seg(c, sx + 4, yb - 14, sx + 12, yb - 30, s.seed + 65, 1.2, INK2);
+    // a trough, and the water in it
+    seg(c, x + 8, yb + 4, x + 34, yb + 4, s.seed + 70, 1.5, INK2);
+    seg(c, x + 10, yb + 10, x + 32, yb + 10, s.seed + 71, 1.3, INK2);
+    c.strokeStyle = "rgba(96,132,150,0.5)";
+    c.lineWidth = 1;
+    ZS.wline(c, x + 12, yb + 7, x + 30, yb + 7, s.seed + 72, 0.4);
+  }
+
+  // the foundry: a long iron shed with a chimney taller than the smith's,
+  // a hoist wheel over the door, ingots stacked outside, and the pour
+  // glowing through the doorway whenever somebody is working.
+  function drawFoundry(c, s, t, env) {
+    const x = s.x,
+      y = s.y,
+      w = s.w,
+      h = s.h,
+      yb = y + h;
+    floor(c, s, "rgba(120,114,104,0.24)");
+    // the shed: stone to waist height, timber above, a shallow roof
+    ZS.wpoly(
+      c,
+      [
+        { x: x, y: yb },
+        { x: x, y: y + 14 },
+        { x: x + w, y: y + 14 },
+        { x: x + w, y: yb },
+      ],
+      s.seed + 1,
+      1.2,
+      true,
+    );
+    c.fillStyle = "rgba(138,134,124,0.34)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 2;
+    c.stroke();
+    // courses of stone
+    for (let i = 1; i < 4; i++) {
+      const yy = yb - (i * (h - 14)) / 4;
+      seg(c, x, yy, x + w, yy, s.seed + 10 + i, 0.9, INK2);
+    }
+    // the roof: shallow, wide eaves
+    ZS.wpoly(
+      c,
+      [
+        { x: x - 8, y: y + 15 },
+        { x: x + w / 2, y: y - 12 },
+        { x: x + w + 8, y: y + 15 },
+        { x: x + w + 4, y: y + 20 },
+        { x: x - 4, y: y + 20 },
+      ],
+      s.seed + 20,
+      1.2,
+      true,
+    );
+    c.fillStyle = "rgba(112,108,98,0.4)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.8;
+    c.stroke();
+    for (let i = 1; i <= 3; i++) {
+      const f = i / 4;
+      const yy = y - 12 + (27 + 12) * f - 12 * f;
+      seg(
+        c,
+        x - 8 + (w + 16) * f * 0.3,
+        yy,
+        x + w + 8 - (w + 16) * f * 0.3,
+        yy,
+        s.seed + 30 + i,
+        0.8,
+        INK2,
+      );
+    }
+    // the chimney: brick, banded, taller than anything else in the village
+    const cx = x + w - 26;
+    ZS.wpoly(
+      c,
+      [
+        { x: cx - 9, y: y + 2 },
+        { x: cx - 10, y: y - 62 },
+        { x: cx + 10, y: y - 63 },
+        { x: cx + 9, y: y + 2 },
+      ],
+      s.seed + 40,
+      1,
+      true,
+    );
+    c.fillStyle = "rgba(148,104,88,0.38)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.6;
+    c.stroke();
+    for (let i = 1; i < 6; i++)
+      seg(c, cx - 9, y - i * 10, cx + 9, y - i * 10 - 1, s.seed + 50 + i, 0.8, INK2);
+    smoke(c, cx, y - 64, t, s.seed + 56, 5);
+    // the doorway: dark, and glowing while the iron is up
+    const dw = 40,
+      dx = x + 26;
+    ZS.wpoly(
+      c,
+      [
+        { x: dx - dw / 2, y: yb - 1 },
+        { x: dx - dw / 2, y: yb - 44 },
+        { x: dx + dw / 2, y: yb - 44 },
+        { x: dx + dw / 2, y: yb - 1 },
+      ],
+      s.seed + 60,
+      0.8,
+      true,
+    );
+    c.fillStyle =
+      s.workT > 0
+        ? "rgba(196,116,52," + (0.35 + 0.2 * Math.sin(t * 7)).toFixed(2) + ")"
+        : "rgba(58,52,44,0.62)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.6;
+    c.stroke();
+    // the hoist wheel over the door, turning while they work
+    const hx = x + w / 2,
+      hy = y - 4;
+    c.strokeStyle = "rgba(96,92,84,0.95)";
+    c.lineWidth = 1.4;
+    const ang = s.workT > 0 ? t * 1.4 : s.seed;
+    ZS.wcirc(c, hx, hy, 15, s.seed + 70, 0.7);
+    for (let i = 0; i < 6; i++) {
+      const a = ang + (i * 6.283) / 6;
+      seg(c, hx, hy, hx + Math.cos(a) * 15, hy + Math.sin(a) * 15, s.seed + 80 + i, 1, INK2);
+    }
+    // the ingots, stacked in twos
+    for (let i = 0; i < 3; i++) {
+      const px = x + w - 18 - i * 13;
+      for (let k = 0; k < 2; k++) {
+        ZS.wpoly(
+          c,
+          [
+            { x: px - 7, y: yb + 2 - k * 7 },
+            { x: px + 7, y: yb + 2 - k * 7 },
+            { x: px + 5, y: yb - 5 - k * 7 },
+            { x: px - 5, y: yb - 5 - k * 7 },
+          ],
+          s.seed + 90 + i * 3 + k,
+          0.5,
+          true,
+        );
+        c.fillStyle = "rgba(118,118,124,0.45)";
+        c.fill();
+        c.strokeStyle = INK;
+        c.lineWidth = 1.1;
+        c.stroke();
+      }
+    }
+    // a wheelbarrow of scrap by the door
+    ZS.wcirc(c, x + 8, yb + 6, 5, s.seed + 110, 0.5);
+    c.strokeStyle = INK;
+    c.lineWidth = 1.2;
+    c.stroke();
+    seg(c, x + 8, yb + 6, x + 20, yb + 1, s.seed + 111, 1.3, INK2);
+    if (env.night > 0.2) windowLit(c, x + w - 14, y + 40, s.seed + 112, 1);
+  }
+
+  // the airfield: a strip of mown grass with the wind bleached out of it,
+  // a windsock on a pole, an arched hangar, a fuel drum, and — once it is
+  // level 2 — a machine sitting on the grass with its propeller still.
+  function drawAirfield(c, s, t, env) {
+    const x = s.x,
+      y = s.y,
+      w = s.w,
+      h = s.h,
+      yb = y + h;
+    // the strip: a pale parallelogram, mown in lines
+    ZS.wpoly(
+      c,
+      [
+        { x: x + 6, y: yb - 6 },
+        { x: x + w - 6, y: yb - 10 },
+        { x: x + w - 10, y: y + 22 },
+        { x: x + 10, y: y + 26 },
+      ],
+      s.seed + 1,
+      1.1,
+      true,
+    );
+    c.fillStyle = "rgba(196,196,150,0.34)";
+    c.fill();
+    c.strokeStyle = "rgba(96,112,58,0.7)";
+    c.lineWidth = 1.3;
+    c.stroke();
+    c.strokeStyle = "rgba(150,164,104,0.55)";
+    c.lineWidth = 1;
+    for (let i = 1; i < 5; i++) {
+      const f = i / 5;
+      ZS.wline(
+        c,
+        x + 8 + (w - 16) * f * 0.2,
+        yb - 8 - (h - 34) * f,
+        x + 8 + (w - 16) * (0.8 + f * 0.2),
+        yb - 8 - (h - 34) * f,
+        s.seed + 10 + i,
+        0.6,
+      );
+    }
+    // the centre line: dashed, the way a strip is marked
+    c.strokeStyle = "rgba(240,238,226,0.75)";
+    c.lineWidth = 2.2;
+    for (let i = 0; i < 5; i++) {
+      const f = i / 5;
+      ZS.wline(
+        c,
+        x + w / 2 - 2 - f * 4,
+        yb - 12 - (h - 40) * f,
+        x + w / 2 - 2 - f * 4,
+        yb - 20 - (h - 40) * f,
+        s.seed + 20 + i,
+        0.25,
+      );
+    }
+    // the hangar: an arched roof on a low wall
+    const hx = x + w - 46,
+      hy = y + 30,
+      hw = 62;
+    ZS.wpoly(
+      c,
+      [
+        { x: hx, y: yb - 16 },
+        { x: hx, y: hy + 10 },
+        { x: hx + hw, y: hy + 10 },
+        { x: hx + hw, y: yb - 16 },
+      ],
+      s.seed + 30,
+      0.9,
+      true,
+    );
+    c.fillStyle = "rgba(150,146,136,0.32)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.7;
+    c.stroke();
+    // the arch
+    c.strokeStyle = INK;
+    c.lineWidth = 1.8;
+    ZS.wpoly(
+      c,
+      [
+        { x: hx - 3, y: hy + 11 },
+        { x: hx + hw / 2, y: hy - 14 },
+        { x: hx + hw + 3, y: hy + 11 },
+      ],
+      s.seed + 31,
+      1,
+      true,
+    );
+    c.fillStyle = "rgba(126,130,118,0.34)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.6;
+    c.stroke();
+    // the doors, slid back
+    for (let i = 0; i < 2; i++) {
+      const px = hx + 12 + i * 30;
+      seg(c, px, yb - 16, px, hy + 12, s.seed + 40 + i, 1.4, INK2);
+    }
+    seg(c, hx + 12, hy + 16, hx + 42, hy + 16, s.seed + 42, 1.2, INK2);
+    // the windsock: it tells you which way the strip works
+    const wx = x + 18,
+      wy = yb - 12;
+    seg(c, wx, wy, wx + 1, wy - 40, s.seed + 50, 1.5, INK);
+    const swing = Math.sin(t * 1.7 + s.seed) * 0.35;
+    for (let i = 0; i < 4; i++) {
+      const r = 5 - i * 0.9;
+      ZS.wcirc(
+        c,
+        wx + 1 + Math.sin(swing) * (6 + i * 5),
+        wy - 40 - Math.cos(swing) * (1 + i) + i * 2,
+        r,
+        s.seed + 60 + i,
+        0.5,
+      );
+      c.fillStyle = i % 2 ? "rgba(198,168,88,0.55)" : "rgba(170,64,48,0.5)";
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 1;
+      c.stroke();
+    }
+    // a fuel drum and a crate
+    ZS.wcirc(c, x + 26, yb - 4, 6, s.seed + 70, 0.4);
+    c.fillStyle = "rgba(150,110,60,0.4)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.3;
+    c.stroke();
+    // the machine, once the field is properly open
+    if (s.lvl >= 2) {
+      const px = x + w * 0.42,
+        py = yb - 26;
+      c.save();
+      c.translate(px, py);
+      c.rotate(-0.32);
+      c.strokeStyle = "rgba(96,102,88,0.95)";
+      c.lineWidth = 1.6;
+      // the fuselage, from above: a long tapered lozenge
+      ZS.wpoly(
+        c,
+        [
+          { x: -26, y: 0 },
+          { x: -8, y: -5 },
+          { x: 14, y: -4 },
+          { x: 22, y: 0 },
+          { x: 12, y: 5 },
+          { x: -8, y: 5 },
+        ],
+        s.seed + 80,
+        0.5,
+        true,
+      );
+      c.fillStyle = "rgba(112,118,100,0.28)";
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 1.4;
+      c.stroke();
+      // the wings, and the tailplane
+      seg(c, -4, -2, -6, -20, s.seed + 81, 1.4, "rgba(104,110,94,0.95)");
+      seg(c, -4, 2, -6, 20, s.seed + 82, 1.4, "rgba(104,110,94,0.95)");
+      seg(c, -24, 0, -20, -9, s.seed + 83, 1.2, "rgba(104,110,94,0.9)");
+      seg(c, -24, 0, -20, 9, s.seed + 84, 1.2, "rgba(104,110,94,0.9)");
+      // the roundels
+      c.strokeStyle = "rgba(90,122,58,0.9)";
+      c.lineWidth = 1.3;
+      ZS.wcirc(c, -5, -12, 3, s.seed + 85, 0.3);
+      ZS.wcirc(c, -5, 12, 3, s.seed + 86, 0.3);
+      // the propeller, still
+      c.strokeStyle = "rgba(70,66,58,0.6)";
+      c.lineWidth = 1.2;
+      seg(c, 22, 0, 28, -2, s.seed + 87, 1.2, "rgba(70,66,58,0.7)");
+      ZS.wcirc(c, 24, 0, 1.6, s.seed + 88, 0.2);
+      c.restore();
+    }
+    if (env.night > 0.2) {
+      // two lamps on the strip, so it can be found after dark
+      for (let i = 0; i < 2; i++) {
+        const px = x + 12 + i * (w - 24);
+        c.fillStyle = "rgba(236,200,110," + (0.5 * env.night).toFixed(2) + ")";
+        c.beginPath();
+        c.arc(px, yb - 14, 2.2, 0, 7);
+        c.fill();
+      }
+    }
+  }
+
   const ART = {
     hall: drawHall,
     hut: drawHut,
@@ -1709,6 +2341,10 @@
     kennel: drawKennel,
     shrine: drawShrine,
     barricade: drawBarricade,
+    barracks: drawBarracks,
+    stable: drawStable,
+    foundry: drawFoundry,
+    airfield: drawAirfield,
   };
 
   /* ---------- the module ---------- */
