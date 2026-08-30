@@ -65,6 +65,10 @@
 
   // debug/verification handle (also a hook for future player/vehicle work)
   ZS.debug = { cam, world, nav, buildings: ZS.Buildings, scenario };
+  // the overlay binds itself to the scenario here, so the loop can never
+  // reach it before it has one (the page binds it again afterwards, which
+  // is harmless — init is idempotent)
+  if (ZS.VillageUI) ZS.VillageUI.init(scenario);
   // Recording-only controls. They exist only behind ?record=1 and let the
   // capture harness advance the simulation without waiting in real time.
   // Normal play keeps the exact same clock and surface.

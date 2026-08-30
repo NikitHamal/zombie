@@ -130,6 +130,33 @@ frames(2);
 check(els.panel.innerHTML !== lastHtml, "changing a job does repaint the roster");
 check(els.sel.innerHTML !== card, "and the card");
 
+/* ---- the overlay is part of the game, not a caller beside it ---- */
+// A frame can land before the page has bound the overlay to the scenario
+// (main.js starts the loop the moment the scenario exists). It must not
+// throw — it must bind itself.
+const UI = ZS.VillageUI;
+const keptScen = UI.scen;
+UI.scen = null;
+let boundThrew = null;
+try {
+  UI.tick(0.016);
+  UI.refresh(true);
+  UI.paintAlerts();
+} catch (e) {
+  boundThrew = e;
+}
+check(
+  !boundThrew,
+  "a frame that lands before the binding does not throw",
+  boundThrew ? boundThrew.message : "bound itself",
+);
+check(UI.scen === keptScen, "and binds itself to the live scenario", !!UI.scen);
+check(
+  ZS.scenario && !!UI.el.clock,
+  "the binding is the same one the page would make",
+  "clock " + (UI.el.clock ? "bound" : "missing"),
+);
+
 /* ---- a long run with the panels open ---- */
 let err = null;
 try {

@@ -32,7 +32,10 @@
     toastT: 0,
 
     init(scen) {
-      this.scen = scen;
+      // idempotent, and safe to call with nothing: main.js binds it as
+      // soon as the scenario exists, and the page binds it again after.
+      if (scen && this.scen === scen && this.el && this.el.clock) return this;
+      this.scen = scen || this.scen;
       const q = (id) => document.getElementById(id);
       this.el = {
         clock: q("clock"),
@@ -88,10 +91,19 @@
       return this;
     },
 
+    // The scenario calls the overlay every frame. If a frame ever lands
+    // before the page has bound them together, bind them right there —
+    // the overlay is part of the game, not a caller on the outside.
+    bound() {
+      if (!this.scen && ZS.scenario) this.init(ZS.scenario);
+      return this.scen && this.el && this.el.clock ? this.scen : null;
+    },
+
     /* ---------- input ---------- */
 
     key(e) {
-      const s = this.scen;
+      const s = this.bound();
+      if (!s) return;
       if (!s || s.over) {
         if (s && s.over && (e.key === "Escape" || e.key === " " || e.key === "Enter"))
           s.dismissCard();
@@ -187,7 +199,8 @@
     },
 
     act(what, arg, who) {
-      const s = this.scen;
+      const s = this.bound();
+      if (!s) return;
       switch (what) {
         case "build":
           s.armBuild(arg);
@@ -340,7 +353,7 @@
     // *their* numbers move. Repainting a button under the cursor throws away
     // its hover and eats the click, so each region guards its own.
     refresh(force) {
-      const s = this.scen;
+      const s = this.bound();
       if (!s) return;
       if (force) this.sig = {};
       const sig = (this.sig = this.sig || {});
@@ -863,8 +876,9 @@
     // the left, the roads running out of it, and the fog — a scribbled
     // cloud — over every place nobody has walked to yet.
     paintValleyMap() {
-      const s = this.scen;
+      const s = this.bound();
       const cv = document.getElementById("valleymap");
+      if (!s) return;
       if (!cv || !cv.getContext || !s.ow || !ZS.Overworld) return;
       const c = cv.getContext("2d");
       const W = cv.width || 252,
@@ -1076,8 +1090,9 @@
 
     // the things going wrong, where you cannot miss them
     paintAlerts() {
-      const s = this.scen;
+      const s = this.bound();
       const e = this.el.alerts;
+      if (!s || !e) return;
       if (!e) return;
       const list = ZS.Hazards && s.haz ? ZS.Hazards.alerts(s) : [];
       // the door is the whole defence, so it says so
@@ -1107,8 +1122,10 @@
     },
 
     tick(dt) {
+      const s = this.bound();
+      if (!s) return;
       this.paintAlerts();
-      if (this.scen.mode === "world") {
+      if (s.mode === "world") {
         this.mapT = (this.mapT || 0) - dt;
         if (this.mapT <= 0) {
           this.mapT = 0.25;
@@ -1117,12 +1134,11 @@
       }
       if (this.toastT > 0) {
         this.toastT -= dt;
-        if (this.toastT <= 0) this.el.toast.classList.remove("on");
+        if (this.toastT <= 0 && this.el.toast) this.el.toast.classList.remove("on");
       }
       // "what they are doing" changes every few seconds; it lives in one
       // text node we retype in place, so the buttons around it never move
-      const s = this.scen;
-      const a = s && s.sel && s.sel.k === "v" ? s.sel.o : null;
+      const a = s.sel && s.sel.k === "v" ? s.sel.o : null;
       const line = a
         ? (a.task || "standing about") +
           (a.carry && a.carry.n ? " · carrying " + a.carry.n + " " + a.carry.kind : "")
