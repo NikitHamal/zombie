@@ -1335,6 +1335,7 @@
         this.spawnCritters("crow", 2, this.center.x - 150, this.center.y - 120);
         this.spawnCritters("sheep", 2, this.center.x + 220, this.center.y + 40);
       }
+      if (!s) this._opening();
       // grass, pebbles, ruts: painted once into the persistent stain layer
       if (ZS.Art && this.stains && !this._deco) {
         this._deco = 1;
@@ -1346,6 +1347,14 @@
           this.center.y,
           this.world.seed,
         );
+      }
+    }
+
+    // the first morning: what you have to do, said once
+    _opening() {
+      if (this.hall && this.hall.ruined) {
+        if (ZS.VillageUI) ZS.VillageUI.toast("the hall is a ruin — mend the roof before dark");
+        if (ZS.Chronicle) ZS.Chronicle.add(this, "we came back to the hollow", "life");
       }
     }
 

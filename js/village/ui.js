@@ -80,6 +80,11 @@
       press(this.el.panel);
       press(this.el.sel);
       if (this.el.alerts) press(this.el.alerts);
+      if (this.pendingToast) {
+        const m = this.pendingToast;
+        this.pendingToast = null;
+        this.toast(m);
+      }
       return this;
     },
 
@@ -318,6 +323,11 @@
     },
 
     toast(msg) {
+      // the scenario can speak before the overlay has introduced itself
+      if (!this.el.toast) {
+        this.pendingToast = msg;
+        return;
+      }
       this.el.toast.textContent = msg;
       this.el.toast.classList.add("on");
       this.toastT = 3.2;
@@ -1070,6 +1080,14 @@
       const e = this.el.alerts;
       if (!e) return;
       const list = ZS.Hazards && s.haz ? ZS.Hazards.alerts(s) : [];
+      // the door is the whole defence, so it says so
+      if (s.hall && s.hall.ruined)
+        list.unshift(["door", "the hall is a ruin — there is no door to hold"]);
+      else if (s.hall && s.hall.hp < s.hall.maxHp * 0.45)
+        list.unshift([
+          "door",
+          "the hall is failing — " + Math.round((s.hall.hp / s.hall.maxHp) * 100) + "%",
+        ]);
       const sig = list.map((a) => a[0] + a[1]).join("|");
       if (sig === this.sig.alerts) return;
       this.sig.alerts = sig;
