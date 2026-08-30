@@ -19,7 +19,11 @@ console.log("The Hollow — the newer systems\n");
 frames(20);
 
 /* ---------------- the valley ---------------- */
-check(!!G.ow && G.ow.sites.length === 10, "the valley is there", G.ow ? G.ow.sites.length + " places" : "missing");
+check(
+  !!G.ow && G.ow.sites.length === 10,
+  "the valley is there",
+  G.ow ? G.ow.sites.length + " places" : "missing",
+);
 check(G.ow.sites.filter((s) => s.seen).length === 2, "two of them are known at the start");
 check(G.ow.sites.filter((s) => !s.seen).length === 8, "the rest are rumour and dark");
 check(
@@ -33,8 +37,16 @@ const def = ZS.Overworld.def(near.id);
 G.res.food = 200;
 const before = G.villagers().length;
 const sent = ZS.Overworld.send(G.ow, G, near.id, false);
-check(sent.ok, "a party sets out", sent.ok ? sent.p.members.map((a) => a.name).join(" and ") : sent.err);
-check(G.villagers().length === before - 2, "and they leave the village", G.villagers().length + " at home");
+check(
+  sent.ok,
+  "a party sets out",
+  sent.ok ? sent.p.members.map((a) => a.name).join(" and ") : sent.err,
+);
+check(
+  G.villagers().length === before - 2,
+  "and they leave the village",
+  G.villagers().length + " at home",
+);
 check(G.away.length === 2, "they are accounted for while they are gone");
 const food0 = G.res.food;
 let guard = 0;
@@ -44,9 +56,17 @@ while (G.ow.parties.length && guard++ < 12000) {
   if (G.card) G.dismissCard();
 }
 check(G.ow.parties.length === 0, "the party comes home", guard + " frames");
-check(G.villagers().length === before, "and the village is whole again", G.villagers().length + " villagers");
+check(
+  G.villagers().length === before,
+  "and the village is whole again",
+  G.villagers().length + " villagers",
+);
 check(G.away.length === 0, "nobody is stranded out there");
-check(G.res.food !== food0, "they brought something back", Math.round(G.res.food - food0) + " food");
+check(
+  G.res.food !== food0,
+  "they brought something back",
+  Math.round(G.res.food - food0) + " food",
+);
 check(G.chron.length > 0, "the record was written", G.chron[0].txt);
 
 // a scout reveals what is out there
@@ -62,8 +82,7 @@ if (dark) {
     if (G.card) G.dismissCard();
   }
   check(
-    dark.seen >= 2 ||
-      G.chron.some((e) => e.kind === "death" && e.txt.indexOf("lost") >= 0),
+    dark.seen >= 2 || G.chron.some((e) => e.kind === "death" && e.txt.indexOf("lost") >= 0),
     "and comes back knowing the place — or does not come back at all",
     dark.id +
       " seen=" +
@@ -101,7 +120,7 @@ check(!target.burning, "the building is not burning any more");
 check(
   (G.souls || 0) - souls0 <= 1,
   "and it costs at most one of them",
-  ((G.souls || 0) - souls0) + " lost",
+  (G.souls || 0) - souls0 + " lost",
 );
 
 /* ---------------- fever, and the feast ---------------- */
@@ -186,7 +205,11 @@ frames(2);
 const spots = G._lineSpots("barricade", G.drag);
 check(spots.length > 2, "the line is drawn out as a row of ghosts", spots.length + " pieces");
 G.pointerUp(p1.x, p1.y);
-check(G.world.buildings.length > nBefore, "and set down", G.world.buildings.length - nBefore + " barricades");
+check(
+  G.world.buildings.length > nBefore,
+  "and set down",
+  G.world.buildings.length - nBefore + " barricades",
+);
 const bars = G.world.buildings.filter((b) => b.kind === "barricade");
 check(
   bars.every((b) => isFinite(b.x) && isFinite(b.y)),
@@ -203,9 +226,16 @@ check(ZS.Chronicle.peek(1).chron.length > 0, "and the ledger goes with it");
 
 const data = G.serialize();
 const round = JSON.parse(JSON.stringify(data));
-check(round.v === 2 && round.bs.length === G.world.buildings.length, "the world serializes", round.bs.length + " structures");
+check(
+  round.v === 2 && round.bs.length === G.world.buildings.length,
+  "the world serializes",
+  round.bs.length + " structures",
+);
 check(round.props.length === G.props.length, "and the furniture", round.props.length + " props");
-check(round.pop.every((p) => p.k), "and every person's history");
+check(
+  round.pop.every((p) => p.k),
+  "and every person's history",
+);
 
 /* ---------------- the panels ---------------- */
 key("m");
@@ -245,12 +275,18 @@ try {
 } catch (e) {
   err = e;
 }
-check(!err, "it runs to day 12 with all of it switched on", err ? err.message : "day " + G.day + (G.over ? " · " + G.over.title : ""));
+check(
+  !err,
+  "it runs to day 12 with all of it switched on",
+  err ? err.message : "day " + G.day + (G.over ? " · " + G.over.title : ""),
+);
 check(
   G.villagers().every((a) => isFinite(a.x) && isFinite(a.y)),
   "nobody is lost in the numbers",
 );
 check(store.get("zs.hollow.auto") !== undefined, "and it keeps saving itself");
 
-console.log(fails.length ? "\n" + fails.length + " FAILED: " + fails.join(", ") : "\nall checks passed");
+console.log(
+  fails.length ? "\n" + fails.length + " FAILED: " + fails.join(", ") : "\nall checks passed",
+);
 process.exit(fails.length ? 1 : 0);

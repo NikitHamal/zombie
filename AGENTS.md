@@ -269,6 +269,98 @@ New buildings: **barracks** `r` (+4 beds a level), **stable** `g` (+3),
 **foundry** `p` (+2), **airfield** `z` (+2). New studies: `gunpowder`
 (`rifles`), `mechanised`, `flight`.
 
+### The world beyond (js/village/nations.js)
+
+Seven nations, further out than the factions in the valley, and each one
+is a place with a temper: `def` holds `name · where · blurb · days` (how
+far the road is) · `ang` (where on the map it sits) · `age` · `field`
+(what it puts in the field) · `give` (what a caravan brings) · `want`
+(what it will trade for). **The Choir** (`foe: 1`) is the burnt valley
+walking: it never answers an envoy and it comes anyway, from day
+`CHOIR_AT` 18, `CHOIR_N(day)` at a time, every 8–11 days.
+
+| nation | days | temper | what it sends |
+| --- | --- | --- | --- |
+| the Grange | 2 | 0.65 | militia, spearmen · food |
+| Kell | 4 | 0.42 | spearmen, archers, knights · wood |
+| the Pale | 6 | 0.50 | mercenaries (hired, not sent) |
+| the Order | 8 | 0.38 | knights, lancers · stone |
+| the Salt Road | 3 | 0.55 | caravans · scrap, cloth |
+| the Rustworks | 5 | 0.47 | musketeers, cannon · scrap |
+| the Choir | 7 | 0.06 | everything, and word of nothing |
+
+`Nations.daily(scen)` is called from `_newDay`, after `Factions.daily`:
+opinions drift toward 0.5, you **hear of them in turn** (day `KNOW_AT` 5,
+two days apart, nearest first), rides on the road count down and arrive.
+Fond (≥ 0.6) nations send **caravans**; sour ones (< 0.32) send a
+**demand** for 40 food, which the player pays or refuses from the panel
+(`nat-pay` / `nat-refuse`); at < 0.16 they stop asking and send an army
+every 6–9 days. Two beaten invasions and they sue for peace. An ally
+(≥ 0.78) may ride in on a bad night (`Nations.help(scen)`, called from
+`_endNight`).
+
+**Their own dice.** `roll(st)` draws from `st._rng`, a stream seeded from
+the world seed (`ZS.rng32(seed ^ 0x71ab)`). Nothing the nations do may
+move the village's own random stream — otherwise the weather would change
+because somebody far away was difficult. Every subsystem that rolls dice
+of its own should do the same.
+
+**Their armies are the same soldiers.** `Nations.invade` →
+`Army.spawn(scen, id, true)`; `Army.kill` → `Nations.lost(scen, o)`, which
+counts that nation's `left` down to zero (`f.beaten++`, and peace at
+`SUE_FOR` 2). `Units.count/crew/upkeep` count `!a.foe` only — theirs must
+never eat our bread or sleep in our beds.
+
+The panel (`D`, `nationsPanel`) sketches the seven as a fan around the
+hollow, the road to each one dashed until it has been walked, riders as
+dots on the road, and — when it is war — how many days out the next lot
+are.
+
+### The valley is a place (js/village/chronicle.js, js/main.js)
+
+The seed used to be rolled fresh on every refresh, so a saved game came
+back to a different river. `ZS.Seed` keeps it in `localStorage`
+(`zs.hollow.seed`): `?seed=N` pins it (and is remembered), otherwise the
+kept seed is used, and a new one is only rolled when there is none.
+`serialize()` carries `seed`, and `Chronicle.loadSlot` re-pins it before
+reloading, so a slot brings its own valley back. *A new valley* in the
+record panel rolls a fresh one and clears the live save.
+
+### The steward (js/village/autopilot.js)
+
+`P`, or the *steward* button: an autopilot that plays the village and
+tells you what it did. He is not a second, hidden way of doing things —
+every decision goes through the same public calls the buttons use
+(`setJob`, `_placeAt`, `startResearch`, `recruit`, `Army.order`,
+`Nations.send`, `Overworld.send`).
+
+- **`Autopilot.dawn(scen)`** (from `_newDay`, after the systems) — the
+  whole village thought about once: the work, three sites marked out, two
+  buildings mended, the next study, an upgrade where it matters, beds
+  given, soldiers raised, tribute paid or refused, envoys, a party out, a
+  feast when the heart is going.
+- **`Autopilot.tick(scen, dt)`** (from `maintain`, every
+  `BAL.THINK` 3.2 s) — the small looks round: the work moves with the day,
+  the bell is rung when panic is abroad in the dark, a feast when morale
+  goes, and another site or study if the morning's plan has run dry.
+- **The work** (`plan(r)`) is a list of wanted jobs the length of the
+  village, filled in order: the watch first (a share of the village that
+  grows with the day and jumps to 0.55 when there is something in the
+  field, never more than `adults - 2`), then a healer, then the armourer,
+  then the larder, the plots, the piles, the sites, the mending, and
+  labourers for the rest. Assignment moves as few people as possible
+  (whoever is already doing it, then whoever suits it — `fit()` reads
+  `Kin.trait`), and **children never stand the watch, work the forge or
+  break rock**.
+- **A hand set by the player is their own until the next dawn.** `setJob(a,
+  job)` marks `a.hand = day`; the steward leaves those alone. The quiet
+  third argument (`setJob(a, job, quiet)`) is what he uses, so setting a
+  dozen jobs does not toast or repaint the panel twelve times.
+- **He explains himself**: `scen.pilot.last` and `scen.pilot.did` (the last
+  six), shown at the top of the record panel and written to the ledger.
+- `scen.pilot` is saved (`serialize().pilot`, `Autopilot.load`), so he is
+  still in charge after a reload.
+
 ### Other people (js/village/people.js)
 
 Two of them, and both of them keep an opinion (`0` blood enemies → `1`
@@ -380,6 +472,8 @@ props, the parties, the ledger. v1 saves (the old format) still load.
 | `B` | build menu (number keys / letter keys pick, `esc` cancels) |
 | `T` | the workshop |
 | `H` / `F` | centre on the hall / fit the map |
+| `A` | the field — train and order the army |
+| `D` | the world beyond — the nations |
 | `M` | the valley (parties, the map, the fog) |
 | `L` | the record (ledger, feast, save slots) |
 | `N` | ring the bell — everyone comes home; `shift+N` calls the dark down early |
@@ -426,33 +520,96 @@ building: `U` upgrade, `R` repair, `X` dismantle.
 ## Tooling & verification (how we work)
 
 - **Format/lint** (Oxc): `npm run format` / `npm run lint`. From non-TTY
-  automation, run the local bins directly — `npx` can hang without a TTY:
+  automation run the local bins — `npx` can hang without a TTY:
   `node node_modules/oxfmt/bin/oxfmt js/` and
-  `node node_modules/oxlint/bin/oxlint js/`. No config files; Oxc defaults
-  are the house style (it wraps long calls and adds trailing commas —
-  don't hand-fight it).
+  `node node_modules/oxlint/bin/oxlint js/`. No config files; the Oxc
+  defaults are the house style (it wraps long calls and adds trailing
+  commas — don't hand-fight it). Warnings are errors here: prefix an
+  unused parameter with `_`, or use it.
 - **`.verify/harness.js`** boots the real page headlessly: enough DOM,
-  canvas and storage for `index.html` to load, and a `frames(n)` stepper
+  canvas and storage for `index.html` to load, plus a `frames(n)` stepper
   that drives the rAF loop. **The file list is read out of `index.html`**,
   so it cannot drift from the page. It exports `ZS`, `G` (the scenario),
   `frames`, `key`, `press`, `els`, `store`.
-- **`.verify/` scripts** (run with `node .verify/<name>.js`):
-  - `ui-smoke.js` — the overlay: panels open, rows click, and nothing is
-    rebuilt under the cursor.
-  - `systems-smoke.js` — the newer systems, end to end: parties, fire,
-    fever, birth, grief, the barricade line, the slots, the quality tiers.
-  - `play.js [days]` — **a bot that plays the game**: takes each dawn,
-    sets the work, lays a palisade in a ring, studies, sends parties,
-    holds a feast, and reports whether the village is still there. This is
-    the balance harness. `ZS_DEBUG=1` prints every bite.
-- **Balance is measured, not guessed.** A wall ring, a workshop and a
-  healer carry a village past day 26 with fifteen souls; forget the wall
-  and it is gone by the second week. When you touch `BAL`, run
-  `node .verify/play.js 26` three or four times — the spread is the
-  signal, not any single run.
+- **The verifiers** (`node .verify/<name>.js`, exit 0 = all green):
+  `ui-smoke` (the overlay), `systems-smoke` (hazards, parties, birth,
+  slots), `people-smoke` (kin, factions, cure), `army-smoke` (ages, units,
+  the field), `nations-smoke` (the seven, their wagons and wars),
+  `seed-smoke` (the valley is a place), `pilot-smoke` (the steward), and
+  `play.js [days]` — **the balance harness**, a bot that plays the game and
+  reports whether the village is still there. `.verify/README.md` is the
+  full list, with the environment flags.
+- **`ZS_RNG` pins every die in the game.** Without it two runs are two
+  different evenings and no two builds can be compared; with it, the same
+  build replays itself. Use it for every A/B: run the new build, stash it,
+  run the old one, compare.
+- **`ZS_SEED` pins the map** (`?seed=` in the page, default 20250830);
+  `ZS_TRACE=1` prints a line a day while the bot plays; `ZS_DEBUG=1`
+  prints every bite with the distance to the hall.
+- **Balance is measured, not guessed.** Touch a `BAL`, then run the
+  feature's own smoke test *and* `play.js` three or four times — the
+  spread is the signal, never one run. `play.js 20` fails about two runs
+  in three on this build **and on the commit it grew from**: that is the
+  known death spiral (too few hands to reach the food it takes to
+  recruit), not a regression.
 - **No browser in this sandbox** (Playwright is a devDependency but the
-  browser download is blocked). The harness, plus `node --check`, oxfmt and
-  oxlint, are the verification path.
+  browser download is blocked). The harness plus `node --check`, oxfmt and
+  oxlint are the verification path.
+
+## What we have learned (the traps)
+
+Things that have cost real time, so they do not cost it twice:
+
+- **Their dice are not our dice.** A subsystem that calls `Math.random()`
+  shifts the village's whole random stream, and a new feature then looks
+  like a balance regression when it is only a different evening. Every
+  subsystem rolls its own (`ZS.rng32(seed ^ tag)`, see `Nations.roll` and
+  `Factions`). This cost half a day once.
+- **Count only our own.** `Units.count/crew/upkeep` must filter `!a.foe`,
+  or an invading army eats our bread and sleeps in our beds, and the field
+  reports "no room" with not one of ours in it.
+- **`cancelMode()` clears the rally flag** — arm the cursor *after*
+  cancelling, or nothing happens and there is no error.
+- **Dawn cards pause the world.** Any wait loop that does not dismiss
+  `scen.card` hangs until its guard counter gives up.
+- **`ZS.Units.def(id)` falls back to `militia`**, so a typo'd id walks
+  around looking fine until something reads `d.cost`. Use
+  `ZS.Units.CAT[id]` where the id must exist.
+- **Hard-coded resource assertions break when `BAL` moves.** Leave rack
+  room before testing the armourer; pin the hall's health and the larder
+  in any test that runs long enough for the village to starve.
+- **`Structs.make()` is top-left, `_placeAt()` is centre.**
+- **Object literals take commas; class bodies do not.** Everything in
+  `js/village/` is an object literal on `window.ZS`.
+- **After a sandbox reset `node_modules` is gone** (`npm i` again) and the
+  git objects may be gone too: if `git log` shows only the upstream base,
+  `git fetch origin <branch> && git reset --mixed FETCH_HEAD` puts the
+  branch back without touching the working tree. Check before panicking.
+- **A test that measures a feature must pin everything else**, or you are
+  measuring survival.
+
+## House style (code and prose)
+
+- **The game speaks in its own voice**: plain, past-tense, a bit grim, no
+  exclamation marks, no UI-speak. "the steward takes the village in hand",
+  "the larder is empty", "they will not be spoken to. They will be
+  fought." Player-facing text goes in the panel's `pfoot` lines, the
+  toasts and the ledger — never in an alert.
+- **Comments are prose too**, and they explain *why*, in the same voice.
+  Every file opens with the paragraph that says what it is.
+- **A `BAL` at the top of every subsystem**, with the number in a comment
+  and what it does; nothing magic in the body.
+- **New subsystems are object literals on `window.ZS`**, in their own file
+  under `js/village/`, loaded by a `<script src>` in `index.html` (no
+  modules, no bundler, `file://` must work). They own their state
+  (`create(seed)` / `load(scen, s)` / `save(scen)`), expose `daily/tick`,
+  and are called from exactly one place in the scenario.
+- **Panels**: a `mode` on the scenario + `panelSig`/`paint` in `ui.js` + a
+  key + a bar button. The signature must not contain anything that moves
+  every tick, or the panel rebuilds under the cursor.
+- **New art goes through `js/sketch.js`** (`wline`, `wcirc`, `wpoly`,
+  `sketchRect`) on the paper palette, and figure work is an *additive
+  layer* on the frozen `draw()` in `figures.js` — never an edit to it.
 
 ## Change recipes
 
@@ -477,8 +634,13 @@ building: `U` upgrade, `R` repair, `X` dismantle.
 Tier A (**shipped**) — A2 other people · A3 the cure. A1 the road out was
 left out by request.
 
+The civilisations push (**shipped on top of tier A**, because it was asked
+for before the tiers were finished): the five ages and their 13 units, the
+field (`A`), the seven nations and their wars (`D`), the seed that keeps
+the valley in one piece, and the steward (`P`) who plays it for you.
+
 Tier B — B4 interiors and rooms · B5 items, wear, winter clothes ·
-B6 walk the valley.
+B6 walk the valley (an open map, not a panel).
 
 Tier C — C8 squad tactics. (C1 horde ecology was left out by request.)
 
@@ -487,6 +649,9 @@ modes.
 
 Tier E — E11 climate with warnings · E12 trust between individuals ·
 E13 nights you actually watch · E14 onboarding and access.
+
+Still open from the earlier list: scout reports in the hand of whoever
+went, and more identifiable building art.
 
 ## Future work (known, not started)
 

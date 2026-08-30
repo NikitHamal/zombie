@@ -41,7 +41,11 @@ function dismiss() {
 /* ---------- boot ---------- */
 frames(240);
 ok("the village is standing", G.villagers().length > 0, G.villagers().length + " souls");
-ok("the other people exist", G.fac && G.fac.list.length === 2, G.fac ? G.fac.list.length + " factions" : "none");
+ok(
+  "the other people exist",
+  G.fac && G.fac.list.length === 2,
+  G.fac ? G.fac.list.length + " factions" : "none",
+);
 ok("the cure has not started", G.cure && G.cure.found.length === 0);
 ok(
   "ten places in the valley",
@@ -93,8 +97,11 @@ ok(
   ok("the panel shows it", ZS.VillageUI.peopleBlock(G).indexOf("caravan") >= 0);
   const r = ZS.Factions.trade(G, ev.id);
   ok("the trade goes through", r.ok, r.err || r.got || "");
-  ok("the bread is gone and the iron is here", G.res.scrap > before && G.res.food < food0,
-    "scrap " + before + "→" + G.res.scrap + " · food " + food0 + "→" + G.res.food);
+  ok(
+    "the bread is gone and the iron is here",
+    G.res.scrap > before && G.res.food < food0,
+    "scrap " + before + "→" + G.res.scrap + " · food " + food0 + "→" + G.res.food,
+  );
   ok("they think better of us for it", ZS.Factions.get(G.fac, "ashford").trades === 1);
   ok("and the offer is spent", G.fac.events.length === 0);
 }
@@ -144,8 +151,15 @@ ok(
     killed > 0 || (saw && after < stores0),
     killed + " down · stores " + Math.round(stores0) + " → " + Math.round(after),
   );
-  ok("the village is still here", G.villagers().length > 0 || souls0 === 0, G.villagers().length + " left");
-  ok("the raid is in the ledger", ZS.Chronicle.entries(G).some((e) => e.kind === "people"));
+  ok(
+    "the village is still here",
+    G.villagers().length > 0 || souls0 === 0,
+    G.villagers().length + " left",
+  );
+  ok(
+    "the raid is in the ledger",
+    ZS.Chronicle.entries(G).some((e) => e.kind === "people"),
+  );
 }
 
 /* ---------- the theft itself ---------- */
@@ -166,12 +180,20 @@ ok(
     dismiss();
   }
   ZS.Factions.BAL.STEAL_T = t0;
-  ok("they take what they can carry", !!r.carry, r.carry ? r.carry.n + " " + r.carry.kind : "nothing in " + f);
+  ok(
+    "they take what they can carry",
+    !!r.carry,
+    r.carry ? r.carry.n + " " + r.carry.kind : "nothing in " + f,
+  );
   ok("and the larder is lighter for it", G.res.food < food0, food0 + " → " + G.res.food);
   if (r.carry) {
     const f1 = G.res.food;
     ZS.Factions.escaped(G, r);
-    ok("what reaches the road is gone for good", G.res.food === f1 - r.carry.n, f1 + " → " + G.res.food);
+    ok(
+      "what reaches the road is gone for good",
+      G.res.food === f1 - r.carry.n,
+      f1 + " → " + G.res.food,
+    );
   }
   r.gone = true;
   G.raiders.length = 0;
@@ -189,8 +211,11 @@ ok(
   const op0 = w.opinion;
   const r = ZS.Factions.tribute(G, ev.id);
   ok("paying them works", r.ok, r.err || "");
-  ok("and buys quiet", w.opinion > op0 && G.fac.raidIn === 0,
-    op0.toFixed(2) + " → " + w.opinion.toFixed(2));
+  ok(
+    "and buys quiet",
+    w.opinion > op0 && G.fac.raidIn === 0,
+    op0.toFixed(2) + " → " + w.opinion.toFixed(2),
+  );
 }
 
 /* ---------- a dose ---------- */

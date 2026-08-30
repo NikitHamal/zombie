@@ -61,8 +61,10 @@
       click("buildb", () => this.act("build-panel"));
       click("workb", () => this.act("research-panel"));
       click("armyb", () => this.act("army-panel"));
+      click("natb", () => this.act("nations-panel"));
       click("mapb", () => this.act("world-panel"));
       click("bookb", () => this.act("chron-panel"));
+      click("pilotb", () => this.act("pilot"));
       click("qualb", () => this.act("quality"));
       click("home", () => scen.focusHall());
       click("fit", () => scen.fitView());
@@ -136,6 +138,9 @@
         case "a":
           this.act("army-panel");
           return;
+        case "d":
+          this.act("nations-panel");
+          return;
         case " ":
           s.setSpeed(s.speed ? 0 : 1);
           e.preventDefault();
@@ -199,6 +204,7 @@
       if (lower === "m") return this.act("world-panel");
       if (lower === "k") return this.act("sound");
       if (lower === "l") return this.act("chron-panel");
+      if (lower === "p") return this.act("pilot");
       if (lower === "q") return this.act("quality");
       if (lower === "?") return this.act("help");
     },
@@ -251,6 +257,28 @@
           if (s.mode === "army") s.cancelMode();
           else s.openArmy();
           break;
+        case "nations-panel":
+          if (s.mode === "nations") s.cancelMode();
+          else s.openNations();
+          break;
+        case "nat-send": {
+          const id = arg.split(":")[0],
+            kind = arg.split(":")[1];
+          const r = ZS.Nations.send(s, id, kind);
+          if (!r.ok) this.toast(r.err);
+          else this.toast(kind === "insult" ? "said" : "on the road — " + r.days + " days");
+          break;
+        }
+        case "nat-pay": {
+          const r = ZS.Nations.pay(s, arg);
+          if (!r.ok) this.toast(r.err);
+          break;
+        }
+        case "nat-refuse": {
+          const r = ZS.Nations.refuse(s, arg);
+          if (!r.ok) this.toast(r.err);
+          break;
+        }
         case "train": {
           const r = ZS.Army.order(s, arg);
           if (!r.ok) this.toast(r.err);
@@ -288,6 +316,16 @@
           if (s.mode === "chron") s.cancelMode();
           else s.openChron();
           break;
+        case "pilot": {
+          if (!ZS.Autopilot) break;
+          const on = ZS.Autopilot.toggle(s);
+          this.toast(
+            on
+              ? "the steward takes the village in hand — P to take it back"
+              : "the steward steps back — the village is yours",
+          );
+          break;
+        }
         case "quality":
           if (ZS.Perf) {
             ZS.Perf.cycle();
@@ -338,6 +376,12 @@
           break;
         case "slotclear":
           if (ZS.Chronicle) ZS.Chronicle.clear(+arg);
+          break;
+        case "newvalley":
+          if (ZS.Chronicle) {
+            if (this.confirm && this.confirm !== "newvalley") break;
+            ZS.Seed.newValley();
+          }
           break;
         case "research":
           s.startResearch(arg);
@@ -555,7 +599,21 @@
         f += "|" + this.afford(ZS.Units.ORDER.map((id) => s.canPay(ZS.Units.cost(s, id))));
         return f;
       }
-      if (s.mode === "chron") return "c|" + (s.chron ? s.chron.length : 0) + "|" + s.day;
+      if (s.mode === "nations") {
+        let f = "n|" + s.day + "|" + s.nat.events.length;
+        for (const x of s.nat.list)
+          f += ";" + x.id + Math.round(x.opinion * 20) + x.met + x.war + x.rides.length;
+        return f;
+      }
+      if (s.mode === "chron")
+        return (
+          "c|" +
+          (s.chron ? s.chron.length : 0) +
+          "|" +
+          s.day +
+          "|" +
+          (s.pilot ? s.pilot.on + (s.pilot.last || "") : "")
+        );
       return "none";
     },
 
@@ -565,6 +623,7 @@
       this.el.wx.textContent = s.season.name + " · " + s.weather.name;
       this.el.wx.title = s.season.desc + " · " + s.weather.desc;
       for (let i = 0; i < 4; i++) this.el.speeds[i].classList.toggle("on", s.speed === i);
+      if (this.el.pilotb && ZS.Autopilot) this.el.pilotb.classList.toggle("on", ZS.Autopilot.on(s));
       document.body.classList.toggle("night", s.phase !== "day");
     },
 
@@ -792,6 +851,7 @@
       else if (s.mode === "research") html = this.researchPanel();
       else if (s.mode === "villagers") html = this.villagersPanel();
       else if (s.mode === "army") html = this.armyPanel();
+      else if (s.mode === "nations") html = this.nationsPanel();
       else if (s.mode === "world") html = this.worldPanel();
       else if (s.mode === "chron") html = this.chronPanel();
       if (!html) {
@@ -805,6 +865,7 @@
         e.innerHTML = html;
         this.taskNode = e.querySelector('[data-role="task"]');
         this.paintValleyMap();
+        this.paintNationsMap();
       }
     },
 
@@ -830,6 +891,134 @@
           "</span></div>";
       }
       h += '<div class="pfoot">pick a thing, then click the ground · esc to stop</div>';
+      return h;
+    },
+
+    // the world beyond: six nations, one of which was never going to be a
+    // friend. What they think, how far they are, and who is on the road.
+    nationsPanel() {
+      const s = this.scen;
+      if (!ZS.Nations || !s.nat) return "";
+      const N = ZS.Nations;
+      let h = '<div class="ptitle">the world beyond <kbd>esc</kbd></div>';
+      h += '<canvas id="nationsmap" class="valleymap" width="252" height="176"></canvas>';
+      const foes = N.foes(s);
+      if (foes) h += '<div class="pfoot"><em>' + foes + " of them are in the field</em></div>";
+      // the demands on the table
+      for (const e of s.nat.events) {
+        const d = N.def(e.faction);
+        h +=
+          '<div class="row on"><span>' +
+          d.name +
+          "</span><span>" +
+          e.give.food +
+          " food</span></div>";
+        h += '<div class="pfoot">' + e.text + "</div>";
+        h += '<div class="tray">';
+        h += '<button data-act="nat-pay" data-arg="' + e.id + '">pay it</button>';
+        h += '<button data-act="nat-refuse" data-arg="' + e.id + '" class="danger">refuse</button>';
+        h += "</div>";
+      }
+      for (const f of s.nat.list) {
+        const d = N.def(f.id);
+        if (!f.met) {
+          h += '<div class="row no"><span>somewhere out there</span><span>—</span></div>';
+          continue;
+        }
+        const tag = f.war ? "at war" : N.word(f.opinion);
+        h +=
+          '<div class="row' +
+          (f.war || d.foe ? " no" : "") +
+          '"><span>' +
+          d.name +
+          '</span><span class="who">' +
+          f.days * 2 +
+          "d · " +
+          tag +
+          "</span></div>";
+        h += '<div class="pfoot">' + d.where + " — " + d.blurb + "</div>";
+        // how close the next trouble is, so a war is never a surprise
+        if (f.war || d.foe) {
+          const bits = [];
+          if (f.left > 0) bits.push(f.left + " of theirs still standing");
+          bits.push(
+            f.invadeIn > 0 ? "the next are " + f.invadeIn + " days out" : "they are due any day",
+          );
+          if (f.beaten > 0) bits.push(f.beaten + " beaten");
+          h += '<div class="pfoot dim">' + bits.join(" · ") + "</div>";
+        }
+        h += '<div class="tray">';
+        if (!d.foe) {
+          h +=
+            '<button data-act="nat-send" data-arg="' +
+            f.id +
+            ':envoy"' +
+            (s.canPay({ w: 0, s: 0, c: N.BAL.ENVOY.scrap }) && s.res.food >= N.BAL.ENVOY.food
+              ? ""
+              : ' class="no"') +
+            ">envoy <kbd>" +
+            N.BAL.ENVOY.food +
+            "f</kbd></button>";
+          h +=
+            '<button data-act="nat-send" data-arg="' +
+            f.id +
+            ':trade"' +
+            (s.canPay(d.want) ? "" : ' class="no"') +
+            ">trade " +
+            costText(d.want) +
+            "</button>";
+          h +=
+            '<button data-act="nat-send" data-arg="' +
+            f.id +
+            ':gift"' +
+            (s.res.food >= N.BAL.GIFT.food ? "" : ' class="no"') +
+            ">gift <kbd>" +
+            N.BAL.GIFT.food +
+            "f</kbd></button>";
+          if (d.merc)
+            h +=
+              '<button data-act="nat-send" data-arg="' +
+              f.id +
+              ':hire"' +
+              (s.canPay(N.rideCost(s, "hire")) ? "" : ' class="no"') +
+              ">hire " +
+              costText(N.rideCost(s, "hire")) +
+              "</button>";
+          h +=
+            '<button data-act="nat-send" data-arg="' +
+            f.id +
+            ':insult"' +
+            ' class="danger"' +
+            ">insult</button>";
+        } else {
+          h += '<div class="pfoot">they will not be spoken to. They will be fought.</div>';
+        }
+        h += "</div>";
+        for (const r of f.rides)
+          h +=
+            '<div class="pfoot dim">' +
+            (r.kind === "envoy"
+              ? "an envoy"
+              : r.kind === "trade"
+                ? "the wagons"
+                : r.kind === "hire"
+                  ? "the company"
+                  : r.kind === "gift"
+                    ? "a gift"
+                    : "word") +
+            " · " +
+            r.t +
+            " day" +
+            (r.t === 1 ? "" : "s") +
+            " out</div>";
+      }
+      if (s.nat.news.length) {
+        h += '<div class="ptitle" style="margin-top:5px">word out of the world</div>';
+        for (const n of s.nat.news.slice(0, 5)) h += '<div class="pfoot dim">' + n + "</div>";
+      }
+      h +=
+        '<div class="tray"><button data-act="world-panel">the valley <kbd>M</kbd></button>' +
+        '<button data-act="army-panel">the field <kbd>A</kbd></button></div>';
       return h;
     },
 
@@ -1095,6 +1284,8 @@
       h += '<div class="pfoot">loot: ' + this.lootLine() + "</div>";
       h += this.peopleBlock(s);
       h += this.cureBlock(s);
+      h +=
+        '<div class="tray"><button data-act="nations-panel">the world beyond <kbd>D</kbd></button></div>';
       return h;
     },
 
@@ -1287,6 +1478,120 @@
       c.textAlign = "left";
     },
 
+    // the wider world: the nations, drawn round the hollow at the distance
+    // a rider would take to reach them
+    paintNationsMap() {
+      const s = this.bound();
+      const cv = document.getElementById("nationsmap");
+      if (!s) return;
+      if (!cv || !cv.getContext || !s.nat || !ZS.Nations) return;
+      const c = cv.getContext("2d");
+      const W = cv.width || 252,
+        H = cv.height || 176;
+      const cx = W / 2,
+        cy = H / 2 + 4;
+      c.clearRect(0, 0, W, H);
+      const far = Math.min(W, H) / 2 - 16;
+      // the valley: a dashed ring round the hollow
+      c.strokeStyle = "rgba(120,102,66,0.4)";
+      c.lineWidth = 1;
+      c.setLineDash([3, 4]);
+      c.beginPath();
+      c.ellipse(cx, cy, 30, 20, 0, 0, 6.2832);
+      c.stroke();
+      c.setLineDash([]);
+      // the hollow itself
+      c.strokeStyle = "rgba(70,64,52,0.9)";
+      c.lineWidth = 1.4;
+      ZS.wpoly(
+        c,
+        [
+          { x: cx - 8, y: cy + 6 },
+          { x: cx - 8, y: cy - 3 },
+          { x: cx, y: cy - 9 },
+          { x: cx + 8, y: cy - 3 },
+          { x: cx + 8, y: cy + 6 },
+        ],
+        11,
+        0.5,
+        true,
+      );
+      c.fillStyle = "rgba(214,186,120,0.4)";
+      c.fill();
+      const N = ZS.Nations;
+      for (const f of s.nat.list) {
+        const d = N.def(f.id);
+        if (!f.met) continue;
+        const a = d.ang;
+        const r = 34 + (d.days / 7) * (far - 40);
+        const x = cx + Math.cos(a) * r,
+          y = cy + Math.sin(a) * r * 0.66;
+        const col = d.foe
+          ? "rgba(120,40,32,0.9)"
+          : f.war
+            ? "rgba(150,60,40,0.9)"
+            : f.opinion >= N.BAL.ALLY_AT
+              ? "rgba(64,112,52,0.95)"
+              : f.opinion >= N.BAL.DEMAND_AT
+                ? "rgba(74,68,56,0.85)"
+                : "rgba(150,110,44,0.9)";
+        // the road
+        c.strokeStyle = "rgba(120,102,66,0.45)";
+        c.lineWidth = 1;
+        c.setLineDash(f.met > 1 ? [] : [3, 4]);
+        ZS.wline(c, cx + Math.cos(a) * 9, cy + Math.sin(a) * 6, x, y, 30 + d.days * 7, 1);
+        c.setLineDash([]);
+        // the mark: a walled town, or a black tent
+        c.strokeStyle = col;
+        c.lineWidth = 1.4;
+        if (d.foe) {
+          ZS.wpoly(
+            c,
+            [
+              { x: x - 6, y: y + 4 },
+              { x: x, y: y - 7 },
+              { x: x + 6, y: y + 4 },
+            ],
+            d.days * 13 + 3,
+            0.4,
+            true,
+          );
+        } else {
+          ZS.wpoly(
+            c,
+            [
+              { x: x - 6, y: y + 4 },
+              { x: x - 6, y: y - 2 },
+              { x: x, y: y - 6 },
+              { x: x + 6, y: y - 2 },
+              { x: x + 6, y: y + 4 },
+            ],
+            d.days * 13 + 3,
+            0.4,
+            true,
+          );
+        }
+        if (f.opinion >= N.BAL.ALLY_AT || f.war) {
+          c.fillStyle = f.war ? "rgba(150,60,40,0.22)" : "rgba(96,132,58,0.22)";
+          c.fill();
+        }
+        c.fillStyle = col;
+        c.font = 'italic 9px "Segoe Script","Bradley Hand","Comic Sans MS",cursive';
+        c.textAlign = "center";
+        c.fillText(d.name.split(" ").pop(), x, y + 14);
+        // whoever is on the road
+        for (const rd of f.rides) {
+          const k = 1 - Math.min(1, rd.t / Math.max(1, rd.days * 2));
+          const px = cx + Math.cos(a) * 9 + (x - cx - Math.cos(a) * 9) * k;
+          const py = cy + Math.sin(a) * 6 + (y - cy - Math.sin(a) * 6) * k;
+          c.strokeStyle = "rgba(64,96,52,0.95)";
+          c.lineWidth = 1.3;
+          ZS.wcirc(c, px, py, 2.6, 200 + d.days * 5, 0.4);
+        }
+      }
+      c.textAlign = "left";
+    },
+
     lootLine() {
       const s = this.scen;
       const bits = [];
@@ -1303,6 +1608,24 @@
     chronPanel() {
       const s = this.scen;
       let h = '<div class="ptitle">the record <kbd>esc</kbd></div>';
+      if (ZS.Autopilot) {
+        const on = ZS.Autopilot.on(s);
+        h +=
+          '<div class="row' +
+          (on ? " on" : "") +
+          '"><span>the steward</span><span class="who">' +
+          (on ? "in charge" : "standing by") +
+          "</span></div>";
+        h += '<div class="pfoot">' + ZS.Autopilot.line(s) + "</div>";
+        h +=
+          '<div class="tray"><button data-act="pilot">' +
+          (on ? "take the village back" : "put him in charge") +
+          " <kbd>P</kbd></button></div>";
+        if (on && s.pilot.did.length > 1) {
+          h += '<div class="pfoot">and before that</div>';
+          for (const d of s.pilot.did.slice(1, 4)) h += '<div class="pfoot dim">' + d + "</div>";
+        }
+      }
       const list = (s.chron || []).slice(0, 16);
       if (!list.length) h += '<div class="pfoot">nothing written yet.</div>';
       for (const e of list)
@@ -1347,6 +1670,15 @@
             '"' +
             (sl.used ? "" : ' class="no"') +
             ">clear</button></div>";
+      // which valley this is, and how to leave it
+      h +=
+        '<div class="pfoot">the valley: ' +
+        (s.world.seed | 0) +
+        ' · <button class="link" data-act="newvalley">a new valley</button>' +
+        (this.confirm === "newvalley"
+          ? ' — <button class="link" data-act="newvalley">yes, and lose this one</button>'
+          : "") +
+        "</div>";
       h +=
         '<div class="pfoot">quality: ' +
         ZS.Perf.def.name +
@@ -1415,6 +1747,12 @@
       }
       // the army shouts for itself (an army out of bread is an army going home)
       if (s.alerts) for (const a of s.alerts) if (a.t > 0) list.push([a.kind, a.txt]);
+      // and so do the nations
+      if (ZS.Nations && s.nat) {
+        for (const a of ZS.Nations.alerts(s)) list.push(a);
+        for (const f of s.nat.list)
+          if (f.war) list.push(["war", ZS.Nations.def(f.id).name + " are at war with us"]);
+      }
       // the door is the whole defence, so it says so
       if (s.hall && s.hall.ruined)
         list.unshift(["door", "the hall is a ruin — there is no door to hold"]);
@@ -1450,6 +1788,13 @@
         if (this.mapT <= 0) {
           this.mapT = 0.25;
           this.paintValleyMap();
+        }
+      }
+      if (s.mode === "nations") {
+        this.natT = (this.natT || 0) - dt;
+        if (this.natT <= 0) {
+          this.natT = 1;
+          this.paintNationsMap();
         }
       }
       if (this.toastT > 0) {

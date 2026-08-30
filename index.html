@@ -290,6 +290,18 @@
         font-size: 10px;
         margin-left: 3px;
       }
+      /* a button set in a line of text: small, flat, no box */
+      #panel .pfoot button.link {
+        font-size: 12px;
+        padding: 0 3px;
+        background: none;
+        border: none;
+        border-bottom: 1px dashed rgba(60, 50, 40, 0.5);
+        border-radius: 0;
+      }
+      #panel .pfoot button.link:hover {
+        background: rgba(112, 148, 72, 0.3);
+      }
       /* the alarm strip: fire, fever, rats, cold, despair */
       #alerts {
         left: 12px;
@@ -425,8 +437,10 @@
         <button id="buildb" title="build something (B)">build</button>
         <button id="workb" title="the workshop — what the village learns (T)">workshop</button>
         <button id="armyb" title="the field — train and order the army (A)">field</button>
+        <button id="natb" title="the world beyond — the nations (D)">nations</button>
         <button id="mapb" title="the valley — send parties out (M)">valley</button>
         <button id="bookb" title="the record — what has happened, and saving (L)">record</button>
+        <button id="pilotb" title="the steward — let him play the village for you (P)">steward</button>
         <span class="sep"></span>
         <button id="home" title="centre on the hall (H)">hall</button>
         <button id="fit" title="fit the whole map (F)">map</button>
@@ -461,6 +475,14 @@
             <div><span class="k">T</span>the workshop's research</div>
             <div>
               <span class="k">A</span>the field — train soldiers, carts, cannon, wings
+            </div>
+            <div>
+              <span class="k">D</span>the world beyond — the nations, their wagons and
+              their wars
+            </div>
+            <div>
+              <span class="k">P</span>the steward — he sets the work, raises and mends,
+              and tells you what he did
             </div>
             <div><span class="k">A</span>then <i>rally</i>, and click the ground to place it</div>
             <div><span class="k">U R X</span>on a building: upgrade · rebuild · dismantle</div>
@@ -503,6 +525,8 @@
     <script src="js/village/units.js"></script>
     <script src="js/village/fx.js"></script>
     <script src="js/village/army.js"></script>
+    <script src="js/village/nations.js"></script>
+    <script src="js/village/autopilot.js"></script>
     <script src="js/agents.js"></script>
     <script src="js/sim.js"></script>
     <script src="js/scenarios/village.js"></script>

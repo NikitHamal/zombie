@@ -99,6 +99,8 @@
     if (scen.sel && scen.sel.o === o) scen.sel = null;
     if (o.foe) {
       A.kills++;
+      // whoever sent them hears about it
+      if (ZS.Nations && scen.nat) ZS.Nations.lost(scen, o);
       const sc = Math.max(1, Math.round((d.crew || 1) * 2));
       const got = scen._add("scrap", sc);
       if (got) scen._pop(o.x, o.y - 22, "+" + got + " scrap", "#6f7681");
@@ -127,11 +129,33 @@
     return { x: h.x + h.w / 2, y: h.y + h.h / 2 };
   }
 
-  // where the army forms when nobody has told it otherwise: the green in
-  // front of the barracks, or the hall's yard
+  // No orders, and something is coming: the line forms between the stores
+  // and the threat, ninety paces out. That is what an army is for — you
+  // should not have to point at the enemy for them to notice it.
+  function threatPost(scen) {
+    const home = homePoint(scen);
+    let tx = 0,
+      ty = 0,
+      n = 0;
+    for (const a of scen.agents) {
+      if (!opposed(OURS, a)) continue;
+      if (dist2(a.x, a.y, home.x, home.y) > 620 * 620) continue;
+      tx += a.x;
+      ty += a.y;
+      n++;
+    }
+    if (!n) return null;
+    const dx = tx / n - home.x,
+      dy = ty / n - home.y;
+    const m = Math.hypot(dx, dy) || 1;
+    return { x: home.x + (dx / m) * 96, y: home.y + (dy / m) * 96 };
+  }
+
+  // where the army forms when nobody has told it otherwise
   function post(scen) {
     const A = scen.army;
     if (A.rally) return A.rally;
+    if (A.threat) return A.threat;
     const b = scen._first("barracks");
     if (b) return { x: b.x + b.w / 2, y: b.y + b.h + 54 };
     const h = scen.hall;
@@ -151,6 +175,9 @@
     const f = (o) => {
       if (o === a || !opposed(a, o)) return;
       if (!reachable(a, o)) return;
+      // somebody standing inside a building cannot be got at: an army
+      // that wants them starts on what is keeping them out
+      if (o.st === 0 && o.bld >= 0) return;
       const d = dist2(a.x, a.y, o.x, o.y);
       if (d < bd) {
         bd = d;
@@ -160,6 +187,37 @@
     if (grid) grid.query(a.x, a.y, r, f);
     else for (const o of scen.agents) f(o);
     return best;
+  }
+
+  // what stands in the way gets pulled at: a line that cannot get in
+  // starts on the gate, and a cannon does it faster than a spear does
+  function siegeAt(scen, a, d, dt) {
+    let best = null,
+      bd = 1e18;
+    for (const b of scen.world.buildings) {
+      const dx = Math.max(b.x - a.x, 0, a.x - (b.x + b.w));
+      const dy = Math.max(b.y - a.y, 0, a.y - (b.y + b.h));
+      const dd = Math.hypot(dx, dy);
+      if (dd > 58 || dd >= bd) continue;
+      bd = dd;
+      best = b;
+    }
+    if (!best) return false;
+    a.a = Math.atan2(best.y + best.h / 2 - a.y, best.x + best.w / 2 - a.x);
+    a.vx *= 0.7;
+    a.vy *= 0.7;
+    a.swing = Math.max(a.swing, 0.3);
+    if (a.atkT > 0) return true;
+    a.atkT = d.rate;
+    scen._damageStruct(best, d.dmg * (d.siege || 0.5) * 0.55);
+    scen.fx.push({
+      x: best.x + best.w / 2 + (a.x - (best.x + best.w / 2)) * 0.7,
+      y: best.y + best.h / 2,
+      t: 0.3,
+      chip: 1,
+      seed: a.seed + dt * 100,
+    });
+    return true;
   }
 
   /* ---------- one soldier, one frame ---------- */
@@ -481,6 +539,7 @@
       a.move = Math.hypot(a.vx, a.vy);
       const o = find(scen, a, BAL.SIGHT, grid);
       if (o) engage(scen, a, o, d, dt, t, nav);
+      else if (a.stuckT > 1.4 && siegeAt(scen, a, d, dt)) return;
       else hold(scen, a, d, dt, t, nav);
     },
 
@@ -513,6 +572,7 @@
         const ours = this.units(scen, false);
         for (let i = 0; i < ours.length; i++) ours[i].slot = i;
         A.unit = ours.length;
+        A.threat = threatPost(scen); // where the line should be, right now
       }
       /* bread, and how far from the stores an army can fight without it */
       A.supT -= dt;

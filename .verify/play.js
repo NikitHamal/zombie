@@ -43,6 +43,7 @@ const WANT = [
   ["hut", 6],
   ["barracks", 1],
   ["stable", 1],
+  ["barracks", 2],
 ];
 
 function freeSpot(kind) {
@@ -56,7 +57,8 @@ function freeSpot(kind) {
       const x = cx + Math.cos(a) * r,
         y = cy + Math.sin(a) * r * 0.85;
       if (x < 80 || y < 80 || x > G.world.w - 80 || y > G.world.h - 80) continue;
-      if (ZS.Structs.footprintClear(G.world, G.nav, x - c.w / 2, y - c.h / 2, c.w, c.h)) return { x, y };
+      if (ZS.Structs.footprintClear(G.world, G.nav, x - c.w / 2, y - c.h / 2, c.w, c.h))
+        return { x, y };
     }
   }
   return null;
@@ -73,9 +75,11 @@ function ring(kind, n, r) {
   const c = ZS.Structs.CAT[kind];
   for (let i = 0; i < n; i++) {
     const p = ringSpot(i, n, r);
-    if (!ZS.Structs.footprintClear(G.world, G.nav, p.x - c.w / 2, p.y - c.h / 2, c.w, c.h)) continue;
+    if (!ZS.Structs.footprintClear(G.world, G.nav, p.x - c.w / 2, p.y - c.h / 2, c.w, c.h))
+      continue;
     const have = G.world.buildings.filter(
-      (b) => b.kind === kind && Math.abs(b.x + b.w / 2 - p.x) < 30 && Math.abs(b.y + b.h / 2 - p.y) < 30,
+      (b) =>
+        b.kind === kind && Math.abs(b.x + b.w / 2 - p.x) < 30 && Math.abs(b.y + b.h / 2 - p.y) < 30,
     ).length;
     if (have) continue;
     G.armBuild(kind);
@@ -169,7 +173,7 @@ function dawn() {
   }
   // the field: once there is a barracks, put people under arms — the
   // cheapest thing that can hold a line first, and only with food to spare
-  if (G.has("barracks") && G.res.food > 220 && ZS.Units.crew(G) < ZS.Units.cap(G)) {
+  if (G.has("barracks") && G.res.food > 200 && ZS.Units.crew(G) < ZS.Units.cap(G)) {
     for (const id of ["spearman", "archer", "militia", "cart"]) {
       const r = ZS.Army.order(G, id);
       if (r.ok) break;
@@ -184,7 +188,8 @@ function dawn() {
     const known = G.ow.sites.filter((s) => s.seen);
     if (known.length) {
       const pick = known[(Math.random() * known.length) | 0];
-      if (ZS.Overworld.canSend(G.ow, G, pick.id, false).ok) ZS.Overworld.send(G.ow, G, pick.id, false);
+      if (ZS.Overworld.canSend(G.ow, G, pick.id, false).ok)
+        ZS.Overworld.send(G.ow, G, pick.id, false);
     }
   }
   // and if the heart is going, a hot meal
@@ -198,8 +203,18 @@ if (process.env.ZS_DEBUG) {
   G._bite = function (a, v) {
     const s = G._shelter();
     console.log(
-      "  bite d" + G.day + " " + G.phase + " · " + v.name + " (" + v.job + ") " +
-        Math.round(Math.hypot(v.x - s.x, v.y - s.y)) + "px from the hall · hp " + Math.round(v.hp),
+      "  bite d" +
+        G.day +
+        " " +
+        G.phase +
+        " · " +
+        v.name +
+        " (" +
+        v.job +
+        ") " +
+        Math.round(Math.hypot(v.x - s.x, v.y - s.y)) +
+        "px from the hall · hp " +
+        Math.round(v.hp),
     );
     return origBite(a, v);
   };
@@ -215,6 +230,24 @@ while (G.day < DAYS && !G.over && guard++ < 300000) {
     log.push("day " + G.day + ": " + (G.card.lines[0] || ""));
     G.dismissCard();
     dawn();
+    if (process.env.ZS_TRACE)
+      console.log(
+        "  d" +
+          G.day +
+          " v" +
+          G.villagers().length +
+          " foes" +
+          ZS.Army.units(G, true).length +
+          " kills" +
+          G.army.kills +
+          " war:" +
+          (G.nat && G.nat.list
+            ? G.nat.list
+                .filter((f) => f.war)
+                .map((f) => f.id)
+                .join(",")
+            : "-"),
+      );
   }
   if (G.phase === "night" && !night) night = 1;
   if (G.phase === "day") night = 0;
@@ -252,17 +285,24 @@ console.log(
     G.world.buildings.filter((b) => b.built && !b.ruined).length +
     " · ruined " +
     G.world.buildings.filter((b) => b.ruined).length +
-    " · field: " + ZS.Army.line(G) + "\n" + " · researched " +
+    " · field: " +
+    ZS.Army.line(G) +
+    "\n" +
+    " · researched " +
     Object.keys(G.done).length +
     " · souls " +
     G.souls,
 );
-console.log("  morale " + G.morale.toFixed(2) + " · grief " + G.grief.toFixed(2) + " · " + G.season.name);
+console.log(
+  "  morale " + G.morale.toFixed(2) + " · grief " + G.grief.toFixed(2) + " · " + G.season.name,
+);
 for (const l of log.slice(-6)) console.log("    " + l);
 const deaths = (G.chron || []).filter((e) => e.kind === "death");
-if (deaths.length) console.log("  the lost: " + deaths.map((e) => "d" + e.day + " " + e.txt).join(" · "));
+if (deaths.length)
+  console.log("  the lost: " + deaths.map((e) => "d" + e.day + " " + e.txt).join(" · "));
 const folk = (G.chron || []).filter((e) => e.kind === "people" || e.kind === "cure");
-if (folk.length) console.log("  out there: " + folk.map((e) => "d" + e.day + " " + e.txt).join(" · "));
+if (folk.length)
+  console.log("  out there: " + folk.map((e) => "d" + e.day + " " + e.txt).join(" · "));
 
 check(!G.over, "the village is still standing", G.over ? G.over.title : "day " + G.day);
 check(G.day >= DAYS, "it reached day " + DAYS, "day " + G.day);
@@ -275,5 +315,7 @@ check(
   Object.keys(G.done).join(", ") || "nothing",
 );
 
-console.log(fails.length ? "\n" + fails.length + " FAILED: " + fails.join(", ") : "\nall checks passed");
+console.log(
+  fails.length ? "\n" + fails.length + " FAILED: " + fails.join(", ") : "\nall checks passed",
+);
 process.exit(fails.length ? 1 : 0);

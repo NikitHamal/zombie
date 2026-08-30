@@ -910,22 +910,25 @@
       return n;
     },
 
-    // the army's daily bread
+    // the army's daily bread — theirs is not our problem
     upkeep(scen) {
       let food = 0;
-      for (const a of scen.agents) if (a.st === 4 && CAT[a.unit]) food += CAT[a.unit].eat;
+      for (const a of scen.agents) if (a.st === 4 && !a.foe && CAT[a.unit]) food += CAT[a.unit].eat;
       return food;
     },
 
+    // how many of ours are in the field (theirs do not count, and do not
+    // take our beds)
     count(scen, id) {
       let n = 0;
-      for (const a of scen.agents) if (a.st === 4 && (!id || a.unit === id)) n++;
+      for (const a of scen.agents) if (a.st === 4 && !a.foe && (!id || a.unit === id)) n++;
       return n;
     },
 
     crew(scen) {
       let n = 0;
-      for (const a of scen.agents) if (a.st === 4 && CAT[a.unit]) n += CAT[a.unit].crew || 1;
+      for (const a of scen.agents)
+        if (a.st === 4 && !a.foe && CAT[a.unit]) n += CAT[a.unit].crew || 1;
       return n;
     },
 

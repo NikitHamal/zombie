@@ -20,7 +20,10 @@ frames(20);
 key("v");
 check(G.mode === "villagers", "V opens the roster", G.mode);
 const roster = els.panel.innerHTML;
-check(roster.indexOf("mara") >= 0 || roster.indexOf("villagers") >= 0, "the roster has names in it");
+check(
+  roster.indexOf("mara") >= 0 || roster.indexOf("villagers") >= 0,
+  "the roster has names in it",
+);
 check(roster.indexOf('data-act="pick"') >= 0, "every villager is a clickable row");
 
 const first = G.villagers()[0];
@@ -33,7 +36,11 @@ check(tray.indexOf("data-who=") >= 0, "each job button knows who it is for");
 // give somebody a job from the panel, with nothing selected on the card
 const second = G.villagers()[1];
 press("panel", "job", "wood", String(second.uid));
-check(second.job === "wood", "a job given from the roster sticks", second.name + " → " + second.job);
+check(
+  second.job === "wood",
+  "a job given from the roster sticks",
+  second.name + " → " + second.job,
+);
 
 // and from the selection card as well
 G.selectVillager(first);
@@ -91,11 +98,18 @@ ZS.Sim.tap(G.world, G.hover.x, G.hover.y, {});
 check(G.world.buildings.length === before + 1, "clicking sets the site down");
 const put = G.world.buildings[G.world.buildings.length - 1];
 check(
-  isFinite(put.x) && isFinite(put.y) &&
+  isFinite(put.x) &&
+    isFinite(put.y) &&
     Math.abs(put.x + put.w / 2 - G.hover.x) < 1 &&
     Math.abs(put.y + put.h / 2 - G.hover.y) < 1,
   "and it lands centred on the ghost",
-  Math.round(put.x + put.w / 2) + "," + Math.round(put.y + put.h / 2) + " vs " + Math.round(G.hover.x) + "," + Math.round(G.hover.y),
+  Math.round(put.x + put.w / 2) +
+    "," +
+    Math.round(put.y + put.h / 2) +
+    " vs " +
+    Math.round(G.hover.x) +
+    "," +
+    Math.round(G.hover.y),
 );
 G.cancelMode();
 
@@ -171,5 +185,7 @@ try {
 }
 check(!err, "it runs with the overlay up", err ? err.message : "to day " + G.day);
 
-console.log(fails.length ? "\n" + fails.length + " FAILED: " + fails.join(", ") : "\nall checks passed");
+console.log(
+  fails.length ? "\n" + fails.length + " FAILED: " + fails.join(", ") : "\nall checks passed",
+);
 process.exit(fails.length ? 1 : 0);

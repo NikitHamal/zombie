@@ -60,17 +60,12 @@ dismiss();
 ok("the village is standing", G.villagers().length > 0, G.villagers().length + " souls");
 ok("the army has a book", !!G.army);
 ok("the ages are known", ZS.Ages.AGES.length === 5, ZS.Ages.AGES.map((a) => a.id).join(","));
+ok("and it starts as a refuge", ZS.Ages.of(G).id === "refuge", ZS.Ages.of(G).name);
+ok("thirteen things to train", ZS.Units.ORDER.length === 13, ZS.Units.ORDER.join(","));
 ok(
-  "and it starts as a refuge",
-  ZS.Ages.of(G).id === "refuge",
-  ZS.Ages.of(G).name,
+  "every one of them has art",
+  ZS.Units.ORDER.every((id) => !!ZS.Units.ART[id]),
 );
-ok(
-  "thirteen things to train",
-  ZS.Units.ORDER.length === 13,
-  ZS.Units.ORDER.join(","),
-);
-ok("every one of them has art", ZS.Units.ORDER.every((id) => !!ZS.Units.ART[id]));
 ok(
   "and every one of them knows its age",
   ZS.Units.ORDER.every((id) => !!ZS.Ages.def(ZS.Units.def(id).age)),
@@ -157,7 +152,12 @@ ok("the first of them is trained", units(false).length >= 1, units(false).length
   const before = units(false).length;
   const p = G._spawnPoint();
   for (let i = 0; i < 6; i++) {
-    const q = G.nav.nearestWalkable(p.x + (Math.random() - 0.5) * 120, p.y + (Math.random() - 0.5) * 120, 300, true);
+    const q = G.nav.nearestWalkable(
+      p.x + (Math.random() - 0.5) * 120,
+      p.y + (Math.random() - 0.5) * 120,
+      300,
+      true,
+    );
     if (q) G._spawnZed({ k: "walker", at: q });
   }
   ok("the dead are out there", zeds().length >= 4, zeds().length + " of them");
@@ -170,7 +170,11 @@ ok("the first of them is trained", units(false).length >= 1, units(false).length
   }
   ok("and the field kills them", G.army.kills > k0, G.army.kills + " kills");
   ok("the dead are gone", zeds().length === 0, zeds().length + " left");
-  ok("nobody was lost doing it", units(false).length >= before - 1, before + " → " + units(false).length);
+  ok(
+    "nobody was lost doing it",
+    units(false).length >= before - 1,
+    before + " → " + units(false).length,
+  );
   ok("the burst was drawn", G.fx.length >= 0);
 }
 
@@ -216,7 +220,9 @@ ok("the first of them is trained", units(false).length >= 1, units(false).length
     G.res.arms = 4; // room in the rack, so the work is visible
     const before = G.res.arms;
     // two of them, so a night's huddling or a sick day cannot hide it
-    const hands = G.villagers().filter((a) => !(a.kin && a.kin.child)).slice(0, 2);
+    const hands = G.villagers()
+      .filter((a) => !(a.kin && a.kin.child))
+      .slice(0, 2);
     for (const v of hands) G.setJob(v, "smith");
     let made = false;
     for (let i = 0; i < 8 && !made; i++) {

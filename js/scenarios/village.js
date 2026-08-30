@@ -456,6 +456,7 @@
       this.drag = null; // a line of barricades being dragged out
       this.seasonI = 0;
       this.army = null; // the field: who is under arms (js/village/army.js)
+      this.nat = null; // the world beyond: the nations (js/village/nations.js)
       this._units = []; // today's roll of them, rebuilt each frame
       this.rallying = false; // clicking the ground to place the rally flag
       this.loaded = this._load();
@@ -813,6 +814,8 @@
       this._sdT = Math.max(0, (this._sdT || 0) - dt);
       this._tickResearch(dt);
       this._tickSystems(agents, dt);
+      // the steward's small looks round, between the dawns
+      if (ZS.Autopilot) ZS.Autopilot.tick(this, dt);
       if (ZS.Army && this.army) ZS.Army.tick(this, dt);
       if (this.phase === "day") {
         if (this.phaseT >= BAL.DAY_LEN) this._startNight(false);
@@ -1135,6 +1138,8 @@
       this.phase = "dawn";
       this.phaseT = 0;
       const log = this.nightLog || { n: 0, killed: 0, lost: [], built: 0, dmg: 0 };
+      // a bad night is heard of: an ally may put riders on the road
+      if (ZS.Nations && this.nat && (log.lost.length || log.dmg > 220)) ZS.Nations.help(this);
       const lines = [];
       lines.push("the dead came: " + log.n + " · put down: " + log.killed);
       const lost = log.lost.length;
@@ -1186,8 +1191,12 @@
       if (ZS.Army && this.army) ZS.Army.dawn(this);
       // the other people out there: opinions, caravans, demands, raids
       if (ZS.Factions && this.fac) ZS.Factions.daily(this);
+      // and the nations beyond them: envoys, wagons, and wars
+      if (ZS.Nations && this.nat) ZS.Nations.daily(this);
       // and the cure, if the village has the makings of it
       if (ZS.Cure && this.cure) ZS.Cure.daily(this);
+      // the steward: the day's work, thought about once
+      if (ZS.Autopilot) ZS.Autopilot.dawn(this);
       this._recalc();
       const si = Math.floor((this.day - 1) / 8) % 4;
       if (si !== this.seasonI) {
@@ -1429,7 +1438,9 @@
           p.scouting = !!p.scouting;
         }
       }
+      this.pilot = ZS.Autopilot ? ZS.Autopilot.load(this, s && s.pilot) : null;
       this.fac = s && s.fac ? s.fac : ZS.Factions.create(this.world.seed);
+      if (ZS.Nations) this.nat = ZS.Nations.load(this, s && s.nat);
       this.cure = s && s.cure ? s.cure : ZS.Cure.create();
       this.raiders = []; // a raid in progress is not saved; it ends with the reload
       this.raidersKilled = 0;
@@ -1826,6 +1837,8 @@
         cure: this.cure,
         cured: this.cured,
         army: ZS.Army ? ZS.Army.save(this) : null,
+        nat: ZS.Nations ? ZS.Nations.save(this) : null,
+        pilot: ZS.Autopilot ? ZS.Autopilot.save(this) : null,
       };
     }
 
@@ -2157,15 +2170,18 @@
 
     _findWork(a) {
       const job = a.job;
-      const str = (s, sub, work, cont) => ({
-        kind: "struct",
-        o: s,
-        x: s.x + s.w / 2,
-        y: s.y + s.h / 2,
-        sub,
-        work: work || 0,
-        cont: !!cont,
-      });
+      const str = (s, sub, work, cont) =>
+        !s
+          ? null // nothing there to work on (a plot with no ground under it)
+          : {
+              kind: "struct",
+              o: s,
+              x: s.x + s.w / 2,
+              y: s.y + s.h / 2,
+              sub,
+              work: work || 0,
+              cont: !!cont,
+            };
       const room = (k) => this.res[k] < this.storeCap(k) - 1;
       const node = (n, sub) => ({ kind: "node", o: n, x: n.x, y: n.y, sub, work: BAL.WORK[sub] });
       const tree = (tr) => ({
@@ -3579,15 +3595,17 @@
 
     /* ================= actions ================= */
 
-    setJob(a, job) {
+    setJob(a, job, quiet) {
       if (job === "guard" && a.job !== "guard" && this.guards().length >= this.guardCap()) {
-        if (ZS.VillageUI) ZS.VillageUI.toast("no room in the guard — build a guard post");
+        if (!quiet && ZS.VillageUI) ZS.VillageUI.toast("no room in the guard — build a guard post");
         return;
       }
       a.job = job;
       this._dress(a);
       this._breakOff(a, false);
-      if (ZS.VillageUI) ZS.VillageUI.refresh(true);
+      // a hand set by the player is their own until the next dawn
+      if (!quiet) a.hand = this.day;
+      if (!quiet && ZS.VillageUI) ZS.VillageUI.refresh(true);
     }
 
     _joinVillager() {
@@ -3662,6 +3680,12 @@
 
     openArmy() {
       this.mode = "army";
+      this.sel = null;
+      this.armed = null;
+    }
+
+    openNations() {
+      this.mode = "nations";
       this.sel = null;
       this.armed = null;
     }

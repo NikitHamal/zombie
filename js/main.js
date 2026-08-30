@@ -15,8 +15,11 @@
     DPR = 1;
 
   const world = new ZS.World(window.ZS_WW || 3200, window.ZS_WH || 2400); // a page may size its own world
-  // ?seed=N pins the map (reproducible runs); otherwise a fresh world on every refresh
-  world.seed = parseInt(params.get("seed"), 10) | 0 || (Math.random() * 0x7fffffff) | 0;
+  // The valley is a place, not a dice roll: the river that ran yesterday
+  // runs today. ?seed=N pins it; otherwise the seed is the one this browser
+  // has been keeping (js/village/chronicle.js), and a fresh one is only
+  // rolled when there is none. "a new valley" from the record starts over.
+  world.seed = ZS.Seed.get(params);
   const nav = new ZS.Nav(world);
   world.nav = nav;
   // scenario: which pack this page runs. Each HTML page sets

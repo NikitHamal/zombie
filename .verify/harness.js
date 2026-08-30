@@ -223,6 +223,16 @@ const page = fs
   .map((l) => (/<script src="([^"]+)"/.exec(l) || [])[1])
   .filter(Boolean);
 // the inline script that names the world (it lives on window, as in a page)
+// ZS_RNG pins the dice: with it, two builds of the game play the *same*
+// evening, and any difference between them is a difference in the game.
+const RNG = process.env.ZS_RNG ? +process.env.ZS_RNG : 0;
+if (RNG) {
+  let s = RNG | 0 || 1;
+  Math.random = () => {
+    s = (s * 1664525 + 1013904223) % 4294967296;
+    return s / 4294967296;
+  };
+}
 win.ZS_WW = 2200;
 win.ZS_WH = 1600;
 win.ZS_SCEN = "ScenarioVillage";
@@ -251,7 +261,15 @@ function frames(n) {
 
 function key(k, extra) {
   const e = Object.assign(
-    { key: k, shiftKey: false, ctrlKey: false, metaKey: false, altKey: false, preventDefault() {}, stopPropagation() {} },
+    {
+      key: k,
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+      preventDefault() {},
+      stopPropagation() {},
+    },
     extra || {},
   );
   for (const fn of winHandlers.keydown || []) fn(e);
