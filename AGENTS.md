@@ -415,6 +415,25 @@ that the camp is broken and the raids stop for good.
 
 A raid is not saved mid-fight: reload and it is over.
 
+### The families (js/village/kin.js — generations and legacy)
+
+Everybody in the hollow belongs to a **house** (`kin.house`, one of
+twelve: Alder, Marlow, Fen, Corbie, Hallow, Barrow, Wren, Dunn, Sedge,
+Thorne, Kesh, Vayle). The four founders each take a house of their own; a
+newcomer takes one that is thin on the ground (`Kin.adopt`); **a child
+takes its mother's**, and with it `kin.gen = mother's + 1`. A child also
+takes its mother's trait 55% of the time, and a memory of who it came
+from. `Kin.full(a)` is the name the village knows them by — used in the
+roster, the card, the graves and the birth line ("a child is born — Wren
+Alder, to Marlow Alder · third generation").
+
+`scen.line` is the book of the families: `{ n, h, b, d, m, g }` — name,
+house, born, died, mother, generation — written when somebody joins
+(`Kin.note`) and finished when they are buried (`Kin.bury`, called from
+`scen.grave`). `Kin.houses(scen)` groups it for the record panel: who is
+left of each house, how many are under the ground, how many generations
+deep it goes. It is saved as `line`.
+
 ### The cure (js/village/cure.js)
 
 Four steps, and the first three are places you have to go and come back

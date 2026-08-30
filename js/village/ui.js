@@ -719,7 +719,12 @@
       const s = this.scen;
       const job = JOBS.find((j) => j.id === a.job) || JOBS[0];
       const wpn = a.gun ? a.wep : a.tool || "fists";
-      let h = '<div class="head"><b>' + a.name + "</b><span>" + job.name + "</span>";
+      let h =
+        '<div class="head"><b>' +
+        (ZS.Kin ? ZS.Kin.full(a) : a.name) +
+        "</b><span>" +
+        job.name +
+        "</span>";
       h += '<i data-act="close">×</i></div>';
       h +=
         '<div class="line">health <b>' +
@@ -1221,9 +1226,9 @@
           '" data-act="pick" data-who="' +
           a.uid +
           '" title="click to find ' +
-          a.name +
+          (ZS.Kin ? ZS.Kin.full(a) : a.name) +
           '"><span>' +
-          a.name +
+          (ZS.Kin ? ZS.Kin.full(a) : a.name) +
           (a.sick > 0 ? " <em>·ill</em>" : "") +
           '</span><span class="hp"><i style="width:' +
           hp +
@@ -1719,6 +1724,26 @@
         (canFeast ? "" : ' class="no"') +
         ' title="a hot meal: +spirits, and the grief lifts a little">hold a feast (18 food)</button>';
       h += "</div>";
+      // the families: who is left of them, and who is under the ground
+      if (ZS.Kin) {
+        const houses = ZS.Kin.houses(s);
+        if (houses.length) {
+          h += '<div class="ptitle" style="margin-top:5px">the families</div>';
+          for (const f of houses.slice(0, 6)) {
+            h +=
+              '<div class="row' +
+              (f.live.length ? "" : " no") +
+              '"><span>' +
+              f.house +
+              '</span><span class="who">' +
+              (f.live.length ? f.live.length + " living" : "gone") +
+              (f.dead ? " · " + f.dead + " buried" : "") +
+              (f.gen > 1 ? " · " + f.gen + " generations" : "") +
+              "</span></div>";
+            if (f.live.length) h += '<div class="pfoot dim">' + f.live.join(", ") + "</div>";
+          }
+        }
+      }
       h += '<div class="pfoot">save a run</div>';
       if (ZS.Chronicle)
         for (const sl of ZS.Chronicle.slots())

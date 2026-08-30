@@ -101,6 +101,29 @@
 
   const GROW = 6; // days from birth to working age
 
+  // the hollow's family names: a newcomer takes one that is thin on the
+  // ground, a child takes its mother's
+  const HOUSES = [
+    "Alder",
+    "Marlow",
+    "Fen",
+    "Corbie",
+    "Hallow",
+    "Barrow",
+    "Wren",
+    "Dunn",
+    "Sedge",
+    "Thorne",
+    "Kesh",
+    "Vayle",
+  ];
+
+  const ORDINAL = ["", "first", "second", "third", "fourth", "fifth", "sixth", "seventh"];
+
+  function ordinal(n) {
+    return ORDINAL[n] || n + "th";
+  }
+
   const Kin = {
     TRAITS,
     GROW,
@@ -125,23 +148,127 @@
     },
 
     // a child: small, useless for now, and the whole village's stake in
-    // being alive next year
+    // being alive next year. It takes its mother's house, her generation
+    // plus one, and — more often than not — her nature.
     born(mother, day) {
+      const mk = mother && mother.kin ? mother.kin : null;
+      const trait =
+        mk && Math.random() < 0.55 ? mk.trait : TRAITS[(Math.random() * TRAITS.length) | 0].id;
       return {
-        trait: TRAITS[(Math.random() * TRAITS.length) | 0].id,
+        trait,
         age: 0,
         born: day,
         child: true,
         grow: 0,
         morale: 0.8,
-        mem: ["born in the hollow"],
+        mem: ["born in the hollow", mk ? "of " + this.full(mother) : "found as a child"],
         kids: 0,
         worked: 0,
         nights: 0,
         kills: 0,
         saved: 0,
         mother: mother ? mother.name : null,
+        house: mk ? mk.house || null : null,
+        gen: (mk && mk.gen ? mk.gen : 1) + 1,
       };
+    },
+
+    /* ---------- names, houses, generations ---------- */
+
+    // the name the village knows them by
+    full(a) {
+      if (!a) return "";
+      const h = a.kin && a.kin.house;
+      return h ? a.name + " " + h : a.name;
+    },
+
+    generation(a) {
+      return (a && a.kin && a.kin.gen) || 1;
+    },
+
+    generationWord(a) {
+      return ordinal(this.generation(a)) + " generation";
+    },
+
+    // a house for somebody who walked in out of the wood: one that is
+    // thin on the ground, or a fresh one
+    adopt(scen, a) {
+      if (!a.kin) return a;
+      if (a.kin.house) return a;
+      const used = {};
+      for (const v of scen.villagers()) {
+        if (v === a || !v.kin || !v.kin.house) continue;
+        used[v.kin.house] = (used[v.kin.house] || 0) + 1;
+      }
+      let pick = null,
+        few = 99;
+      for (const h of HOUSES) {
+        const n = used[h] || 0;
+        if (n < few) {
+          few = n;
+          pick = h;
+        }
+      }
+      a.kin.house = pick;
+      a.kin.gen = 1; // the first of their line in the hollow
+      return a;
+    },
+
+    /* ---------- the lineage: who was born here, and who is left ---------- */
+
+    // scen.line is the village's own book of its families
+    line(scen) {
+      if (!scen.line) scen.line = [];
+      return scen.line;
+    },
+
+    // written when somebody joins the village, and finished when they die
+    note(scen, a) {
+      const book = this.line(scen);
+      for (const r of book) if (r.n === a.name && !r.d) return r;
+      const k = a.kin || {};
+      const r = {
+        n: a.name,
+        h: k.house || null,
+        b: k.born || scen.day,
+        d: 0,
+        m: k.mother || null,
+        g: k.gen || 1,
+      };
+      book.push(r);
+      if (book.length > 120) book.shift();
+      return r;
+    },
+
+    bury(scen, a) {
+      const book = this.line(scen);
+      let r = book.find((x) => x.n === a.name && !x.d);
+      if (!r) r = this.note(scen, a);
+      r.d = scen.day;
+      return r;
+    },
+
+    // the families, for the record: who is left of each, and who is under
+    // the ground
+    houses(scen) {
+      const out = [];
+      const by = {};
+      for (const v of scen.villagers()) {
+        const h = (v.kin && v.kin.house) || "no house";
+        const f = by[h] || (by[h] = { house: h, live: [], dead: 0, gen: 0, born: 0 });
+        f.live.push(v.name);
+        f.gen = Math.max(f.gen, this.generation(v));
+      }
+      for (const r of this.line(scen)) {
+        const h = r.h || "no house";
+        const f = by[h] || (by[h] = { house: h, live: [], dead: 0, gen: 0, born: 0 });
+        f.gen = Math.max(f.gen, r.g || 1);
+        if (r.d) f.dead++;
+        else f.born++;
+      }
+      for (const h in by) out.push(by[h]);
+      out.sort((a, b) => b.live.length - a.live.length || a.house.localeCompare(b.house));
+      return out;
     },
 
     trait(a) {
@@ -302,7 +429,16 @@
         for (const v of scen.villagers())
           if (v !== a) v.kin.morale = Math.min(1, v.kin.morale + 0.14);
         scen.grief = Math.max(0, (scen.grief || 0) - 0.3);
-        if (scen.logLine) scen.logLine("a child is born — " + a.name + ", to " + mother.name);
+        if (ZS.Kin) ZS.Kin.note(scen, a);
+        if (scen.logLine)
+          scen.logLine(
+            "a child is born — " +
+              this.full(a) +
+              ", to " +
+              this.full(mother) +
+              " · " +
+              this.generationWord(a),
+          );
       }
       return a;
     },

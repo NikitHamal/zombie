@@ -261,6 +261,77 @@ ok(
   );
 }
 
+/* ---------- generations: houses, inheritance, and the book of them ---------- */
+{
+  const K = ZS.Kin;
+  const step = (n) => {
+    for (let i = 0; i < n; i++) {
+      frames(1);
+      if (G.card) G.dismissCard();
+    }
+  };
+  ok("the kin keep houses", typeof K.full === "function" && typeof K.houses === "function");
+
+  // every soul in the village has a name the village knows them by
+  const named = G.villagers().filter((a) => K.full(a) && K.full(a).indexOf(" ") > 0);
+  ok(
+    "they carry a house",
+    named.length === G.villagers().length,
+    named.length + "/" + G.villagers().length + " named",
+  );
+  ok(
+    "and a generation",
+    G.villagers().every((a) => K.generation(a) >= 1),
+    K.generationWord(G.villagers()[0]),
+  );
+
+  // a child takes its mother's house, and more often than not her nature
+  const mother = G.villagers().find((a) => !(a.kin && a.kin.child));
+  mother.kin.house = mother.kin.house || "Alder";
+  mother.kin.gen = mother.kin.gen || 1;
+  const k = K.born(mother, G.day);
+  ok("a child is born into its mother's house", k.house === mother.kin.house, k.house);
+  ok("and into the next generation", k.gen === (mother.kin.gen || 1) + 1, "gen " + k.gen);
+  let same = 0;
+  for (let i = 0; i < 60; i++) if (K.born(mother, G.day).trait === mother.kin.trait) same++;
+  ok("and takes after her more often than not", same > 20 && same < 55, same + " of 60");
+
+  // the book of the families
+  K.note(G, mother);
+  ok(
+    "the lineage is written",
+    (G.line || []).some((r) => r.n === mother.name),
+  );
+  K.bury(G, mother);
+  ok(
+    "and finished when they die",
+    (G.line || []).find((r) => r.n === mother.name).d === G.day,
+    "died day " + G.day,
+  );
+  const houses = K.houses(G);
+  ok("the houses can be counted", houses.length > 0, houses.map((h) => h.house).join(", "));
+  ok(
+    "each with the living and the dead",
+    houses.every((h) => Array.isArray(h.live)),
+  );
+
+  // it goes with the save
+  const s = G.serialize();
+  ok(
+    "the book is saved",
+    Array.isArray(s.line) && s.line.length === (G.line || []).length,
+    (s.line || []).length + " entries",
+  );
+
+  // and the record panel shows it
+  G.openChron();
+  step(4);
+  const h = ZS.VillageUI.html.panel || "";
+  ok("the record shows the families", /the families/.test(h), h.length + " chars");
+  G.cancelMode();
+  step(2);
+}
+
 /* ---------- round trip ---------- */
 {
   const s = G.serialize();

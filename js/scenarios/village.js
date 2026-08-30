@@ -680,7 +680,15 @@
       this.loaded = null;
       for (const a of agents) this._dress(a);
       // the people: a trait, an age, a temper
-      for (const a of agents) if (!a.kin) a.kin = ZS.Kin.make(Math.random, this.day);
+      for (const a of agents) {
+        if (a.kin) continue;
+        a.kin = ZS.Kin.make(Math.random, this.day);
+        // the first four are the founders: each takes a house of their own
+        if (ZS.Kin) {
+          ZS.Kin.adopt(this, a);
+          ZS.Kin.note(this, a);
+        }
+      }
       this._startSystems(s);
       if (ZS.Army) ZS.Army.load(this, s && s.army);
       this._recalc();
@@ -1454,6 +1462,7 @@
       this.bonus = (s && s.bonus) || { farm: 0 };
       this.souls = (s && s.souls) || 0;
       this.putDown = (s && s.putDown) || 0;
+      this.line = (s && s.line) || []; // the book of the families
       if (s && s.props)
         this.props = s.props.map(([kind, x, y, seed]) => ZS.Art.prop(kind, x, y, seed));
       else if (!this.props.length) this.spawnProps();
@@ -1689,7 +1698,8 @@
       const bx = this.center.x - 250 + (n % 6) * 26,
         by = this.center.y + 190 + Math.floor(n / 6) * 22;
       const p = ZS.Art.prop("grave", bx, by, v.seed === undefined ? Math.random() * 997 : v.seed);
-      p.who = v.name;
+      p.who = ZS.Kin ? ZS.Kin.full(v) : v.name;
+      if (ZS.Kin) ZS.Kin.bury(this, v);
       this.props.push(p);
     }
 
@@ -1832,6 +1842,7 @@
         bonus: this.bonus,
         souls: this.souls,
         putDown: this.putDown || 0,
+        line: this.line || [],
         props: this.props.map((p) => [
           p.kind,
           Math.round(p.x),
@@ -3659,6 +3670,10 @@
       }
       a.name = free;
       a.kin = ZS.Kin.make(Math.random, this.day);
+      if (ZS.Kin) {
+        ZS.Kin.adopt(this, a);
+        ZS.Kin.note(this, a);
+      }
       this._dress(a);
       this.agents.push(a);
       return a;
