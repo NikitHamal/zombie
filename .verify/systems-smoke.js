@@ -166,7 +166,11 @@ const mourn0 = G.grief;
 const dying = G.villagers()[1];
 G.killVillager(dying, "a test");
 check(G.grief > mourn0, "the village grieves", G.grief.toFixed(2));
-check(!!G.props.find((p) => p.kind === "grave" && p.who === dying.name), "and digs a grave");
+check(
+  !!G.props.find((p) => p.kind === "grave" && p.who === ZS.Kin.full(dying)),
+  "and digs a grave",
+  ZS.Kin.full(dying),
+);
 check(
   G.chron.some((e) => e.kind === "death"),
   "and writes it in the record",
