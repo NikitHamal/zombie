@@ -32,10 +32,10 @@
     DUSK: 9, // the warning: the horn, the sky, everyone home
     NIGHT_LEN: 70, // 19:00 → 06:00
     DAWN: 3,
-    START: { wood: 45, stone: 25, food: 70, scrap: 14 },
+    START: { wood: 60, stone: 30, food: 90, scrap: 14, cloth: 0 },
     POP0: 4,
     STORE0: 260, // the hall's own corner, per good, before any storehouse
-    HOMES0: 2,
+    HOMES0: 4,
     CARRY: 12, // a villager's load
     SPEED: { walk: 82, haul: 74, guard: 92, panic: 138 },
     WORK: { tree: 3.4, rock: 4.2, bush: 2.6, wreck: 3.6, plant: 2.6, tend: 2.2, reap: 3.2 },
@@ -45,9 +45,9 @@
     TREE_REGROW: 70, // a sapling in the wood, so timber never runs out
     GROW: 46, // seconds a plot needs to ripen, before modifiers
     FARM_YIELD: 10,
-    VILL_HP: 55,
-    GUARD_HP: 78,
-    FIST_DMG: 7,
+    VILL_HP: 60,
+    GUARD_HP: 90,
+    FIST_DMG: 8,
     FIST_RATE: 0.95,
     SUN_DPS: 2.2, // daylight finishes the dead that linger after a night
     UPKEEP: 3, // food per villager, charged at dawn
@@ -64,26 +64,35 @@
     VILL_FIGHT: 34, // a cornered villager swings back from this far
     FLEE: 130, // a villager bolts when the dead are this close
     SHELTER_R: 90, // how close to the hall the village huddles
-    INFECT_TIME: 45, // seconds a bite takes to turn someone
-    INFECT_CHANCE: 0.35,
+    LEASH: 230, // how far a guard will follow the fight from the line
+    INFECT_TIME: 80, // seconds a bite takes to turn someone
+    INFECT_CHANCE: 0.13,
     RISE_CHANCE: 0.4, // the dead get up again...
     ZED: {
       walker: { hp: 24, dmg: 5, spd: 76, cd: 1.15, reach: 20, scrap: 1 },
       runner: { hp: 18, dmg: 4, spd: 146, cd: 0.85, reach: 18, scrap: 2 },
       brute: { hp: 110, dmg: 16, spd: 52, cd: 1.6, reach: 26, scrap: 5 },
+      // dragged down but not finished: slow, low, and easy to step over —
+      // until there are forty of them
+      crawler: { hp: 14, dmg: 4, spd: 38, cd: 1.4, reach: 15, scrap: 1 },
+      // stands at the back and screams: every scream pulls more of them in
+      wailer: { hp: 34, dmg: 3, spd: 58, cd: 1.5, reach: 17, scrap: 3 },
     },
     ZED_HP_DAY: 2.5,
-    NIGHT_N: (day) => Math.min(70, 1 + day * 1.05 + Math.floor(Math.pow(day, 1.2) * 0.2)),
+    NIGHT_N: (day) => Math.min(70, 1 + day * 0.95 + Math.floor(Math.pow(day, 1.15) * 0.16)),
     RUNNER_DAY: 5,
     BRUTE_DAY: 9,
+    CRAWL_DAY: 3,
+    WAIL_DAY: 10,
+    WAIL_CALL: 1, // how many a wailer's scream pulls in
     SURGE: [0.42, 0.74], // the two late-night pushes, as a fraction of the night
   };
 
   // guard weapons, by research tier (the armed look is the frozen one)
   const WEAPONS = {
-    club: { name: "clubs", dmg: 10, range: 26, rate: 1, melee: true, tool: "club" },
-    spear: { name: "spears", dmg: 16, range: 38, rate: 1.05, melee: true, tool: "spear" },
-    bow: { name: "bows", dmg: 13, range: 215, rate: 1.1, tool: "bow" },
+    club: { name: "clubs", dmg: 12, range: 26, rate: 0.85, melee: true, tool: "club" },
+    spear: { name: "spears", dmg: 18, range: 38, rate: 1.05, melee: true, tool: "spear" },
+    bow: { name: "bows", dmg: 15, range: 215, rate: 1.1, tool: "bow" },
     rifle: { name: "rifles", dmg: 17, range: 300, rate: 0.95, gun: "rifle" },
     shotgun: { name: "shotguns", dmg: 30, range: 170, rate: 1.35, gun: "shotgun", pellets: 3 },
     smg: { name: "SMGs", dmg: 11, range: 250, rate: 0.28, gun: "smg" },
@@ -304,6 +313,8 @@
     fight: "fighting",
     flee: "running",
     patrol: "on watch",
+    douse: "fighting the fire",
+    away: "out in the valley",
   };
 
   /* ---------- helpers ---------- */
@@ -364,6 +375,22 @@
       this.moanT = 0;
       this.warned = {};
       this.starveT = 0;
+
+      /* ---------- the newer systems ---------- */
+      this.props = []; // carts, barrels, graves, racks (js/village/art.js)
+      this.critters = []; // chickens, sheep, dogs, crows, rats
+      this.ow = null; // the valley beyond the clearing (js/village/overworld.js)
+      this.haz = null; // fire, fever, rats, cold, despair (js/village/hazards.js)
+      this.chron = []; // the ledger (js/village/chronicle.js)
+      this.away = []; // everybody out on an expedition
+      this.alerts = []; // what the overlay is shouting about
+      this.grief = 0;
+      this.morale = 0.7;
+      this.bonus = { farm: 0 }; // things found out there that stay found
+      this.winterWood = 0; // the day's burn, for the panel
+      this.souls = 0; // candles on the shrine
+      this.drag = null; // a line of barricades being dragged out
+      this.seasonI = 0;
       this.loaded = this._load();
     }
 
@@ -545,6 +572,25 @@
           a.job = p.j;
           a.hp = p.hp;
           a.inf = p.i || 0;
+          a.sick = p.s || 0;
+          if (p.k) {
+            const k = p.k;
+            a.kin = {
+              trait: k[0],
+              age: k[1],
+              child: !!k[2],
+              grow: k[3] || 0,
+              morale: k[4],
+              mem: k[5] || [],
+              kids: k[6] || 0,
+              mother: k[7] || null,
+              born: 1,
+              worked: 0,
+              nights: 0,
+              kills: 0,
+              saved: 0,
+            };
+          }
           agents.push(a);
         }
       } else {
@@ -564,6 +610,9 @@
       }
       this.loaded = null;
       for (const a of agents) this._dress(a);
+      // the people: a trait, an age, a temper
+      for (const a of agents) if (!a.kin) a.kin = ZS.Kin.make(Math.random, this.day);
+      this._startSystems(s);
       this._recalc();
     }
 
@@ -586,9 +635,15 @@
     maxSpeed(a) {
       if (a.st === 2) return a.spd;
       if (a.panic > 0) return BAL.SPEED.panic;
-      if (a.job === "guard") return BAL.SPEED.guard;
-      if (a.carry && a.carry.n) return BAL.SPEED.haul;
-      return BAL.SPEED.walk;
+      let s =
+        a.job === "guard"
+          ? BAL.SPEED.guard
+          : a.carry && a.carry.n
+            ? BAL.SPEED.haul
+            : BAL.SPEED.walk;
+      if (ZS.Kin && a.kin) s *= ZS.Kin.speed(a);
+      if (a.sick > 0) s *= 0.62; // a fever takes the legs first
+      return s;
     }
 
     makeAgent(x, y, st, extra) {
@@ -682,6 +737,7 @@
       this._shT = Math.max(0, (this._shT || 0) - dt);
       this._sdT = Math.max(0, (this._sdT || 0) - dt);
       this._tickResearch(dt);
+      this._tickSystems(agents, dt);
       if (this.phase === "day") {
         if (this.phaseT >= BAL.DAY_LEN) this._startNight(false);
       } else if (this.phase === "dusk") {
@@ -692,6 +748,15 @@
         }
       } else if (this.phase === "night") {
         this.nightT += dt;
+        const nf = this.nightT / this._nightLen();
+        const stage =
+          nf < 0.12 ? "scouts" : nf < 0.4 ? "trickle" : nf < 0.72 ? "push" : "stragglers";
+        if (stage !== this.stage) {
+          this.stage = stage;
+          if (stage === "push" && ZS.VillageUI) ZS.VillageUI.toast("here they come");
+          if (stage === "stragglers" && ZS.VillageUI)
+            ZS.VillageUI.toast("nearly light — the last of them");
+        }
         while (this.queue.length && this.queue[0].t <= this.nightT)
           this._spawnZed(this.queue.shift());
         if (this.nightT >= this._nightLen() || (!this.queue.length && !this._zeds(agents).length))
@@ -709,17 +774,22 @@
     }
 
     frame(agents, dt, _t, _grid, _nav) {
+      const sh = this._shelter();
       for (const a of agents) {
         if (a.muzzle > 0) a.muzzle = Math.max(0, a.muzzle - dt);
         if (a.panic > 0) a.panic = Math.max(0, a.panic - dt);
-        if (
-          a.st === 0 &&
-          a.hp < a.maxHp &&
-          this.phase === "day" &&
-          this.res.food > 0 &&
-          a.mode !== "rest"
-        )
+        if (a.st !== 0 || a.dead) continue;
+        if (a.hp < a.maxHp && this.phase === "day" && this.res.food > 0 && a.mode !== "rest")
           a.hp = Math.min(a.maxHp, a.hp + 1.2 * dt);
+        // by night, with a roof over them and the door barred, they mend
+        if (
+          this.phase === "night" &&
+          a.hp < a.maxHp &&
+          a.sick <= 0 &&
+          dist2(a.x, a.y, sh.x, sh.y) < BAL.SHELTER_R * BAL.SHELTER_R &&
+          a.mode !== "fight"
+        )
+          a.hp = Math.min(a.maxHp, a.hp + 0.9 * dt * (ZS.Kin ? ZS.Kin.heal(a) : 1));
       }
       // the light finishes whatever the night left behind
       if (this.phase === "day") {
@@ -812,7 +882,7 @@
       for (const a of agents) {
         if (a.st !== 0 || a.inf <= 0) continue;
         a.inf -= dt;
-        if (a.inf <= 0) this._turn(a);
+        if (a.inf <= 0 && !this._fightItOff(a)) this._turn(a);
       }
     }
 
@@ -827,14 +897,25 @@
       // the schedule: most of them trickle in, two pushes late on
       const len = this._nightLen();
       this.queue = [];
+      // The shape of a night: two or three drift in early while it is still
+      // light enough to watch them come, the trickle through the dark, two
+      // pushes in the small hours, and stragglers at first light.
       for (let i = 0; i < n; i++) {
-        let t;
+        let t,
+          k = "walker";
         const roll = Math.random();
-        if (roll < 0.22) t = len * (BAL.SURGE[0] + Math.random() * 0.06);
-        else if (roll < 0.36) t = len * (BAL.SURGE[1] + Math.random() * 0.08);
-        else t = Math.random() * len * 0.8;
-        this.queue.push({ t });
+        if (i < Math.min(3, 1 + (this.day > 4 ? 1 : 0) + (this.day > 9 ? 1 : 0))) {
+          t = len * (0.03 + Math.random() * 0.1);
+          k = "scout";
+        } else if (roll < 0.2) t = len * (BAL.SURGE[0] + Math.random() * 0.06);
+        else if (roll < 0.34) t = len * (BAL.SURGE[1] + Math.random() * 0.08);
+        else if (roll < 0.42) {
+          t = len * (0.9 + Math.random() * 0.09);
+          k = "straggler";
+        } else t = Math.random() * len * 0.8;
+        this.queue.push({ t, k });
       }
+      this.stage = "scouts";
       this.queue.sort((a, b) => a.t - b.t);
       this.nightLog = { n: 0, killed: 0, lost: [], built: 0, dmg: 0, called: !!called };
       if (ZS.sound) ZS.sound.event("horn", this.hall.x, this.hall.y);
@@ -849,13 +930,18 @@
       if (ZS.VillageUI) ZS.VillageUI.toast("the bell — you called the dark down early");
     }
 
-    _spawnZed() {
-      const p = this._spawnPoint();
+    _spawnZed(e) {
+      const p = (e && e.at) || this._spawnPoint();
       if (!p) return;
       const day = this.day;
       let type = "walker";
-      if (day >= BAL.BRUTE_DAY && Math.random() < 0.16 + day * 0.006) type = "brute";
+      const kind = e && e.k ? e.k : "walker";
+      if (kind === "scout")
+        type = day >= BAL.RUNNER_DAY && Math.random() < 0.4 ? "runner" : "walker";
+      else if (day >= BAL.BRUTE_DAY && Math.random() < 0.16 + day * 0.006) type = "brute";
       else if (day >= BAL.RUNNER_DAY && Math.random() < 0.24 + day * 0.01) type = "runner";
+      else if (day >= BAL.CRAWL_DAY && Math.random() < 0.14) type = "crawler";
+      if (day >= BAL.WAIL_DAY && Math.random() < 0.05) type = "wailer";
       const z = BAL.ZED[type];
       const hp = z.hp + day * BAL.ZED_HP_DAY * (type === "brute" ? 3 : 1);
       const a = this.makeAgent(p.x, p.y, 2, {
@@ -867,6 +953,7 @@
         atkT: ZS.rnd(0, 0.8),
         scale: type === "brute" ? 1.65 : type === "runner" ? 0.92 : 1,
         name: null,
+        screamT: type === "wailer" ? 3 + Math.random() * 3 : 0,
       });
       this.agents.push(a);
       if (this.nightLog) this.nightLog.n++;
@@ -937,17 +1024,32 @@
         a.panic = 0;
         this._breakOff(a, false);
       }
+      // the people: grief, birth, coming of age
+      if (ZS.Kin) ZS.Kin.daily(this);
+      // everything else that can go wrong, rolled at dawn
+      if (ZS.Hazards && this.haz) ZS.Hazards.daily(this);
       this._recalc();
+      const si = Math.floor((this.day - 1) / 8) % 4;
+      if (si !== this.seasonI) {
+        this.seasonI = si;
+        this.logLine(SEASONS[si].name + " — " + SEASONS[si].desc);
+      }
+      if (ZS.Chronicle) ZS.Chronicle.autosave(this);
       if (ZS.VillageUI)
         ZS.VillageUI.toast("day " + this.day + " · " + this.season.name + ", " + this.weather.name);
     }
 
     _upkeep() {
+      let gran = 0;
+      for (const b of this.world.buildings)
+        if (b.kind === "granary" && b.built && !b.ruined) gran += b.lvl;
+      const keep = 1 - Math.min(0.28, gran * 0.09);
       return (
         this.villagers().length *
         BAL.UPKEEP *
         (this.season.upkeep || 1) *
-        (this.weather.upkeep || 1)
+        (this.weather.upkeep || 1) *
+        keep
       );
     }
 
@@ -1004,42 +1106,7 @@
     save(_agents) {
       if (!this.hall) return;
       try {
-        const pop = this.villagers().map((a) => ({
-          x: Math.round(a.x),
-          y: Math.round(a.y),
-          n: a.name,
-          j: a.job,
-          hp: Math.round(a.hp),
-          i: Math.round(a.inf),
-        }));
-        const bs = this.world.buildings.map((b) => [
-          b.kind,
-          Math.round(b.x),
-          Math.round(b.y),
-          b.lvl,
-          Math.round(b.hp),
-          b.built ? 1 : 0,
-          b.ruined ? 1 : 0,
-          b.prog === undefined ? 1 : Math.round(b.prog * 100) / 100,
-        ]);
-        localStorage.setItem(
-          SAVE_KEY,
-          JSON.stringify({
-            v: 1,
-            day: this.day,
-            seed: this.world.seed,
-            res: this.res,
-            done: this.done,
-            pop,
-            bs,
-            nodes: this.nodes.map((n) => [
-              n.kind,
-              Math.round(n.x),
-              Math.round(n.y),
-              Math.round(n.amt),
-            ]),
-          }),
-        );
+        localStorage.setItem(SAVE_KEY, JSON.stringify(this.serialize()));
       } catch {
         /* private browsing, a full disk: the game still plays */
       }
@@ -1050,7 +1117,7 @@
         const raw = localStorage.getItem(SAVE_KEY);
         if (!raw) return null;
         const s = JSON.parse(raw);
-        return s && s.v === 1 ? s : null;
+        return s && (s.v === 1 || s.v === 2) ? s : null;
       } catch {
         return null;
       }
@@ -1097,6 +1164,462 @@
         /* nothing saved, nothing to clear */
       }
       location.reload();
+    }
+
+    // the newer systems, all on the village's clock
+    _tickSystems(agents, dt) {
+      if (ZS.Kin) ZS.Kin.tick(this, dt);
+      if (ZS.Hazards && this.haz) ZS.Hazards.tick(this, dt);
+      if (ZS.Overworld && this.ow) ZS.Overworld.tick(this.ow, dt, this);
+      if (ZS.Art && this.critters.length) {
+        const threat = this.phase === "night" || this.phase === "dusk" ? this._zeds(agents) : null;
+        ZS.Art.tickCritters(this.critters, dt, this.t, this.nav, threat);
+      }
+      for (let i = this.alerts.length - 1; i >= 0; i--) {
+        this.alerts[i].t -= dt;
+        if (this.alerts[i].t <= 0) this.alerts.splice(i, 1);
+      }
+      let sick = 0;
+      for (const a of this.villagers()) if (a.sick > 0) sick++;
+      if (this.haz) this.haz.sick = sick;
+      // rain, snow, leaves, embers: only in the rectangle you are looking at
+      if (ZS.Art) {
+        ZS.Art.setWeather(this.weather.id, 0.4);
+        const cam = ZS.debug && ZS.debug.cam;
+        if (cam) {
+          const vw = window.innerWidth || 1280,
+            vh = window.innerHeight || 720;
+          ZS.Art.tickWeather(dt, this.t, cam.visible(vw, vh, 80), this._env || { night: 0 });
+        }
+      }
+    }
+
+    /* ============== the wider world: the valley, the weather, the people ============== */
+
+    _startSystems(s) {
+      this.ow = s && s.ow ? s.ow : ZS.Overworld.create(this.world.seed);
+      this.ow.parties = this.ow.parties || [];
+      this.haz = ZS.Hazards.create();
+      if (s && s.haz) {
+        this.haz.rats = s.haz.rats || 0;
+        this.haz.despair = s.haz.despair || 0;
+        this.haz.cold = s.haz.cold || 0;
+        this.haz.feastT = s.haz.feastT || 0;
+        this.haz.sick = 0;
+      }
+      // parties that were out when the record was written come back with it
+      if (this.ow && this.ow.parties && this.ow.parties.length) {
+        for (const p of this.ow.parties) {
+          const mem = [];
+          for (const m of p.members || []) {
+            const a = this.makeAgent(
+              this.hall.x + this.hall.w / 2,
+              this.hall.y + this.hall.h / 2,
+              0,
+            );
+            a.name = m.n;
+            a.job = m.j;
+            a.hp = m.hp || 20;
+            a.kin = m.k
+              ? {
+                  trait: m.k[0],
+                  age: m.k[1],
+                  child: !!m.k[2],
+                  grow: 0,
+                  morale: m.k[3],
+                  mem: [],
+                  kids: 0,
+                  born: 1,
+                  worked: 0,
+                  nights: 0,
+                  kills: 0,
+                  saved: 0,
+                  mother: null,
+                }
+              : ZS.Kin.make(Math.random, this.day);
+            this._dress(a);
+            a.away = true;
+            a.gone = false;
+            this.away.push(a);
+            mem.push(a);
+          }
+          p.members = mem;
+          p.scouting = !!p.scouting;
+        }
+      }
+      this.chron = (s && s.chron) || [];
+      this.grief = (s && s.grief) || 0;
+      this.bonus = (s && s.bonus) || { farm: 0 };
+      this.souls = (s && s.souls) || 0;
+      if (s && s.props)
+        this.props = s.props.map(([kind, x, y, seed]) => ZS.Art.prop(kind, x, y, seed));
+      else if (!this.props.length) this.spawnProps();
+      if (s && s.crit)
+        this.critters = s.crit.map(([kind, x, y]) => {
+          const c = ZS.Art.critter(kind, x, y);
+          c.home = { x, y };
+          return c;
+        });
+      else if (!this.critters.length) {
+        this.spawnCritters("chicken", 3, this.center.x + 40, this.center.y + 110);
+        this.spawnCritters("crow", 2, this.center.x - 150, this.center.y - 120);
+        this.spawnCritters("sheep", 2, this.center.x + 220, this.center.y + 40);
+      }
+      // grass, pebbles, ruts: painted once into the persistent stain layer
+      if (ZS.Art && this.stains && !this._deco) {
+        this._deco = 1;
+        ZS.Art.decorate(
+          this.stains,
+          this.world,
+          this.nav,
+          this.center.x,
+          this.center.y,
+          this.world.seed,
+        );
+      }
+    }
+
+    // the furniture of the place, set down once at the start
+    spawnProps() {
+      const cx = this.center.x,
+        cy = this.center.y;
+      const put = (kind, dx, dy) => this.addProp(kind, cx + dx, cy + dy);
+      put("cart", 128, 118);
+      put("barrel", 62, 86);
+      put("crate", 100, 92);
+      put("sack", 38, 112);
+      put("woodpile", 152, 56);
+      put("signpost", -176, 44);
+      put("banner", -58, 126);
+      put("torch", 26, 148);
+      put("torch", -144, 116);
+      put("logs", -124, -64);
+      put("stones", 206, 126);
+    }
+
+    addProp(kind, x, y) {
+      if (!ZS.Art) return null;
+      const p = ZS.Art.prop(kind, x, y, Math.random() * 997);
+      this.props.push(p);
+      return p;
+    }
+
+    spawnCritters(kind, n, x, y) {
+      if (!ZS.Art) return;
+      for (let i = 0; i < n; i++) {
+        const p = this.nav.nearestWalkable(
+          x + (Math.random() - 0.5) * 100,
+          y + (Math.random() - 0.5) * 80,
+          220,
+          false,
+        );
+        if (p) this.critters.push(ZS.Art.critter(kind, p.x, p.y));
+      }
+    }
+
+    // a structure finished: what comes with it
+    onBuilt(b) {
+      const cx = b.x + b.w / 2,
+        cy = b.y + b.h / 2;
+      if (b.kind === "kennel") this.spawnCritters("dog", 2, cx, cy + 30);
+      else if (b.kind === "mill") this.spawnCritters("sheep", 2, cx + 60, cy + 40);
+      else if (b.kind === "farm") {
+        this.addProp("scarecrow", cx - 30, cy + 20);
+        this.addProp("hive", cx + 46, cy + 14);
+      } else if (b.kind === "granary") {
+        this.addProp("sack", cx - 20, cy + 30);
+        this.addProp("sack", cx + 16, cy + 34);
+      } else if (b.kind === "store") {
+        this.addProp("crate", cx - 30, cy + 26);
+        this.addProp("barrel", cx + 30, cy + 26);
+      } else if (b.kind === "hut") {
+        this.addProp("barrel", cx + 34, cy + 22);
+      } else if (b.kind === "shrine") {
+        b.souls = this.souls || 1;
+        this.logLine("the shrine is raised — the village has somewhere to grieve");
+      } else if (b.kind === "well") {
+        this.addProp("pump", cx + 30, cy + 16);
+      } else if (b.kind === "smith") {
+        this.logLine("the forge is lit");
+      }
+      if (ZS.Chronicle) ZS.Chronicle.add(this, ZS.Structs.CAT[b.kind].name + " built", "build");
+    }
+
+    /* ---------- the expedition's hooks (see js/village/overworld.js) ---------- */
+
+    // who could be spared: adults at home, the fittest first, guards last
+    partyPool(n) {
+      const pool = this.villagers().filter((a) => !(a.kin && a.kin.child) && !a.away);
+      pool.sort((a, b) => {
+        const sa =
+          (a.job === "guard" ? -1 : 0) + a.hp / a.maxHp + (a.kin ? a.kin.morale : 0.7) * 0.2;
+        const sb =
+          (b.job === "guard" ? -1 : 0) + b.hp / b.maxHp + (b.kin ? b.kin.morale : 0.7) * 0.2;
+        return sb - sa;
+      });
+      return pool.slice(0, n);
+    }
+
+    sendAway(a) {
+      a.away = true;
+      const i = this.agents.indexOf(a);
+      if (i >= 0) this.agents.splice(i, 1);
+      this.away.push(a);
+      if (this.sel && this.sel.o === a) this.sel = null;
+    }
+
+    bringBack(a, lost, bitten) {
+      const i = this.away.indexOf(a);
+      if (i >= 0) this.away.splice(i, 1);
+      a.away = false;
+      if (lost) {
+        // they are not coming back
+        if (ZS.Kin) ZS.Kin.mourn(this, a);
+        if (ZS.Chronicle) ZS.Chronicle.add(this, a.name + " — lost in the valley", "death");
+        this.souls++;
+        this.grave(a);
+        return;
+      }
+      const p =
+        this.nav.nearestWalkable(
+          this.hall.x + this.hall.w / 2 + (Math.random() - 0.5) * 140,
+          this.hall.y + this.hall.h / 2 + 110,
+          240,
+          false,
+        ) || this.hall;
+      a.x = p.x || this.hall.x;
+      a.y = p.y || this.hall.y;
+      a.vx = 0;
+      a.vy = 0;
+      a.tgt = null;
+      a.mode = "idle";
+      a.task = TASK.idle;
+      a.path = null;
+      a.gx = null;
+      a.carry = null;
+      a.hp = Math.max(4, a.hp * 0.7);
+      if (bitten) {
+        a.inf = BAL.INFECT_TIME;
+        if (ZS.VillageUI) ZS.VillageUI.toast(a.name + " came home bitten");
+      }
+      this.agents.push(a);
+    }
+
+    weaponTier() {
+      const o = WEP_ORDER.indexOf(this.weaponKey ? this.weaponKey() : "club");
+      return o < 0 ? 0 : o;
+    }
+
+    grantResearch(id) {
+      if (this.done[id]) return;
+      this.done[id] = true;
+      this._recalc();
+      if (ZS.VillageUI) ZS.VillageUI.toast("learned: " + RESEARCH[id].name);
+      if (ZS.Chronicle) ZS.Chronicle.add(this, "learned " + RESEARCH[id].name, "note");
+    }
+
+    // a new face: from the wood, from a birth, or from the far side of the river
+    joinVillager(fromOutside, kinRec) {
+      const hx = this.hall.x + this.hall.w / 2,
+        hy = this.hall.y + this.hall.h / 2;
+      const p = this.nav.nearestWalkable(
+        hx + (Math.random() - 0.5) * 120,
+        hy + 90 + Math.random() * 60,
+        200,
+        false,
+      ) || { x: hx, y: hy };
+      const a = this.makeAgent(p.x, p.y, 0);
+      const used = {};
+      for (const v of this.agents) if (v.name) used[v.name] = 1;
+      let free = null;
+      for (let i = 0; i < 10 && !free; i++) {
+        const n = NAMES[(Math.random() * NAMES.length) | 0];
+        if (!used[n]) free = n;
+      }
+      if (!free) {
+        let i = 2;
+        while (used[(free = NAMES[0] + " " + i)]) i++;
+      }
+      a.name = free;
+      a.kin = kinRec || ZS.Kin.make(Math.random, this.day);
+      this._dress(a);
+      this.agents.push(a);
+      if (fromOutside && ZS.Chronicle)
+        ZS.Chronicle.add(this, a.name + " joined the village", "note");
+      this._recalc();
+      return a;
+    }
+
+    /* ---------- death, and the record ---------- */
+
+    killVillager(v, cause) {
+      if (v.dead) return;
+      this._killVillager(v);
+      this.souls++;
+      this.grave(v);
+      if (ZS.Kin) ZS.Kin.mourn(this, v);
+      if (ZS.Chronicle) ZS.Chronicle.add(this, v.name + " — " + (cause || "lost"), "death");
+      for (const b of this.world.buildings)
+        if (b.kind === "shrine" && b.built) b.souls = this.souls;
+    }
+
+    // they get a grave, in a row, on the far side of the hall
+    grave(v) {
+      if (!ZS.Art) return;
+      const n = this.props.filter((p) => p.kind === "grave").length;
+      const bx = this.center.x - 250 + (n % 6) * 26,
+        by = this.center.y + 190 + Math.floor(n / 6) * 22;
+      const p = ZS.Art.prop("grave", bx, by, v.seed === undefined ? Math.random() * 997 : v.seed);
+      p.who = v.name;
+      this.props.push(p);
+    }
+
+    logLine(txt) {
+      if (ZS.Chronicle) ZS.Chronicle.add(this, txt, "note");
+      if (ZS.VillageUI) ZS.VillageUI.toast(txt);
+    }
+
+    // the overlay's shout: fire, fever, cold, despair
+    alarm(kind, txt) {
+      for (const a of this.alerts)
+        if (a.kind === kind) {
+          a.txt = txt;
+          a.t = 12;
+          return;
+        }
+      this.alerts.push({ kind, txt, t: 12 });
+      if (ZS.VillageUI) ZS.VillageUI.toast(txt);
+    }
+
+    dayLen() {
+      return BAL.DAY_LEN + this._nightLen();
+    }
+
+    /* ---------- what the newer buildings do ---------- */
+
+    // the windmill grinds: every level is a quarter more from the harvest
+    farmMul() {
+      let m = 1 + (this.bonus.farm || 0);
+      for (const b of this.world.buildings)
+        if (b.kind === "mill" && b.built && !b.ruined) m += 0.25 * b.lvl;
+      return m;
+    }
+    // the smithy sharpens everything, and the guns need one standing
+    smithMul() {
+      let m = 1;
+      for (const b of this.world.buildings)
+        if (b.kind === "smith" && b.built && !b.ruined) m += 0.1 * b.lvl;
+      return m;
+    }
+    hasSmith() {
+      for (const b of this.world.buildings)
+        if (b.kind === "smith" && b.built && !b.ruined && b.lvl >= 1) return true;
+      return false;
+    }
+    // the dogs: they smell the dead before anyone sees them
+    dogSight() {
+      let m = 1;
+      for (const b of this.world.buildings)
+        if (b.kind === "kennel" && b.built && !b.ruined) m += 0.18 * b.lvl;
+      return m;
+    }
+    shrineMul() {
+      let m = 1;
+      for (const b of this.world.buildings)
+        if (b.kind === "shrine" && b.built && !b.ruined) m += 0.12;
+      return m;
+    }
+
+    /* ---------- serialize ---------- */
+
+    serialize() {
+      const bs = this.world.buildings.map((b) => [
+        b.kind,
+        Math.round(b.x),
+        Math.round(b.y),
+        b.lvl,
+        Math.round(b.hp),
+        b.built ? 1 : 0,
+        b.ruined ? 1 : 0,
+        b.prog === undefined ? 1 : Math.round(b.prog * 100) / 100,
+      ]);
+      return {
+        v: 2,
+        day: this.day,
+        seed: this.world.seed,
+        hallHp: this.hall ? Math.round(this.hall.hp) : 0,
+        res: this.res,
+        done: this.done,
+        pop: this.villagers().map((a) => ({
+          x: Math.round(a.x),
+          y: Math.round(a.y),
+          n: a.name,
+          j: a.job,
+          hp: Math.round(a.hp),
+          i: Math.round(a.inf),
+          s: a.sick | 0,
+          k: a.kin
+            ? [
+                a.kin.trait,
+                Math.round(a.kin.age * 100) / 100,
+                a.kin.child ? 1 : 0,
+                a.kin.grow | 0,
+                Math.round(a.kin.morale * 100) / 100,
+                a.kin.mem.slice(-4),
+                a.kin.kids | 0,
+                a.kin.mother || "",
+              ]
+            : null,
+        })),
+        bs,
+        nodes: this.nodes.map((n) => [n.kind, Math.round(n.x), Math.round(n.y), Math.round(n.amt)]),
+        ow: this.ow
+          ? {
+              seed: this.ow.seed,
+              sites: this.ow.sites,
+              // a party in the field goes into the record with its people,
+              // so closing the browser does not strand anybody out there
+              parties: this.ow.parties.map((p) => ({
+                id: p.id,
+                site: p.site,
+                scouting: p.scouting ? 1 : 0,
+                phase: p.phase,
+                t: Math.round(p.t),
+                total: Math.round(p.total),
+                out: Math.round(p.out),
+                work: Math.round(p.work),
+                danger: p.danger,
+                members: p.members.map((a) => ({
+                  n: a.name,
+                  j: a.job,
+                  hp: Math.round(a.hp),
+                  k: a.kin ? [a.kin.trait, a.kin.age, a.kin.child ? 1 : 0, a.kin.morale] : null,
+                })),
+              })),
+              next: this.ow.next,
+              log: this.ow.log.slice(0, 20),
+            }
+          : null,
+        chron: (this.chron || []).slice(0, 60),
+        haz: this.haz
+          ? {
+              rats: this.haz.rats,
+              despair: this.haz.despair,
+              cold: this.haz.cold,
+              feastT: this.haz.feastT,
+            }
+          : null,
+        grief: Math.round(this.grief * 100) / 100,
+        bonus: this.bonus,
+        souls: this.souls,
+        props: this.props.map((p) => [
+          p.kind,
+          Math.round(p.x),
+          Math.round(p.y),
+          Math.round(p.seed),
+        ]),
+        crit: this.critters.map((c) => [c.kind, Math.round(c.x), Math.round(c.y)]),
+      };
     }
 
     /* ================= the people ================= */
@@ -1192,7 +1715,7 @@
       const dark = this.phase === "night" || this.phase === "dusk";
       const inf = this.has("infirm");
       // the bitten run for the infirmary; the wounded stagger there
-      if (a.inf > 0 && inf && !dark) {
+      if (a.inf > 0 && inf) {
         const s = this._first("infirm");
         this._goto(a, outside(s, a.x, a.y, 24), dt, t, nav, this.maxSpeed(a), () => {
           a.mode = "rest";
@@ -1387,12 +1910,18 @@
 
     /* ---------- work ---------- */
 
-    _workSpeed(_a) {
+    _workSpeed(a) {
       let s = 1;
       if (this.done.tools1) s += 0.3;
       if (this.done.tools2) s += 0.3;
       s *= this.weather.work || 1;
       if (this.res.food <= 0) s *= 0.5;
+      s *= this.shrineMul();
+      s *= 0.86 + (this.morale === undefined ? 0.6 : this.morale) * 0.28;
+      if (a) {
+        if (ZS.Kin && a.kin) s *= ZS.Kin.work(a);
+        if (a.sick > 0) s *= 0.5;
+      }
       return s;
     }
 
@@ -1421,7 +1950,7 @@
         work: work || 0,
         cont: !!cont,
       });
-      const room = (k) => this.res[k] < this.storeCap() - 1;
+      const room = (k) => this.res[k] < this.storeCap(k) - 1;
       const node = (n, sub) => ({ kind: "node", o: n, x: n.x, y: n.y, sub, work: BAL.WORK[sub] });
       const tree = (tr) => ({
         kind: "tree",
@@ -1443,6 +1972,20 @@
       const hurt = hurtAll.filter(
         (b) => (b.mat || (!b.ruined && b.hp < b.maxHp * 0.6)) && busy(b) < 2,
       );
+      // a fire outranks every job in the village
+      if (this.haz && this.haz.fire.length) {
+        let hot = null,
+          hd = 1e18;
+        for (const f of this.haz.fire) {
+          if (!f.s) continue;
+          const d = dist2(a.x, a.y, f.s.x + f.s.w / 2, f.s.y + f.s.h / 2);
+          if (d < hd) {
+            hd = d;
+            hot = f.s;
+          }
+        }
+        if (hot) return str(hot, "douse", 0, true);
+      }
       const plots = this.world.buildings.filter(
         (b) => b.kind === "farm" && b.built && !b.ruined && b.plot && busy(b) < 1,
       );
@@ -1527,9 +2070,9 @@
       if (fallow.length && this.season.farm > 0.2 && room("food"))
         return str(this._nearest(a, fallow), "plant", BAL.WORK.plant);
       // a growing village wants a growing pile
-      const wantW = Math.min(this.storeCap(), 80 + pop * 10);
-      const wantS = Math.min(this.storeCap(), 60 + pop * 8);
-      const wantC = Math.min(this.storeCap(), 40 + pop * 6);
+      const wantW = Math.min(this.storeCap("wood"), 80 + pop * 10);
+      const wantS = Math.min(this.storeCap("stone"), 60 + pop * 8);
+      const wantC = Math.min(this.storeCap("scrap"), 40 + pop * 6);
       if (this.res.wood < wantW && room("wood")) {
         const tr = this._nearestTree(a);
         if (tr) return tree(tr);
@@ -1718,9 +2261,30 @@
           if (b.kind === "farm") b.plot = { stage: 0, growth: 0, wet: 0 };
           this._pop(b.x + b.w / 2, b.y, ZS.Structs.CAT[b.kind].name + " up", "#5a7a3a");
           if (ZS.sound) ZS.sound.event("v_callout", b.x, b.y);
+          this.onBuilt(b);
           a.mode = "idle";
           a.tgt = null;
         }
+        return;
+      }
+      if (tg.sub === "douse") {
+        const b = tg.o;
+        if (!b || !b.burning) {
+          a.mode = "idle";
+          a.tgt = null;
+          return;
+        }
+        // a bucket from the well, over and over. The fire gives way because
+        // hazards.js counts how many hands are on it.
+        a.swing += dt * 14;
+        if (Math.random() < dt * 1.4)
+          this.fx.push({
+            x: b.x + b.w / 2,
+            y: b.y + 8,
+            t: 0.25,
+            splash: 1,
+            seed: a.seed + this.fx.length,
+          });
         return;
       }
       if (tg.sub === "repair") {
@@ -1971,12 +2535,14 @@
 
     weapon() {
       let w = "club";
-      for (const k of WEP_ORDER) if (this.done[k === "club" ? "club" : k]) w = k;
       if (this.done.spears) w = "spear";
       if (this.done.bows) w = "bow";
-      if (this.done.rifles) w = "rifle";
-      if (this.done.shotguns) w = "shotgun";
-      if (this.done.smgs) w = "smg";
+      // powder and shot need a forge and an anvil to keep them in order
+      if (this.hasSmith()) {
+        if (this.done.rifles) w = "rifle";
+        if (this.done.shotguns) w = "shotgun";
+        if (this.done.smgs) w = "smg";
+      }
       return w;
     }
 
@@ -1993,6 +2559,17 @@
       return 1 + (this.done.armor1 ? 0.4 : 0) + (this.done.armor2 ? 0.4 : 0);
     }
 
+    // is there a lit beacon near this spot? the dead will not come to it
+    lightAt(x, y) {
+      for (const s of this.world.buildings) {
+        if (s.kind !== "beacon" || !s.built || s.ruined || s.lit === false) continue;
+        const dx = s.x + s.w / 2 - x,
+          dy = s.y + s.h / 2 - y;
+        if (dx * dx + dy * dy < 165 * 165) return true;
+      }
+      return false;
+    }
+
     _sight(a) {
       let s = BAL.GUARD_SIGHT * (this.weather.sight || 1);
       for (const b of this.world.buildings)
@@ -2001,10 +2578,22 @@
           break;
         }
       if (this.done.towers2) s *= 1.4;
+      s *= this.dogSight();
       return s;
     }
 
     _updateGuard(a, dt, t, grid, nav) {
+      // badly hurt: fall back through the door and let somebody else have
+      // the wall. A dead guard holds nothing.
+      if (a.hp < a.maxHp * 0.32) {
+        a.task = TASK.flee;
+        a.mode = "seek";
+        a.panic = Math.max(a.panic, 0.6);
+        a.wantMove = true;
+        ZS.planAndFollow(a, this._shelter(), false, this.maxSpeed(a) * 1.1, dt, t, nav);
+        if (a.sayT <= 0 && Math.random() < dt * 0.4) this._say(a, "I'm hurt!", 1.4);
+        return;
+      }
       const w = WEAPONS[this.weapon()];
       const sight = this._sight(a);
       const z = this._nearestZed(a, sight, grid) || this._nearestZed(a, 70, grid);
@@ -2058,6 +2647,15 @@
         return;
       }
       const d = Math.hypot(z.x - a.x, z.y - a.y);
+      const sh = this._shelter();
+      const home = this.has("post") || this.has("tower") ? this._shield() : sh;
+      // there is a line, and a guard does not leave it
+      if (Math.hypot(a.x - home.x, a.y - home.y) > BAL.LEASH) {
+        a.task = TASK.patrol;
+        a.wantMove = true;
+        ZS.planAndFollow(a, home, false, BAL.SPEED.guard, dt, t, nav);
+        return;
+      }
       a.a = Math.atan2(z.y - a.y, z.x - a.x);
       a.task = TASK.fight;
       if (!w.melee) {
@@ -2107,6 +2705,7 @@
 
     _fire(a, z, w) {
       a.muzzle = 0.12;
+      const mul = this.smithMul() * (ZS.Kin ? ZS.Kin.fight(a) : 1);
       this.fx.push({
         x0: a.x,
         y0: a.y - 10,
@@ -2123,7 +2722,7 @@
           a.y,
         );
       const shots = w.pellets || 1;
-      for (let i = 0; i < shots; i++) this._hitZombie(a, z, w.dmg / (w.pellets ? 1.6 : 1));
+      for (let i = 0; i < shots; i++) this._hitZombie(a, z, (w.dmg / (w.pellets ? 1.6 : 1)) * mul);
     }
 
     /* ---------- the dead ---------- */
@@ -2164,21 +2763,56 @@
         if (!nav.los(a.x, a.y, v.x, v.y, true)) continue;
         // somebody pressed up against the hall in the dark keeps their head
         // down — they are only found when the dead are nearly on them
-        if (dist2(v.x, v.y, sh.x, sh.y) < 80 * 80 && d > 95 * 95) continue;
+        // pressed up against the hall in the dark, with the door barred:
+        // they are only found when the dead are nearly on them
+        if (dist2(v.x, v.y, sh.x, sh.y) < 108 * 108 && d > 74 * 74) continue;
         bd = d;
         prey = v;
       }
+      // ...but the door is barred. Whoever is pressed up against the hall
+      // is behind it, and the dead have to go through the timber first.
+      const hall = this.hall;
+      const barred = hall && hall.built && !hall.ruined && hall.hp > hall.maxHp * 0.28;
+      if (prey && barred && dist2(prey.x, prey.y, sh.x, sh.y) < 104 * 104) prey = null;
       // they always know where the hall is: the light, the smoke, the noise
       const goal = prey || { x: this.hall.x + this.hall.w / 2, y: this.hall.y + this.hall.h / 2 };
       const d = Math.hypot(goal.x - a.x, goal.y - a.y);
       a.a = Math.atan2(goal.y - a.y, goal.x - a.x);
       if (d > (prey ? 16 : 40)) {
         a.wantMove = true;
-        ZS.planAndFollow(a, goal, true, a.spd, dt, t, nav);
+        // firelight: they still come, but slower, and they hate every step
+        const shy = this.lightAt(a.x, a.y) ? 0.62 : 1;
+        ZS.planAndFollow(a, goal, true, a.spd * shy, dt, t, nav);
       }
       // what stands in the way gets pulled at
       if ((a.stuckT > 0.8 || d < 44) && !prey) this._gnaw(a, dt);
       else if (a.stuckT > 0.8) this._gnaw(a, dt);
+      // a wailer keeps its distance and screams: every scream brings more
+      if (a.zType === "wailer") {
+        a.screamT -= dt;
+        if (prey && d < 200) {
+          a.a = Math.atan2(a.y - goal.y, a.x - goal.x);
+          a.vx += Math.cos(a.a) * a.spd * dt * 2;
+          a.vy += Math.sin(a.a) * a.spd * dt * 2;
+        }
+        if (a.screamT <= 0 && (a.screams || 0) < 3) {
+          a.screamT = 7 + Math.random() * 4;
+          a.screams = (a.screams || 0) + 1;
+          for (let i = 0; i < BAL.WAIL_CALL; i++) {
+            const q = this.nav.nearestWalkable(
+              a.x + (Math.random() - 0.5) * 170,
+              a.y + (Math.random() - 0.5) * 170,
+              220,
+              true,
+            );
+            if (q) this._spawnZed({ k: "walker", at: q });
+          }
+          this.fx.push({ x: a.x, y: a.y - 16, t: 0.7, wail: 1, seed: a.seed });
+          if (ZS.sound) ZS.sound.event("v_shout", a.x, a.y);
+          if (ZS.VillageUI) ZS.VillageUI.toast("something out there is screaming");
+        }
+        return;
+      }
       // the bite
       if (prey && d < BAL.ZED[a.zType].reach + 10) {
         a.atkT -= dt;
@@ -2220,7 +2854,7 @@
       if (this.stains) this.stains.splat(v.x, v.y + 2, "blood", v.seed + Math.random() * 99);
       if (ZS.sound) ZS.sound.event("v_gasp", v.x, v.y);
       if (v.hp <= 0) {
-        this._killVillager(v);
+        this.killVillager(v, "taken by the dead");
         return;
       }
       if (v.inf <= 0 && Math.random() < BAL.INFECT_CHANCE) {
@@ -2245,6 +2879,10 @@
         if (got) this._pop(z.x, z.y - 18, "+" + got + " scrap", "#6f7681");
       }
       if (a && a.st === 0) {
+        if (a.kin) {
+          a.kin.kills++;
+          a.kin.morale = Math.min(1, a.kin.morale + 0.02);
+        }
         this._pop(a.x, a.y - 30, "down", "#5a7a3a");
         if (ZS.sound) ZS.sound.event("v_callout", a.x, a.y);
       }
@@ -2293,9 +2931,37 @@
       if (!this.villagers().length) this._gameOver("silence — there is nobody left");
     }
 
+    // Most bites kill. Some do not — and the village remembers it either way.
+    _fightItOff(a) {
+      const inf = this._first("infirm");
+      if (inf && dist2(a.x, a.y, inf.x + inf.w / 2, inf.y + inf.h / 2) < 80 * 80) {
+        a.inf = 0;
+        a.hp = Math.max(8, a.maxHp * 0.35);
+        this._pop(a.x, a.y - 26, "pulled through", "#5a7a3a");
+        if (ZS.Chronicle) ZS.Chronicle.add(this, a.name + " — pulled through", "life");
+        return true;
+      }
+      let chance = 0.4 + (this.done.medicine ? 0.25 : 0);
+      if (a.kin && a.kin.trait === "steady") chance += 0.15;
+      if (ZS.Kin && a.kin) chance += (ZS.Kin.hp(a) - 1) * 0.3;
+      if (Math.random() < chance) {
+        a.inf = 0;
+        a.hp = Math.max(6, a.hp * 0.3);
+        this._pop(a.x, a.y - 26, "beat the fever", "#5a7a3a");
+        if (ZS.Chronicle) ZS.Chronicle.add(this, a.name + " — beat the bite", "life");
+        if (ZS.VillageUI) ZS.VillageUI.toast(a.name + " beat the bite — but only just");
+        return true;
+      }
+      return false;
+    }
+
     // a bite that runs its course
     _turn(v) {
       v.dead = true;
+      this.souls++;
+      this.grave(v);
+      if (ZS.Kin) ZS.Kin.mourn(this, v);
+      if (ZS.Chronicle) ZS.Chronicle.add(this, v.name + " — turned", "death");
       if (this.stains) this.stains.corpse(v);
       if (this.nightLog) this.nightLog.lost.push(v.name);
       if (ZS.VillageUI) ZS.VillageUI.toast(v.name + " turned in the night");
@@ -2360,17 +3026,21 @@
     }
 
     _add(kind, n) {
-      const room = Math.max(0, this.storeCap() - this.res[kind]);
+      const room = Math.max(0, this.storeCap(kind) - this.res[kind]);
       const got = Math.min(n, room);
       this.res[kind] += got;
       return got;
     }
 
-    // how much of any one good the village can hold
-    storeCap() {
+    // how much of any one good the village can hold (food also keeps in a
+    // granary, and better than it keeps anywhere else)
+    storeCap(kind) {
       let c = BAL.STORE0 + (this.hall.lvl - 1) * 140;
-      for (const b of this.world.buildings)
-        if (b.kind === "store" && b.built && !b.ruined) c += 150 * b.lvl;
+      for (const b of this.world.buildings) {
+        if (!b.built || b.ruined) continue;
+        if (b.kind === "store") c += 150 * b.lvl;
+        else if (b.kind === "granary" && kind === "food") c += 220 * b.lvl;
+      }
       return c;
     }
 
@@ -2386,7 +3056,7 @@
     }
 
     guardCap() {
-      let c = 3;
+      let c = 4;
       for (const b of this.world.buildings) {
         if (!b.built || b.ruined) continue;
         if (b.kind === "post" || b.kind === "tower") c += 2 * b.lvl;
@@ -2461,6 +3131,7 @@
         while (used[(free = NAMES[0] + " " + i)]) i++;
       }
       a.name = free;
+      a.kin = ZS.Kin.make(Math.random, this.day);
       this._dress(a);
       this.agents.push(a);
       return a;
@@ -2489,6 +3160,16 @@
 
     openResearch() {
       this.mode = "research";
+      this.sel = null;
+    }
+
+    openWorld() {
+      this.mode = "world";
+      this.sel = null;
+    }
+
+    openChron() {
+      this.mode = "chron";
       this.sel = null;
     }
 
@@ -2523,6 +3204,7 @@
     }
 
     armBuild(kind) {
+      this.drag = null;
       if (kind === "wall" && this.done.stonewall && this.armed !== "wall2") {
         // the stone version is the same row, toggled by pressing it again
       }
@@ -2536,21 +3218,22 @@
       if (ZS.VillageUI) ZS.VillageUI.refresh(true);
     }
 
-    _placeAt(x, y) {
+    _placeAt(x, y, quiet) {
       const kind = this.armed;
       const chk = ZS.Structs.canPlace(this.world, this.nav, kind, x, y);
       if (!chk.ok) {
-        if (ZS.VillageUI) ZS.VillageUI.toast(chk.err);
-        return;
+        if (!quiet && ZS.VillageUI) ZS.VillageUI.toast(chk.err);
+        return false;
       }
       const cost = this.buildCost(kind);
       if (!this.canPay(cost)) {
-        if (ZS.VillageUI) ZS.VillageUI.toast("not enough: " + ZS.VillageUI.costText(cost));
-        return;
+        if (!quiet && ZS.VillageUI)
+          ZS.VillageUI.toast("not enough: " + ZS.VillageUI.costText(cost));
+        return false;
       }
       this.pay(cost);
       const r = ZS.Structs.place(this.world, this.nav, kind, x, y, { built: false, prog: 0 });
-      if (!r.ok) return;
+      if (!r.ok) return false;
       const s = r.s;
       s.hp = Math.round(s.maxHp * 0.12);
       if (kind === "wall" && this.done.stonewall) {
@@ -2558,11 +3241,43 @@
         s.maxHp = Math.round(s.maxHp * 2);
         s.hp = s.maxHp * 0.12;
       }
-      if (ZS.sound) ZS.sound.event("turret", s.x, s.y);
-      if (ZS.VillageUI) {
-        ZS.VillageUI.toast(ZS.Structs.CAT[kind].name + " marked out");
-        ZS.VillageUI.refresh(true);
+      if (!quiet) {
+        if (ZS.sound) ZS.sound.event("turret", s.x, s.y);
+        if (ZS.VillageUI) {
+          ZS.VillageUI.toast(ZS.Structs.CAT[kind].name + " marked out");
+          ZS.VillageUI.refresh(true);
+        }
       }
+      return true;
+    }
+
+    /* ---------- pointing at the ground ---------- */
+
+    // a site is armed: the gesture is ours, so the camera does not pan
+    pointerDown(x, y) {
+      if (!this.armed) return false;
+      const linish = this.armed === "barricade" || this.armed === "wall";
+      this.drag = { x0: x, y0: y, x, y, line: linish };
+      this._hoverAt(x, y);
+      return true;
+    }
+
+    pointerMove(x, y) {
+      this._hoverAt(x, y);
+      if (this.drag) {
+        this.drag.x = x;
+        this.drag.y = y;
+      }
+    }
+
+    pointerUp(x, y) {
+      if (!this.drag) return;
+      const d = this.drag;
+      this.drag = null;
+      d.x = x;
+      d.y = y;
+      if (d.line && Math.hypot(x - d.x0, y - d.y0) > 40) this._placeLine(this.armed, d);
+      else this._placeAt(x, y);
     }
 
     upgrade(s) {
@@ -2707,10 +3422,6 @@
         return;
       }
       this.clearSel();
-    }
-
-    pointerMove(x, y) {
-      this._hoverAt(x, y);
     }
 
     _hoverAt(x, y) {
@@ -2867,6 +3578,18 @@
               sub: "they are coming out of the wood",
               fade: 0.85,
             };
+          if (this.phase === "night") {
+            const st = this.stage;
+            const sub =
+              st === "scouts"
+                ? "one or two at the treeline"
+                : st === "trickle"
+                  ? "they are filtering in"
+                  : st === "push"
+                    ? "the push — all of them at once"
+                    : "first light · the stragglers";
+            return { main: "night " + this.day, sub, fade: 0.34 };
+          }
           if (this.phase === "dawn") return null;
           return null;
         },
@@ -2893,6 +3616,7 @@
 
     // the ground pass: the rock, the brambles and the wreckage
     drawGround(c, _world, t) {
+      this._env = { night: this._dark() };
       for (const n of this.nodes) {
         if (n.amt <= 0 && n.kind !== "bush") continue;
         const s = n.seed;
@@ -2973,71 +3697,123 @@
       // what sits under the cursor is what the builders will raise
       if (this.armed && this.hover) {
         const kind = this.armed;
-        const cat = ZS.Structs.CAT[kind];
-        const chk = ZS.Structs.canPlace(this.world, this.nav, kind, this.hover.x, this.hover.y);
-        const g =
-          this._ghost ||
-          (this._ghost = {
-            lvl: 1,
-            built: false,
-            ruined: false,
-            prog: 0,
-            seed: 3,
-            hp: 1,
-            maxHp: 1,
-            plot: null,
-            kind: kind,
-            x: 0,
-            y: 0,
-            w: 0,
-            h: 0,
-          });
-        g.kind = kind;
-        g.w = cat.w;
-        g.h = cat.h;
-        g.x = this.hover.x - cat.w / 2;
-        g.y = this.hover.y - cat.h / 2;
-        const cost = this.buildCost(kind);
-        const pay = this.canPay(cost);
-        const ok = chk.ok && pay;
-        c.save();
-        c.globalAlpha = 0.55;
-        ZS.Structs.draw(c, g, t, { night: 0, t: t });
-        c.restore();
-        c.save();
-        // the footprint: green where it may stand, red where it may not
-        ZS.wpoly(
-          c,
-          [
-            { x: g.x, y: g.y },
-            { x: g.x + cat.w, y: g.y },
-            { x: g.x + cat.w, y: g.y + cat.h },
-            { x: g.x, y: g.y + cat.h },
-          ],
-          17,
-          1.3,
-          true,
-        );
-        c.fillStyle = ok ? "rgba(112,148,72,0.16)" : "rgba(150,60,40,0.18)";
-        c.fill();
-        c.strokeStyle = ok ? "rgba(92,122,58,0.9)" : "rgba(150,60,40,0.9)";
-        c.lineWidth = 1.8;
-        c.stroke();
-        // the price, or the reason it cannot stand here
-        c.font = 'italic 11px "Segoe Script","Bradley Hand","Comic Sans MS",cursive';
-        c.textAlign = "center";
-        c.fillStyle = ok ? "rgba(64,84,44,0.92)" : "rgba(150,60,40,0.92)";
-        c.fillText(
-          !pay
-            ? "not enough: " + ZS.VillageUI.costText(cost)
-            : chk.ok
-              ? ZS.VillageUI.costText(cost)
-              : chk.err || "it will not go here",
-          this.hover.x,
-          g.y - 7,
-        );
-        c.restore();
+        const line = this.drag && this.drag.line ? this._lineSpots(kind, this.drag) : null;
+        if (line) {
+          for (const sp of line) this._ghostAt(c, kind, sp.x, sp.y, t, sp.label);
+        } else this._ghostAt(c, kind, this.hover.x, this.hover.y, t, null);
       }
+    }
+
+    // one ghost: the building itself, drawn where it would stand
+    _ghostAt(c, kind, x, y, t, label) {
+      const cat = ZS.Structs.CAT[kind];
+      const chk = ZS.Structs.canPlace(this.world, this.nav, kind, x, y);
+      const g =
+        this._ghost ||
+        (this._ghost = {
+          lvl: 1,
+          built: false,
+          ruined: false,
+          prog: 0,
+          seed: 3,
+          hp: 1,
+          maxHp: 1,
+          plot: null,
+          kind: kind,
+          x: 0,
+          y: 0,
+          w: 0,
+          h: 0,
+        });
+      g.kind = kind;
+      g.w = cat.w;
+      g.h = cat.h;
+      g.x = x - cat.w / 2;
+      g.y = y - cat.h / 2;
+      const cost = ZS.Structs.CAT[kind].cost;
+      let err = label;
+      if (err === undefined) {
+        err = !chk.ok
+          ? chk.err || "it will not go here"
+          : !this.canPay(cost)
+            ? "not enough: " + ZS.VillageUI.costText(cost)
+            : null;
+      }
+      const ok = !err;
+      c.save();
+      c.globalAlpha = 0.55;
+      ZS.Structs.draw(c, g, t, { night: 0, t: t });
+      c.restore();
+      c.save();
+      // the footprint: green where it may stand, red where it may not
+      ZS.wpoly(
+        c,
+        [
+          { x: g.x, y: g.y },
+          { x: g.x + cat.w, y: g.y },
+          { x: g.x + cat.w, y: g.y + cat.h },
+          { x: g.x, y: g.y + cat.h },
+        ],
+        17,
+        1.3,
+        true,
+      );
+      c.fillStyle = ok ? "rgba(112,148,72,0.16)" : "rgba(150,60,40,0.18)";
+      c.fill();
+      c.strokeStyle = ok ? "rgba(92,122,58,0.9)" : "rgba(150,60,40,0.9)";
+      c.lineWidth = 1.8;
+      c.stroke();
+      // the price, or the reason it cannot stand here
+      c.font = 'italic 11px "Segoe Script","Bradley Hand","Comic Sans MS",cursive';
+      c.textAlign = "center";
+      c.fillStyle = ok ? "rgba(64,84,44,0.92)" : "rgba(150,60,40,0.92)";
+      c.fillText(ok ? ZS.VillageUI.costText(cost) : err, x, g.y - 7);
+      c.restore();
+    }
+
+    // a dragged line of palisade or barricade: where each piece would go,
+    // what it would cost, and how far the stores stretch
+    _lineSpots(kind, d) {
+      const cat = ZS.Structs.CAT[kind];
+      const dx = d.x - d.x0,
+        dy = d.y - d.y0;
+      const len = Math.hypot(dx, dy);
+      const step = cat.w + 3;
+      const n = Math.min(30, Math.max(1, Math.round(len / step)));
+      const cost = cat.cost;
+      const out = [];
+      let w = this.res.wood,
+        s = this.res.stone,
+        c = this.res.scrap;
+      for (let i = 0; i <= n; i++) {
+        const f = i / n;
+        const x = d.x0 + dx * f,
+          y = d.y0 + dy * f;
+        const chk = ZS.Structs.canPlace(this.world, this.nav, kind, x, y);
+        let label = chk.ok ? null : chk.err || "no room";
+        if (!label && (w < (cost.w || 0) || s < (cost.s || 0) || c < (cost.c || 0)))
+          label = "out of stores";
+        if (!label) {
+          w -= cost.w || 0;
+          s -= cost.s || 0;
+          c -= cost.c || 0;
+        }
+        out.push({ x, y, label });
+      }
+      return out;
+    }
+
+    // set the line down, piece by piece, for as long as the stores last
+    _placeLine(kind, d) {
+      let n = 0;
+      for (const sp of this._lineSpots(kind, d)) {
+        if (sp.label) continue;
+        if (this._placeAt(sp.x, sp.y, true)) n++;
+      }
+      if (n && ZS.VillageUI)
+        ZS.VillageUI.toast(n + " " + ZS.Structs.CAT[kind].name + (n > 1 ? "s" : "") + " set out");
+      else if (!n && ZS.VillageUI) ZS.VillageUI.toast("no room along that line");
+      return n;
     }
 
     drawBuildingDecor(c, s, t) {
@@ -3052,8 +3828,9 @@
     }
 
     // the last pass over the world: night, light, rain, marks and numbers
-    drawOver(c, world, t) {
+    drawOver(c, world, t, vis) {
       const night = this._dark();
+      if (ZS.Hazards) ZS.Hazards.draw(c, this, t);
       if (night > 0.01) {
         c.fillStyle =
           "rgba(26,30,48," + (night * (this.season.night ? 0.5 : 0.44)).toFixed(3) + ")";
@@ -3099,10 +3876,9 @@
           c.stroke();
         }
       }
-      if (this.weather.id === "fog") {
-        const cam = ZS.debug.cam;
-        const vis = cam.visible(window.innerWidth, window.innerHeight, 60);
-        c.fillStyle = "rgba(226,222,208,0.22)";
+      if (this.weather.id === "fog" || this.weather.id === "storm") {
+        c.fillStyle =
+          this.weather.id === "fog" ? "rgba(226,222,208,0.22)" : "rgba(120,126,136,0.14)";
         c.fillRect(vis.x0, vis.y0, vis.x1 - vis.x0, vis.y1 - vis.y0);
       }
       // the selection: a ring round the structure, and the villager's errand
@@ -3134,6 +3910,8 @@
           }
         }
       }
+      // rain, snow, the leaves coming off the wood, the embers off a fire
+      if (ZS.Art) ZS.Art.drawSky(c, vis, t, { night });
       // floating numbers
       c.textAlign = "center";
       c.font = 'italic 12px "Segoe Script","Bradley Hand","Comic Sans MS",cursive';
@@ -3148,6 +3926,33 @@
     }
 
     /* ---------- transient effects ---------- */
+
+    // everything in the village that is neither a building nor a person
+    extraSprites(vis) {
+      const out = this._sprites || (this._sprites = []);
+      out.length = 0;
+      if (!ZS.Art) return out;
+      for (const p of this.props)
+        if (p.x > vis.x0 - 40 && p.x < vis.x1 + 40 && p.y > vis.y0 - 60 && p.y < vis.y1 + 30)
+          out.push({ y: p.y, kp: 1, o: p });
+      for (const a of this.critters)
+        if (a.x > vis.x0 - 40 && a.x < vis.x1 + 40 && a.y > vis.y0 - 60 && a.y < vis.y1 + 30)
+          out.push({ y: a.y, kp: 0, o: a });
+      return out;
+    }
+
+    drawSprite(c, o, t) {
+      const env = this._env || { night: 0 };
+      c.save();
+      if (o.kp) {
+        const f = ZS.Art.PROP[o.kind];
+        if (f) f(c, o, t, env);
+      } else {
+        const f = ZS.Art.CRIT[o.kind];
+        if (f) f(c, o, t, env);
+      }
+      c.restore();
+    }
 
     drawFX(c, fx) {
       for (const f of fx) {
@@ -3171,6 +3976,18 @@
             const an = ZS.hash(f.seed + i) * 6.283;
             ZS.wline(c, f.x, f.y, f.x + Math.cos(an) * 7, f.y + Math.sin(an) * 5, f.seed + i, 0.4);
           }
+        } else if (f.wail) {
+          const r = 20 + (0.7 - f.t) * 90;
+          c.strokeStyle = "rgba(150,60,44," + (f.t * 0.9).toFixed(2) + ")";
+          c.lineWidth = 2;
+          ZS.wcirc(c, f.x, f.y - 16, r, f.seed, 3);
+          c.strokeStyle = "rgba(150,60,44," + (f.t * 0.5).toFixed(2) + ")";
+          ZS.wcirc(c, f.x, f.y - 16, r * 0.6, f.seed + 3, 2);
+        } else if (f.splash) {
+          c.strokeStyle = "rgba(96,132,150,0.7)";
+          c.lineWidth = 1.2;
+          for (let i = 0; i < 3; i++)
+            ZS.wline(c, f.x - 6 + i * 6, f.y, f.x - 8 + i * 6, f.y + 8, f.seed + i, 0.6);
         } else if (f.sprout) {
           c.strokeStyle = "rgba(96,132,58,0.9)";
           c.lineWidth = 1.4;

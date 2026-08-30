@@ -41,6 +41,7 @@
         sel: q("sel"),
         panel: q("panel"),
         toast: q("toast"),
+        alerts: q("alerts"),
         help: q("helpwrap"),
         speeds: [q("sp0"), q("sp1"), q("sp2"), q("sp3")],
       };
@@ -55,6 +56,9 @@
       click("roles", () => this.act("villagers-panel"));
       click("buildb", () => this.act("build-panel"));
       click("workb", () => this.act("research-panel"));
+      click("mapb", () => this.act("world-panel"));
+      click("bookb", () => this.act("chron-panel"));
+      click("qualb", () => this.act("quality"));
       click("home", () => scen.focusHall());
       click("fit", () => scen.fitView());
       click("bell", () => scen.callNight());
@@ -75,6 +79,7 @@
         });
       press(this.el.panel);
       press(this.el.sel);
+      if (this.el.alerts) press(this.el.alerts);
       return this;
     },
 
@@ -158,13 +163,21 @@
         if (lower === "r") return this.act("repair");
         if (lower === "x") return this.act("demolish");
       }
+      if (k === "F3") {
+        ZS.Perf.on = !ZS.Perf.on;
+        e.preventDefault();
+        return;
+      }
       if (lower === "t") return this.act("research-panel");
       if (lower === "b") return this.act("build-panel");
       if (lower === "v") return this.act("villagers-panel");
       if (lower === "h") return this.act("home");
       if (lower === "f") return this.act("fit");
       if (lower === "n") return this.act("bell");
-      if (lower === "m") return this.act("sound");
+      if (lower === "m") return this.act("world-panel");
+      if (lower === "k") return this.act("sound");
+      if (lower === "l") return this.act("chron-panel");
+      if (lower === "q") return this.act("quality");
       if (lower === "?") return this.act("help");
     },
 
@@ -211,6 +224,46 @@
           if (s.mode === "villagers") s.cancelMode();
           else s.openVillagers();
           break;
+        case "world-panel":
+          if (s.mode === "world") s.cancelMode();
+          else s.openWorld();
+          break;
+        case "chron-panel":
+          if (s.mode === "chron") s.cancelMode();
+          else s.openChron();
+          break;
+        case "quality":
+          if (ZS.Perf) {
+            ZS.Perf.cycle();
+            this.toast("quality: " + ZS.Perf.def.name + (ZS.Perf.auto ? " (auto)" : ""));
+          }
+          break;
+        case "send":
+          this.expedition(arg, false);
+          break;
+        case "scout":
+          this.expedition(arg, true);
+          break;
+        case "feast": {
+          const r = ZS.Hazards.feast(s);
+          if (!r.ok) this.toast(r.err);
+          break;
+        }
+        case "slot":
+          if (ZS.Chronicle) {
+            const ok = ZS.Chronicle.save(s, +arg);
+            this.toast(ok ? "written to slot " + arg : "could not write the slot");
+          }
+          break;
+        case "slotload":
+          if (ZS.Chronicle) {
+            if (ZS.Chronicle.loadSlot(+arg)) location.reload();
+            else this.toast("that slot is empty");
+          }
+          break;
+        case "slotclear":
+          if (ZS.Chronicle) ZS.Chronicle.clear(+arg);
+          break;
         case "research":
           s.startResearch(arg);
           break;
@@ -238,6 +291,21 @@
       }
       this.sig = "";
       this.refresh(true);
+    },
+
+    expedition(id, scouting) {
+      const s = this.scen;
+      if (!ZS.Overworld) return;
+      const chk = ZS.Overworld.canSend(s.ow, s, id, scouting);
+      if (!chk.ok) {
+        this.toast(chk.err);
+        return;
+      }
+      const r = ZS.Overworld.send(s.ow, s, id, scouting);
+      if (r.ok) {
+        const who = r.p.members.map((a) => a.name).join(" and ");
+        this.toast(who + (scouting ? " rides for " : " set out for ") + ZS.Overworld.def(id).name);
+      }
     },
 
     toggleHelp(on) {
@@ -380,9 +448,19 @@
       }
       if (s.mode === "villagers") {
         let f = "v|" + s.guardCap() + "|" + (s.sel && s.sel.k === "v" ? s.sel.o.uid : 0);
+        // spirits move every tick, so they are not part of the roster's
+        // signature — the panel must not rebuild itself under the cursor
         for (const a of s.villagers()) f += ";" + a.uid + a.job + Math.ceil(a.hp / 8);
         return f;
       }
+      if (s.mode === "world") {
+        let f = "w|" + (s.res.food | 0) / 5;
+        if (s.ow) for (const st of s.ow.sites) f += ";" + st.seen + st.taken;
+        if (s.ow)
+          for (const p of s.ow.parties) f += "|" + p.id + Math.floor(ZS.Overworld.progress(p) * 20);
+        return f;
+      }
+      if (s.mode === "chron") return "c|" + (s.chron ? s.chron.length : 0) + "|" + s.day;
       return "none";
     },
 
@@ -416,6 +494,10 @@
         row("stone", r.stone, "#8b8779") +
         row("food", r.food, "#b1963e") +
         row("scrap", r.scrap, "#6f7681") +
+        (r.cloth > 0.5 ? row("cloth", r.cloth, "#a89878") : "") +
+        (s.winterWood
+          ? '<span class="chip wide">winter burn <b>' + s.winterWood + "</b> wood a day</span>"
+          : "") +
         '<span class="chip wide">villagers <b>' +
         v +
         "</b>/" +
@@ -571,6 +653,8 @@
       if (s.mode === "build") html = this.buildPanel();
       else if (s.mode === "research") html = this.researchPanel();
       else if (s.mode === "villagers") html = this.villagersPanel();
+      else if (s.mode === "world") html = this.worldPanel();
+      else if (s.mode === "chron") html = this.chronPanel();
       if (!html) {
         e.classList.remove("on");
         this.html.panel = "";
@@ -632,11 +716,20 @@
           a.name +
           '"><span>' +
           a.name +
+          (a.sick > 0 ? " <em>·ill</em>" : "") +
           '</span><span class="hp"><i style="width:' +
           hp +
           '%"></i></span><span class="who">' +
-          (a.inf > 0 ? "<em>bitten</em>" : job.name) +
+          (a.inf > 0 ? "<em>bitten</em>" : a.kin && a.kin.child ? "a child" : job.name) +
           "</span></div>";
+        if (a === pick) {
+          if (a.kin) {
+            h += '<div class="pfoot">' + ZS.Kin.describe(a) + "</div>";
+            if (a.kin.mem && a.kin.mem.length)
+              h +=
+                '<div class="pfoot dim">remembers: ' + a.kin.mem[a.kin.mem.length - 1] + "</div>";
+          }
+        }
         if (a === pick) {
           h += '<div class="tray">';
           for (const j of JOBS)
@@ -668,6 +761,156 @@
         " of " +
         s.guardCap() +
         " on the watch · pick a name and give them work</div>";
+      return h;
+    },
+
+    // the valley: what is out there, what it costs to reach, and who is
+    // already walking
+    worldPanel() {
+      const s = this.scen;
+      if (!ZS.Overworld || !s.ow) return "";
+      let h = '<div class="ptitle">the valley <kbd>esc</kbd></div>';
+      if (s.ow.parties.length) {
+        h += '<div class="pfoot">out there now</div>';
+        for (const p of s.ow.parties) {
+          const def = ZS.Overworld.def(p.site);
+          const pc = Math.round(ZS.Overworld.progress(p) * 100);
+          h +=
+            '<div class="row"><span>' +
+            (p.scouting ? "scout · " : "") +
+            def.name +
+            '</span><span class="who">' +
+            (p.phase === "out"
+              ? "walking out"
+              : p.phase === "work"
+                ? "at the site"
+                : "coming home") +
+            " · " +
+            pc +
+            "%</span></div>";
+          h +=
+            '<div class="hp" style="flex:1 1 100%;height:4px"><i style="width:' +
+            pc +
+            '%"></i></div>';
+          h += '<div class="pfoot">' + p.members.map((a) => a.name).join(", ") + "</div>";
+        }
+      }
+      h += '<div class="pfoot">two people and ten food · the walk is the risk</div>';
+      for (const st of s.ow.sites) {
+        const def = ZS.Overworld.def(st.id);
+        if (!st.seen) {
+          h += '<div class="row no"><span>somewhere out there</span><span>—</span></div>';
+          continue;
+        }
+        const days = Math.max(1, Math.round(def.d / 55));
+        const dgr =
+          "◆".repeat(def.danger) + '<span class="dim">' + "◇".repeat(5 - def.danger) + "</span>";
+        const state =
+          st.seen === 1
+            ? "rumoured"
+            : st.seen === 2
+              ? "scouted"
+              : "worked" + (st.taken > 1 ? " ×" + st.taken : "");
+        const canSend = ZS.Overworld.canSend(s.ow, s, st.id, false).ok;
+        const canScout = st.seen < 2 && ZS.Overworld.canSend(s.ow, s, st.id, true).ok;
+        h +=
+          '<div class="row' +
+          (canSend ? "" : " no") +
+          '"><span>' +
+          def.name +
+          '</span><span class="who">' +
+          days +
+          "d · " +
+          dgr +
+          "</span></div>";
+        h += '<div class="pfoot">' + def.desc + ' <span class="dim">· ' + state + "</span></div>";
+        h += '<div class="tray">';
+        h +=
+          '<button data-act="send" data-arg="' +
+          st.id +
+          '"' +
+          (canSend ? "" : ' class="no"') +
+          ">send two</button>";
+        if (st.seen < 2)
+          h +=
+            '<button data-act="scout" data-arg="' +
+            st.id +
+            '"' +
+            (canScout ? "" : ' class="no"') +
+            ">scout</button>";
+        h += "</div>";
+      }
+      h += '<div class="pfoot">loot: ' + this.lootLine() + "</div>";
+      return h;
+    },
+
+    lootLine() {
+      const s = this.scen;
+      const bits = [];
+      for (const st of s.ow.sites) {
+        if (!st.seen) continue;
+        const def = ZS.Overworld.def(st.id);
+        const k = Object.keys(def.loot)[0];
+        bits.push(def.name.split(" ").pop() + " " + k);
+      }
+      return bits.join(" · ");
+    },
+
+    // the ledger, and the three slots
+    chronPanel() {
+      const s = this.scen;
+      let h = '<div class="ptitle">the record <kbd>esc</kbd></div>';
+      const list = (s.chron || []).slice(0, 16);
+      if (!list.length) h += '<div class="pfoot">nothing written yet.</div>';
+      for (const e of list)
+        h +=
+          '<div class="row' +
+          (e.kind === "death" ? " no" : "") +
+          '"><span>day ' +
+          e.day +
+          '</span><span class="who">' +
+          e.txt +
+          "</span></div>";
+      h +=
+        '<div class="pfoot">the dead: ' + (s.souls || 0) + " · grief: " + griefWord(s) + "</div>";
+      h += '<div class="tray">';
+      const canFeast = s.haz && s.haz.feastT <= 0 && s.res.food >= ZS.Hazards.BAL.FEAST_FOOD;
+      h +=
+        '<button data-act="feast"' +
+        (canFeast ? "" : ' class="no"') +
+        ' title="a hot meal: +spirits, and the grief lifts a little">hold a feast (18 food)</button>';
+      h += "</div>";
+      h += '<div class="pfoot">save a run</div>';
+      if (ZS.Chronicle)
+        for (const sl of ZS.Chronicle.slots())
+          h +=
+            '<div class="row' +
+            (sl.used ? "" : " no") +
+            '"><span>slot ' +
+            sl.n +
+            '</span><span class="who">' +
+            (sl.used ? "day " + sl.day + " · " + sl.pop + " souls · " + sl.when : "empty") +
+            "</span></div>" +
+            '<div class="tray"><button data-act="slot" data-arg="' +
+            sl.n +
+            '">save</button>' +
+            '<button data-act="slotload" data-arg="' +
+            sl.n +
+            '"' +
+            (sl.used ? "" : ' class="no"') +
+            ">load</button>" +
+            '<button data-act="slotclear" data-arg="' +
+            sl.n +
+            '"' +
+            (sl.used ? "" : ' class="no"') +
+            ">clear</button></div>";
+      h +=
+        '<div class="pfoot">quality: ' +
+        ZS.Perf.def.name +
+        (ZS.Perf.auto ? " (auto)" : " · set by hand") +
+        " · " +
+        Math.round(ZS.Perf.fps) +
+        " fps</div>";
       return h;
     },
 
@@ -709,7 +952,32 @@
       return h;
     },
 
+    // the things going wrong, where you cannot miss them
+    paintAlerts() {
+      const s = this.scen;
+      const e = this.el.alerts;
+      if (!e) return;
+      const list = ZS.Hazards && s.haz ? ZS.Hazards.alerts(s) : [];
+      const sig = list.map((a) => a[0] + a[1]).join("|");
+      if (sig === this.sig.alerts) return;
+      this.sig.alerts = sig;
+      if (!list.length) {
+        e.classList.remove("on");
+        return;
+      }
+      let h = "";
+      for (const a of list) h += '<span class="al ' + a[0] + '">' + a[1] + "</span>";
+      if (s.haz.despair > 0.4 || s.morale < 0.45)
+        h +=
+          '<button data-act="feast"' +
+          (s.res.food >= ZS.Hazards.BAL.FEAST_FOOD && s.haz.feastT <= 0 ? "" : ' class="no"') +
+          ">hold a feast</button>";
+      e.innerHTML = h;
+      e.classList.add("on");
+    },
+
     tick(dt) {
+      this.paintAlerts();
       if (this.toastT > 0) {
         this.toastT -= dt;
         if (this.toastT <= 0) this.el.toast.classList.remove("on");
@@ -726,6 +994,17 @@
       if (this.taskNode && this.taskNode.textContent !== line) this.taskNode.textContent = line;
     },
   };
+
+  function griefWord(s) {
+    const g = s.grief || 0;
+    return g > 0.6
+      ? "the village is heartbroken"
+      : g > 0.3
+        ? "heavy"
+        : g > 0.1
+          ? "quiet"
+          : "settled";
+  }
 
   function costText(c) {
     const p = [];

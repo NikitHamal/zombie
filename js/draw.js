@@ -415,6 +415,12 @@
   /* ---------- per-frame pipeline ---------- */
 
   function drawScene(c, cam, world, sim, t, vw, vh) {
+    const P = ZS.Perf;
+    if (P) {
+      P.drawn = 0;
+      P.points = 0;
+      P.calls = 0;
+    }
     c.clearRect(0, 0, vw, vh);
     c.save();
     cam.apply(c, vw, vh);
@@ -428,23 +434,40 @@
 
     // everything that has height, painted back-to-front
     const vis = cam.visible(vw, vh, 80);
-    const list = [];
+    // the painter's list: pooled records, so a busy frame allocates nothing
+    const pool = P ? P.beginList() : null;
+    const list = pool ? pool.live : [];
+    const push = pool
+      ? (y, k, o) => {
+          const it = pool.take();
+          it.y = y;
+          it.k = k;
+          it.o = o;
+        }
+      : (y, k, o) => list.push({ y, k, o });
     for (const tr of world.trees) {
       if (tr.x < vis.x0 || tr.x > vis.x1 || tr.y < vis.y0 - tr.r * 2 || tr.y > vis.y1) continue;
-      list.push({ y: tr.y, k: 0, o: tr });
+      push(tr.y, 0, tr);
     }
     for (const b of world.buildings) {
       if (b.x + b.w < vis.x0 || b.x > vis.x1 || b.y + b.h < vis.y0 || b.y > vis.y1) continue;
-      list.push({ y: b.y + b.h, k: 1, o: b });
+      push(b.y + b.h, 1, b);
     }
     for (const b of world.blocks ? world.blocks.list : []) {
       if (b.x1 < vis.x0 || b.x0 > vis.x1 || b.by < vis.y0 || b.y0 > vis.y1) continue;
-      list.push({ y: b.by, k: 3, o: b });
+      push(b.by, 3, b);
     }
     for (const a of sim.agents) {
       if (a.x < vis.x0 || a.x > vis.x1 || a.y < vis.y0 || a.y > vis.y1) continue;
-      list.push({ y: a.y, k: 2, o: a });
+      push(a.y, 2, a);
     }
+    // the scenario's own standing things (the village's props and livestock)
+    if (ZS.scenario.extraSprites) {
+      const ex = ZS.scenario.extraSprites(vis);
+      for (const e of ex) push(e.y, 4, e);
+    }
+    if (pool) pool.endList();
+    if (P) P.calls = list.length;
     list.sort((p, q) => p.y - q.y);
     for (const it of list) {
       if (it.k === 0) drawTree(c, it.o, t);
@@ -455,6 +478,7 @@
         // order still holds
         if (ZS.scenario.drawBuildingDecor) ZS.scenario.drawBuildingDecor(c, it.o, t);
       } else if (it.k === 3) ZS.scenario.drawBlock(c, it.o, t);
+      else if (it.k === 4) ZS.scenario.drawSprite(c, it.o, t);
       else ZS.scenario.draw(c, it.o, t);
     }
 
@@ -470,6 +494,7 @@
 
     c.restore();
     drawHUD(c, t, vw, vh, sim.wave, sim.agents);
+    if (ZS.Perf && ZS.Perf.on) ZS.Perf.debug(c, vw, vh, null);
   }
 
   ZS.drawScene = drawScene;

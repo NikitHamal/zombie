@@ -55,7 +55,7 @@
       name: "palisade",
       w: 62,
       h: 16,
-      hp: 340,
+      hp: 700,
       cost: { w: 12 },
       time: 9,
       lvlMax: 2,
@@ -133,7 +133,7 @@
       w: 82,
       h: 62,
       hp: 220,
-      cost: { w: 45, s: 22, c: 6 },
+      cost: { w: 34, s: 16, c: 4 },
       time: 36,
       lvlMax: 2,
       key: "i",
@@ -172,19 +172,91 @@
       key: "h",
       desc: "+2 homes, +150 storage per level · if it falls, the village falls",
     },
+    mill: {
+      name: "windmill",
+      w: 78,
+      h: 78,
+      hp: 260,
+      cost: { w: 52, s: 34, c: 4 },
+      time: 38,
+      lvlMax: 2,
+      key: "y",
+      desc: "grinds the harvest · +25% food per level",
+    },
+    smith: {
+      name: "smithy",
+      w: 88,
+      h: 66,
+      hp: 300,
+      cost: { w: 48, s: 40, c: 12 },
+      time: 44,
+      lvlMax: 2,
+      key: "o",
+      desc: "sharper weapons · the guns need a smith",
+    },
+    granary: {
+      name: "granary",
+      w: 86,
+      h: 70,
+      hp: 280,
+      cost: { w: 44, s: 24 },
+      time: 34,
+      lvlMax: 3,
+      key: "a",
+      desc: "+220 food stored, +winter keeping, per level",
+    },
+    kennel: {
+      name: "kennel",
+      w: 72,
+      h: 56,
+      hp: 200,
+      cost: { w: 34, s: 10 },
+      time: 24,
+      lvlMax: 2,
+      key: "k",
+      desc: "dogs on the night line · they smell the dead first",
+    },
+    shrine: {
+      name: "shrine",
+      w: 58,
+      h: 58,
+      hp: 200,
+      cost: { w: 30, s: 26, c: 2 },
+      time: 26,
+      lvlMax: 1,
+      key: "e",
+      desc: "somewhere to grieve · +12% work, steadier nerves",
+    },
+    barricade: {
+      name: "barricade",
+      w: 48,
+      h: 14,
+      hp: 210,
+      cost: { w: 5 },
+      time: 3,
+      lvlMax: 1,
+      key: "d",
+      desc: "cheap, quick, drag-built · the dead chew through it",
+    },
   };
   // the build menu's order (the hall is never built, only repaired)
   const ORDER = [
     "hut",
     "farm",
     "wall",
+    "barricade",
     "shed",
     "quarry",
+    "mill",
+    "granary",
     "store",
+    "smith",
     "tower",
     "post",
+    "kennel",
     "shop",
     "infirm",
+    "shrine",
     "well",
     "beacon",
   ];
@@ -1138,6 +1210,485 @@
     c.stroke();
   }
 
+  /* ---------- the newer trades ---------- */
+
+  // the windmill: a tapered stone tower, a boat-shaped cap, and four sails
+  // that turn all day (faster at level 2). The one building that says
+  // "somebody farms here" from across the map.
+  function drawMill(c, s, t, env) {
+    const x = s.x,
+      y = s.y,
+      w = s.w,
+      h = s.h,
+      yb = y + h;
+    const cx = x + w / 2;
+    floor(c, s, "rgba(170,150,120,0.16)");
+    const tw = w * 0.44,
+      top = yb - h * 0.84;
+    ZS.wpoly(
+      c,
+      [
+        { x: cx - tw / 2, y: yb },
+        { x: cx - tw * 0.35, y: top },
+        { x: cx + tw * 0.35, y: top },
+        { x: cx + tw / 2, y: yb },
+      ],
+      s.seed + 1,
+      1.2,
+      true,
+    );
+    c.fillStyle = "rgba(152,146,132,0.32)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.9;
+    c.stroke();
+    for (let i = 1; i < 4; i++) {
+      const f = i / 4,
+        yy = yb - (yb - top) * f,
+        hw = tw / 2 - tw * 0.14 * f;
+      seg(c, cx - hw, yy, cx + hw, yy, s.seed + 10 + i, 1, INK2);
+    }
+    door(c, s, 19, 25, "rgba(150,108,58,0.4)");
+    windowLit(c, cx, top + 16, s.seed + 20, env.night);
+    // the cap
+    ZS.wpoly(
+      c,
+      [
+        { x: cx - tw * 0.44, y: top + 1 },
+        { x: cx, y: top - 17 },
+        { x: cx + tw * 0.44, y: top + 1 },
+      ],
+      s.seed + 21,
+      1,
+      true,
+    );
+    c.fillStyle = THATCH;
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.6;
+    c.stroke();
+    // the sails
+    const hx = cx,
+      hy = top - 7;
+    const a0 = t * (0.5 + s.lvl * 0.22) + s.seed;
+    const L = 30 + s.lvl * 5;
+    for (let i = 0; i < 4; i++) {
+      const a = a0 + (i * Math.PI) / 2;
+      const dx = Math.cos(a),
+        dy = Math.sin(a);
+      const nx = -dy,
+        ny = dx;
+      seg(c, hx, hy, hx + dx * L, hy + dy * L, s.seed + 30 + i, 1.7, "rgba(108,82,50,0.95)");
+      for (let k = 1; k <= 4; k++) {
+        const f = k / 5;
+        seg(
+          c,
+          hx + dx * L * f,
+          hy + dy * L * f,
+          hx + dx * L * f + nx * 9,
+          hy + dy * L * f + ny * 9,
+          s.seed + 40 + i * 6 + k,
+          0.9,
+          INK2,
+        );
+      }
+      seg(
+        c,
+        hx + nx * 9,
+        hy + ny * 9,
+        hx + dx * L + nx * 9,
+        hy + dy * L + ny * 9,
+        s.seed + 70 + i,
+        1.1,
+        INK2,
+      );
+    }
+    c.strokeStyle = INK;
+    c.lineWidth = 1.5;
+    ZS.wcirc(c, hx, hy, 3.2, s.seed + 74, 0.5);
+    // the tail pole that keeps her nose to the wind
+    seg(c, cx, top - 6, cx - 20, top + 10, s.seed + 75, 1.2, INK2);
+    seg(c, cx - 20, top + 10, cx - 24, top + 22, s.seed + 76, 1.2, INK2);
+  }
+
+  // the smithy: a low stone shop under a tall chimney, a forge mouth that
+  // glows and throws sparks while somebody is working, an anvil outside,
+  // a rack of spears, and a water trough that steams.
+  function drawSmith(c, s, t, env) {
+    floor(c, s, "rgba(126,116,100,0.18)");
+    const x = s.x,
+      y = s.y,
+      w = s.w,
+      h = s.h,
+      yb = y + h;
+    seg(c, x, yb, x, y, s.seed + 1, 2.2);
+    seg(c, x + w, yb, x + w, y, s.seed + 2, 2.2);
+    seg(c, x, y, x + w, y, s.seed + 3, 1.8);
+    gable(c, s, 2, "rgba(124,120,108,0.3)");
+    // the chimney: taller than the roof, because it has to be
+    const chx = x + w - 22;
+    ZS.wpoly(
+      c,
+      [
+        { x: chx - 7, y: y - 2 },
+        { x: chx - 8, y: y - 40 },
+        { x: chx + 7, y: y - 41 },
+        { x: chx + 6, y: y - 2 },
+      ],
+      s.seed + 11,
+      1,
+      true,
+    );
+    c.fillStyle = "rgba(112,108,98,0.34)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.6;
+    c.stroke();
+    smoke(c, chx, y - 42, t, s.seed + 14, 4);
+    // the forge mouth
+    const fx = x + 20,
+      fy = yb - 2;
+    ZS.wpoly(
+      c,
+      [
+        { x: fx - 14, y: yb },
+        { x: fx - 11, y: fy - 25 },
+        { x: fx + 11, y: fy - 25 },
+        { x: fx + 14, y: yb },
+      ],
+      s.seed + 20,
+      1,
+      true,
+    );
+    c.fillStyle = "rgba(78,68,58,0.5)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.5;
+    c.stroke();
+    flames(c, fx, fy - 4, t, s.seed + 21, s.workT > 0 ? 1.25 : 0.85);
+    // sparks, while the iron is on the anvil
+    if (s.workT > 0) {
+      c.fillStyle = "rgba(232,180,88,0.85)";
+      for (let i = 0; i < 5; i++) {
+        const k = (t * 1.7 + i * 0.31 + ZS.hash(s.seed + i)) % 1;
+        c.fillRect(fx - 6 + ZS.hash(s.seed + i * 3) * 12 + k * 5, fy - 8 - k * 26, 1.6, 1.6);
+      }
+    }
+    // the anvil
+    const ax = x + w - 30,
+      ay = yb + 8;
+    seg(c, ax - 10, ay, ax + 10, ay, s.seed + 30, 2.2);
+    seg(c, ax - 7, ay - 3, ax + 7, ay - 3, s.seed + 31, 2);
+    seg(c, ax - 4, ay + 3, ax + 4, ay + 3, s.seed + 32, 1.6);
+    seg(c, ax - 3, ay + 3, ax + 3, ay + 9, s.seed + 33, 1.6);
+    seg(c, ax - 9, ay + 9, ax + 9, ay + 9, s.seed + 34, 1.6);
+    // a spear rack against the wall
+    for (let i = 0; i < 3; i++) {
+      const px = x + 44 + i * 7;
+      seg(c, px, yb - 2, px + 4, yb - 40, s.seed + 40 + i, 1.2, "rgba(120,92,54,0.9)");
+      c.strokeStyle = INK2;
+      c.lineWidth = 1;
+      ZS.wcirc(c, px + 4, yb - 40, 2, s.seed + 50 + i, 0.4);
+    }
+    // the water trough, steaming
+    seg(c, x + 6, yb + 6, x + 34, yb + 6, s.seed + 60, 1.6, INK2);
+    seg(c, x + 8, yb + 12, x + 32, yb + 12, s.seed + 61, 1.4, INK2);
+    windowLit(c, x + w - 16, y + h * 0.4, s.seed + 62, env.night);
+  }
+
+  // the granary: a stave-built round house up on staddle stones so the
+  // rats can't climb, a conical thatch cap, a ladder, and sacks at the foot.
+  function drawGranary(c, s, t, env) {
+    const x = s.x,
+      y = s.y,
+      w = s.w,
+      h = s.h,
+      yb = y + h;
+    const cx = x + w / 2;
+    floor(c, s, "rgba(176,158,120,0.16)");
+    const bw = w * 0.58,
+      by = yb - 16,
+      ty = y + 16;
+    // staddle stones
+    for (let i = 0; i < 4; i++) {
+      const px = cx - bw / 2 + (i * bw) / 3 + (i === 3 ? 2 : 0);
+      seg(c, px - 3, by, px + 3, by, s.seed + i, 1.4, INK2);
+      seg(c, px - 4, by + 8, px + 4, by + 8, s.seed + 10 + i, 1.4, INK2);
+      seg(c, px - 3, by, px - 4, by + 8, s.seed + 20 + i, 1.2, INK2);
+      seg(c, px + 3, by, px + 4, by + 8, s.seed + 30 + i, 1.2, INK2);
+    }
+    // the body
+    ZS.wpoly(
+      c,
+      [
+        { x: cx - bw / 2, y: by },
+        { x: cx - bw / 2 + 4, y: ty },
+        { x: cx + bw / 2 - 4, y: ty },
+        { x: cx + bw / 2, y: by },
+      ],
+      s.seed + 1,
+      1.1,
+      true,
+    );
+    c.fillStyle = "rgba(160,124,72,0.3)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.8;
+    c.stroke();
+    // staves + two hoops
+    for (let i = 1; i < 4; i++) {
+      const px = cx - bw / 2 + (i * bw) / 4;
+      seg(c, px, by, px + 1, ty, s.seed + 40 + i, 0.9, INK2);
+    }
+    for (let k = 1; k <= 2; k++) {
+      const f = k / 3,
+        yy = by - (by - ty) * f,
+        hw = bw / 2 - 2;
+      seg(c, cx - hw, yy, cx + hw, yy, s.seed + 50 + k, 1.3, "rgba(112,92,62,0.8)");
+    }
+    // the cap
+    ZS.wpoly(
+      c,
+      [
+        { x: cx - bw / 2 - 5, y: ty },
+        { x: cx, y: ty - 24 },
+        { x: cx + bw / 2 + 5, y: ty },
+      ],
+      s.seed + 60,
+      1.2,
+      true,
+    );
+    c.fillStyle = THATCH;
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.7;
+    c.stroke();
+    seg(c, cx - 3, ty - 24, cx + 3, ty - 24, s.seed + 61, 1, INK2);
+    // the hatch and its ladder
+    ZS.wpoly(
+      c,
+      [
+        { x: cx - 9, y: by - 1 },
+        { x: cx - 8, y: by - 15 },
+        { x: cx + 8, y: by - 15 },
+        { x: cx + 9, y: by - 1 },
+      ],
+      s.seed + 62,
+      0.8,
+      true,
+    );
+    c.fillStyle = "rgba(140,104,52,0.45)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.4;
+    c.stroke();
+    for (let i = 1; i < 5; i++) {
+      const f = i / 5,
+        yy = by - (by - (by + 10)) * f;
+      seg(c, cx - 7, yy, cx + 7, yy, s.seed + 70 + i, 1, INK2);
+    }
+    seg(c, cx - 7, by, cx - 7, by + 10, s.seed + 75, 1.2, INK2);
+    seg(c, cx + 7, by, cx + 7, by + 10, s.seed + 76, 1.2, INK2);
+    // sacks at the foot, and the grain that spills
+    for (let i = 0; i < 2 + s.lvl; i++) {
+      const px = x + 10 + i * 15;
+      blob(c, px, yb + 4, 5, s.seed + 80 + i, "rgba(198,182,150,0.5)", INK2);
+    }
+    if (env.night > 0.2) windowLit(c, cx, ty + 10, s.seed + 85, 0);
+  }
+
+  // the kennel: a low house with a round door, a fenced run, a bowl, and
+  // a bone. The dogs themselves are critters; this is where they live.
+  function drawKennel(c, s, t, env) {
+    const x = s.x,
+      y = s.y,
+      w = s.w,
+      h = s.h,
+      yb = y + h;
+    floor(c, s, "rgba(150,132,100,0.14)");
+    const bw = w * 0.5;
+    ZS.wpoly(
+      c,
+      [
+        { x: x + 2, y: yb },
+        { x: x + 2, y: y + 18 },
+        { x: x + bw, y: y + 16 },
+        { x: x + bw, y: yb },
+      ],
+      s.seed + 1,
+      1,
+      true,
+    );
+    c.fillStyle = "rgba(156,116,68,0.28)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.7;
+    c.stroke();
+    ZS.wpoly(
+      c,
+      [
+        { x: x - 3, y: y + 19 },
+        { x: x + bw * 0.5, y: y + 2 },
+        { x: x + bw + 3, y: y + 17 },
+      ],
+      s.seed + 2,
+      1.1,
+      true,
+    );
+    c.fillStyle = THATCH;
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.5;
+    c.stroke();
+    // the round door
+    c.beginPath();
+    c.arc(x + bw * 0.5, yb - 9, 9, Math.PI, 0);
+    c.strokeStyle = INK;
+    c.lineWidth = 1.6;
+    c.stroke();
+    c.fillStyle = "rgba(50,40,30,0.42)";
+    c.fill();
+    // the run: posts and two rails across the rest of the footprint
+    for (let i = 0; i <= 3; i++) {
+      const px = x + bw + 4 + (i * (w - bw - 8)) / 3;
+      seg(c, px, yb, px, yb - 20, s.seed + 10 + i, 1.3, "rgba(120,92,54,0.9)");
+    }
+    for (let k = 1; k <= 2; k++) {
+      const yy = yb - 6 - k * 6;
+      seg(c, x + bw + 4, yy, x + w - 4, yy, s.seed + 20 + k, 1, INK2);
+    }
+    // a bowl and a bone
+    c.strokeStyle = INK2;
+    c.lineWidth = 1.3;
+    ZS.wcirc(c, x + w - 12, yb + 2, 4.4, s.seed + 30, 0.6);
+    seg(c, x + w - 26, yb + 4, x + w - 18, yb + 4, s.seed + 31, 1.2, INK2);
+    c.strokeStyle = "rgba(226,220,204,0.9)";
+    c.lineWidth = 1.2;
+    ZS.wcirc(c, x + w - 25, yb + 3, 1.6, s.seed + 32, 0.3);
+    ZS.wcirc(c, x + w - 19, yb + 3, 1.6, s.seed + 33, 0.3);
+    if (env.night > 0.25) windowLit(c, x + bw * 0.5, y + 24, s.seed + 34, 0.2);
+  }
+
+  // the shrine: a stone arch over a niche, a copper roof gone green, and
+  // candles under it. The chronicle writes the names of the lost on it.
+  function drawShrine(c, s, t, env) {
+    const x = s.x,
+      y = s.y,
+      w = s.w,
+      h = s.h,
+      yb = y + h;
+    const cx = x + w / 2;
+    floor(c, s, "rgba(150,146,134,0.16)");
+    // two pillars and an arch
+    for (let i = 0; i < 2; i++) {
+      const px = cx + (i ? 16 : -16);
+      ZS.wpoly(
+        c,
+        [
+          { x: px - 7, y: yb },
+          { x: px - 6, y: y + 14 },
+          { x: px + 6, y: y + 14 },
+          { x: px + 7, y: yb },
+        ],
+        s.seed + i * 10,
+        1,
+        true,
+      );
+      c.fillStyle = "rgba(136,132,120,0.3)";
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 1.6;
+      c.stroke();
+    }
+    ZS.wpoly(
+      c,
+      [
+        { x: cx - 24, y: y + 15 },
+        { x: cx - 14, y: y + 2 },
+        { x: cx + 14, y: y + 2 },
+        { x: cx + 24, y: y + 15 },
+      ],
+      s.seed + 30,
+      1,
+      true,
+    );
+    c.fillStyle = "rgba(112,138,116,0.34)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.7;
+    c.stroke();
+    // the niche
+    c.fillStyle = "rgba(64,54,42,0.4)";
+    c.beginPath();
+    c.arc(cx, y + 34, 8, 0, 7);
+    c.fill();
+    // candles: one per soul the village has lost, up to five
+    const n = Math.min(5, s.souls || 1);
+    for (let i = 0; i < n; i++) {
+      const px = cx - 12 + i * 6;
+      const fl = Math.sin(t * 6 + i * 2.1 + s.seed) * 0.5 + Math.sin(t * 3.3 + i) * 0.5;
+      seg(c, px, yb - 2, px, yb - 12, s.seed + 40 + i, 1.2, "rgba(226,220,204,0.9)");
+      c.strokeStyle = "rgba(232,186,86,0.95)";
+      c.lineWidth = 1.6;
+      ZS.wline(c, px, yb - 13, px + fl, yb - 18 - fl, s.seed + 50 + i, 0.5);
+      if (ZS.Perf && ZS.Perf.glow && env.night > 0.2) {
+        const g = c.createRadialGradient(px, yb - 18, 2, px, yb - 18, 40);
+        g.addColorStop(0, "rgba(236,196,110," + (0.13 * env.night).toFixed(3) + ")");
+        g.addColorStop(1, "rgba(236,196,110,0)");
+        c.fillStyle = g;
+        c.beginPath();
+        c.arc(px, yb - 18, 40, 0, 7);
+        c.fill();
+      }
+    }
+    // flowers laid at the foot
+    for (let i = 0; i < 4; i++) {
+      const px = cx - 14 + i * 9 + ZS.hash(s.seed + i) * 4;
+      c.strokeStyle = "rgba(150,120,140,0.8)";
+      c.lineWidth = 1;
+      ZS.wline(c, px, yb + 1, px + 1, yb - 5, s.seed + 60 + i, 0.4);
+      c.fillStyle = "rgba(186,150,160,0.7)";
+      c.beginPath();
+      c.arc(px + 1, yb - 6, 1.6, 0, 7);
+      c.fill();
+    }
+  }
+
+  // the barricade: crossed stakes, two rails, a tangle of thorn. Cheap,
+  // quick to raise, and the dead go straight through it eventually.
+  function drawBarricade(c, s) {
+    const x = s.x,
+      y = s.y,
+      w = s.w,
+      h = s.h,
+      yb = y + h;
+    const f = s.hp / s.maxHp;
+    c.strokeStyle = "rgba(118,90,54,0.95)";
+    c.lineWidth = 1.9;
+    // stakes, alternating lean
+    const n = 5;
+    for (let i = 0; i <= n; i++) {
+      const px = x + (i * w) / n;
+      const lean = i % 2 ? 4 : -4;
+      if (f < 0.5 && ZS.hash(s.seed + i * 3.1) > f * 2) continue; // broken away
+      ZS.wline(c, px, yb, px + lean, yb - 20 - ZS.hash(s.seed + i) * 5, s.seed + i * 3, 0.9);
+    }
+    // two rails
+    for (let k = 0; k < 2; k++) {
+      const yy = yb - 6 - k * 8;
+      c.strokeStyle = "rgba(118,90,54,0.9)";
+      c.lineWidth = 1.5;
+      ZS.wline(c, x - 1, yy, x + w + 1, yy - 1, s.seed + 40 + k, 1);
+    }
+    // thorn tangle
+    c.strokeStyle = "rgba(96,124,54,0.85)";
+    c.lineWidth = 1.1;
+    for (let i = 0; i < 4; i++) {
+      const px = x + 4 + (i * (w - 8)) / 3;
+      ZS.wcirc(c, px, yb - 10 - (i % 2) * 4, 4.5, s.seed + 60 + i, 1.6);
+    }
+  }
+
   const ART = {
     hall: drawHall,
     hut: drawHut,
@@ -1152,6 +1703,12 @@
     infirm: drawInfirm,
     well: drawWell,
     beacon: drawBeacon,
+    mill: drawMill,
+    smith: drawSmith,
+    granary: drawGranary,
+    kennel: drawKennel,
+    shrine: drawShrine,
+    barricade: drawBarricade,
   };
 
   /* ---------- the module ---------- */

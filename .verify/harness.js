@@ -1,7 +1,7 @@
 /* A headless harness for The Hollow: enough DOM, canvas and storage for the
    real page to boot, and a step function so a test can drive frame after
    frame without a browser. Nothing here is imported by the game — the files
-   are loaded in page order, exactly as village.html loads them.
+   are loaded in page order, exactly as index.html loads them.
 
    ZS_SEED pins the map (otherwise every run is a new village). */
 "use strict";
@@ -216,24 +216,12 @@ globalThis.Image = class Image {
 globalThis.HTMLElement = class HTMLElement {};
 
 /* ---------- load the page ---------- */
-const page = [
-  "js/sketch.js",
-  "js/grid.js",
-  "js/nav.js",
-  "js/camera.js",
-  "js/world.js",
-  "js/buildings.js",
-  "js/stains.js",
-  "js/village/figures.js",
-  "js/village/structs.js",
-  "js/agents.js",
-  "js/sim.js",
-  "js/scenarios/village.js",
-  "js/village/ui.js",
-  "js/draw.js",
-  "js/sound.js",
-  "js/main.js",
-];
+// the file order comes from index.html itself, so it cannot drift
+const page = fs
+  .readFileSync(path.join(ROOT, "index.html"), "utf8")
+  .split("\n")
+  .map((l) => (/<script src="([^"]+)"/.exec(l) || [])[1])
+  .filter(Boolean);
 // the inline script that names the world (it lives on window, as in a page)
 win.ZS_WW = 2200;
 win.ZS_WH = 1600;

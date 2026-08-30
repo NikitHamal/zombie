@@ -6,6 +6,8 @@
   const ZS = window.ZS;
   const params = new URLSearchParams(location.search);
 
+  const perf = ZS.Perf ? ZS.Perf.init() : null;
+
   const cv = document.getElementById("c");
   const ctx = cv.getContext("2d");
   let W = 0,
@@ -42,7 +44,9 @@
   const cam = new ZS.Camera(world);
 
   function resize() {
-    DPR = Math.min(2, window.devicePixelRatio || 1);
+    // the quality tier caps the pixel ratio: on a weak machine a smaller
+    // canvas beats a prettier one every time
+    DPR = Math.min(perf ? perf.dprCap() : 2, window.devicePixelRatio || 1);
     W = window.innerWidth;
     H = window.innerHeight;
     cv.width = Math.max(1, W * DPR);
@@ -54,6 +58,7 @@
   window.addEventListener("resize", resize);
 
   resize();
+  if (perf) perf.onTier = resize; // stepping down re-sizes the canvas
   cam.fit(W, H);
   cam.minZoom = cam.zoom * 0.8; // a little paper margin around the world frame
   ZS.Sim.init(world, W, H);
@@ -195,8 +200,13 @@
   let last = performance.now();
   function loop(now) {
     const t = now / 1000 + recordingOffset;
-    const dt = Math.min(0.05, (now - last) / 1000);
+    const raw = (now - last) / 1000;
+    const dt = Math.min(0.05, raw);
     last = now;
+    if (perf) {
+      perf.frame(Math.min(0.5, raw));
+      perf.tickFrame();
+    }
     ZS.setBoil(t);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     // the clock: a scenario may run it slower or faster (the village's

@@ -201,7 +201,9 @@
     const S = ZS.scenario;
     const nav = world.nav;
     const buildings = world.buildings;
-    navBudget = NAV_BUDGET;
+    // A* is the most expensive thing a frame can do; the quality tier says
+    // how many searches it may spend
+    navBudget = ZS.Perf ? ZS.Perf.navBudget() : NAV_BUDGET;
     const grid = new ZS.Grid(CELL);
     for (let i = 0; i < agents.length; i++) {
       const a = agents[i];
