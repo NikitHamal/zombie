@@ -174,6 +174,33 @@
       desc: "+40% guard range and sight",
       req: ["bows"],
     },
+    physic: {
+      name: "the physic's chest",
+      cost: { w: 20, s: 10, c: 14 },
+      time: 45,
+      desc: "herbs, instruments, a notebook: +healing, and a bite is a little less final",
+    },
+    serum1: {
+      name: "what the physician saw",
+      req: ["physic"],
+      cost: { w: 40, c: 30 },
+      time: 60,
+      desc: "the ledger, read properly: the illness is a thing, and things can be answered",
+    },
+    serum2: {
+      name: "the cold box",
+      req: ["serum1"],
+      cost: { w: 60, c: 44 },
+      time: 75,
+      desc: "glass, a cold box, and a sample that is still alive: the shape of a cure",
+    },
+    serum3: {
+      name: "the course",
+      req: ["serum2", "medicine"],
+      cost: { w: 70, c: 60 },
+      time: 120,
+      desc: "brew it in a level-two infirmary, and a bite stops being a death sentence",
+    },
     medicine: {
       name: "medicine",
       cost: { w: 40, c: 18 },
@@ -395,6 +422,11 @@
       this.chron = []; // the ledger (js/village/chronicle.js)
       this.away = []; // everybody out on an expedition
       this.alerts = []; // what the overlay is shouting about
+      this.fac = null; // the other people out there (js/village/people.js)
+      this.cure = null; // the four steps of the cure (js/village/cure.js)
+      this.raiders = []; // st === 3: living, hostile, and carrying things off
+      this.raidersKilled = 0;
+      this.cured = 0; // the plague is done in this valley
       this.grief = 0;
       this.morale = 0.7;
       this.bonus = { farm: 0 }; // things found out there that stay found
@@ -636,7 +668,7 @@
     }
 
     hostile(a) {
-      return a.st === 2;
+      return a.st === 2 || a.st === 3;
     }
 
     walkBlocked(a) {
@@ -902,6 +934,15 @@
 
     _startNight(called) {
       if (this.phase !== "day" && this.phase !== "dusk") return;
+      // the plague is done in this valley: the wood stays quiet
+      if (this.cured) {
+        this.phase = "night";
+        this.nightT = 0;
+        this.queue = [];
+        this.stage = "quiet";
+        if (ZS.VillageUI) ZS.VillageUI.toast("the wood is quiet · nothing is coming tonight");
+        return;
+      }
       this.phase = "dusk";
       this.phaseT = 0;
       this.nightT = 0;
@@ -1067,8 +1108,10 @@
     }
 
     _newDay(agents) {
-      // the dead that were still out there are gone with the light
-      for (const a of agents) if (a.st === 2) a.gone = true;
+      // the dead that were still out there are gone with the light, and so
+      // are the Warrens, whatever they are carrying
+      for (const a of agents) if (a.st === 2 || a.st === 3) a.gone = true;
+      this.raiders.length = 0;
       this.card = null;
       this.day++;
       this.phase = "day";
@@ -1098,6 +1141,10 @@
       if (ZS.Kin) ZS.Kin.daily(this);
       // everything else that can go wrong, rolled at dawn
       if (ZS.Hazards && this.haz) ZS.Hazards.daily(this);
+      // the other people out there: opinions, caravans, demands, raids
+      if (ZS.Factions && this.fac) ZS.Factions.daily(this);
+      // and the cure, if the village has the makings of it
+      if (ZS.Cure && this.cure) ZS.Cure.daily(this);
       this._recalc();
       const si = Math.floor((this.day - 1) / 8) % 4;
       if (si !== this.seasonI) {
@@ -1107,6 +1154,26 @@
       if (ZS.Chronicle) ZS.Chronicle.autosave(this);
       if (ZS.VillageUI)
         ZS.VillageUI.toast("day " + this.day + " · " + this.season.name + ", " + this.weather.name);
+    }
+
+    // the cure is finished: the last night that is not a night
+    curedEnding() {
+      this.cured = 1;
+      if (ZS.Chronicle)
+        ZS.Chronicle.add(
+          this,
+          "the plague is finished in this valley. The hollow goes on.",
+          "cure",
+        );
+      this.card = {
+        title: "the last night",
+        lines: [
+          "the course is poured, and the last of the dead are put down",
+          "nothing came out of the wood tonight",
+          "",
+          "the hollow is yours now — build it, and keep it",
+        ],
+      };
     }
 
     _upkeep() {
@@ -1249,6 +1316,8 @@
         this.alerts[i].t -= dt;
         if (this.alerts[i].t <= 0) this.alerts.splice(i, 1);
       }
+      // the raid ends when the last of them is down or off the map
+      if (ZS.Factions && this.fac && this.fac.raidT && !this.raiders.length) ZS.Factions.over(this);
       let sick = 0;
       for (const a of this.villagers()) if (a.sick > 0) sick++;
       if (this.haz) this.haz.sick = sick;
@@ -1317,6 +1386,11 @@
           p.scouting = !!p.scouting;
         }
       }
+      this.fac = s && s.fac ? s.fac : ZS.Factions.create(this.world.seed);
+      this.cure = s && s.cure ? s.cure : ZS.Cure.create();
+      this.raiders = []; // a raid in progress is not saved; it ends with the reload
+      this.raidersKilled = 0;
+      this.cured = (s && s.cured) || 0;
       this.chron = (s && s.chron) || [];
       this.grief = (s && s.grief) || 0;
       this.bonus = (s && s.bonus) || { farm: 0 };
@@ -1493,8 +1567,15 @@
       if (this.done[id]) return;
       this.done[id] = true;
       this._recalc();
+      if (id === "serum3" && ZS.Cure) ZS.Cure.brewed(this);
       if (ZS.VillageUI) ZS.VillageUI.toast("learned: " + RESEARCH[id].name);
       if (ZS.Chronicle) ZS.Chronicle.add(this, "learned " + RESEARCH[id].name, "note");
+    }
+
+    // a party came home (js/village/overworld.js calls this)
+    onExpeditionReturn(p, _got) {
+      if (ZS.Cure && p && p.site && !p.scouting) ZS.Cure.onReturn(this, p.site);
+      // the valley's own line is in the record already (Overworld.say)
     }
 
     // a new face: from the wood, from a birth, or from the far side of the river
@@ -1698,6 +1779,9 @@
           Math.round(p.seed),
         ]),
         crit: this.critters.map((c) => [c.kind, Math.round(c.x), Math.round(c.y)]),
+        fac: this.fac,
+        cure: this.cure,
+        cured: this.cured,
       };
     }
 
@@ -1778,6 +1862,7 @@
     update(a, dt, t, grid, nav) {
       a.noPush = false; // set by the states that hold a spot (see js/agents.js)
       if (a.st === 2) this._updateZombie(a, dt, t, grid, nav);
+      else if (a.st === 3) this._updateRaider(a, dt, t, grid, nav);
       else if (a.job === "guard") this._updateGuard(a, dt, t, grid, nav);
       else this._updateVillager(a, dt, t, grid, nav);
     }
@@ -2833,13 +2918,192 @@
       for (let i = 0; i < shots; i++) this._hitZombie(a, z, (w.dmg / (w.pellets ? 1.6 : 1)) * mul);
     }
 
+    /* ---------- other people (js/village/people.js) ---------- */
+
+    // they come in from the treeline like anybody else, and they are not
+    // the dead: they want the granary, and they want to go home
+    spawnRaiders(n) {
+      const B = ZS.Factions.BAL;
+      for (let i = 0; i < n; i++) {
+        const p = this._spawnPoint();
+        if (!p) return;
+        const a = this.makeAgent(p.x, p.y, 3);
+        a.hp = B.RAID_HP;
+        a.maxHp = B.RAID_HP;
+        a.job = "raider";
+        a.tool = "club";
+        a.atkT = 0;
+        a.stealT = 0;
+        a.fleeing = 0;
+        a.name = null;
+        this.agents.push(a);
+        this.raiders.push(a);
+      }
+    }
+
+    _updateRaider(a, dt, t, grid, nav) {
+      const B = ZS.Factions.BAL;
+      a.atkT -= dt;
+      // hurt enough: drop it and run for the road
+      if (!a.fleeing && a.hp < a.maxHp * B.FLEE_AT) {
+        a.fleeing = 1;
+        this._pop(a.x, a.y - 26, "running", "#a04030");
+      }
+      if (a.fleeing || (a.carry && a.carry.n)) {
+        const edge = this._edgeFor(a);
+        a.wantMove = true;
+        ZS.planAndFollow(a, edge, false, B.RAID_SPD, dt, t, nav);
+        if (this._offMap(a)) {
+          if (a.carry) ZS.Factions.escaped(this, a);
+          a.gone = true;
+          this._dropRaider(a);
+        }
+        return;
+      }
+      // somebody within reach: a club is not a bite, but it ends the same
+      const reach = B.RAID_REACH + 14;
+      const v = this._nearestPrey(a, reach, grid);
+      if (v && a.atkT <= 0) {
+        a.atkT = B.RAID_CD;
+        a.swing = 0;
+        a.a = Math.atan2(v.y - a.y, v.x - a.x);
+        this._wound(v, B.RAID_DMG, a);
+        return;
+      }
+      // nothing in the way: the granary, then the road
+      const box = this._lootTarget(a);
+      if (!box) {
+        a.fleeing = 1;
+        return;
+      }
+      if (dist2(a.x, a.y, box.x, box.y) < 52 * 52) {
+        a.stealT += dt;
+        a.a = Math.atan2(box.y - a.y, box.x - a.x);
+        if (a.stealT >= B.STEAL_T) {
+          a.stealT = 0;
+          const kind =
+            this.res.food > 14
+              ? "food"
+              : this.res.scrap > 10
+                ? "scrap"
+                : this.res.wood > 10
+                  ? "wood"
+                  : null;
+          if (kind) {
+            const n = Math.min(B.STEAL, Math.floor(this.res[kind]));
+            if (n > 0) {
+              this.res[kind] -= n;
+              a.carry = { kind, n };
+              this._pop(a.x, a.y - 24, "-" + n + " " + kind, "#a04030");
+            }
+          }
+          a.fleeing = 1;
+        }
+        return;
+      }
+      a.wantMove = true;
+      ZS.planAndFollow(a, box, false, B.RAID_SPD, dt, t, nav);
+    }
+
+    // the nearest living person who is not one of them
+    _nearestPrey(a, r, grid) {
+      let best = null,
+        bd = r * r;
+      const f = (o) => {
+        if (o.st !== 0 || o.dead || o.gone) return;
+        const d = dist2(a.x, a.y, o.x, o.y);
+        if (d < bd) {
+          bd = d;
+          best = o;
+        }
+      };
+      if (grid) grid.query(a.x, a.y, r, f);
+      else for (const o of this.agents) f(o);
+      return best;
+    }
+
+    // where the food is kept
+    _lootTarget(a) {
+      let best = null,
+        bd = 1e18;
+      for (const b of this.world.buildings) {
+        if (!b.built || b.ruined) continue;
+        if (b.kind !== "store" && b.kind !== "granary" && b.kind !== "hall") continue;
+        const x = b.x + b.w / 2,
+          y = b.y + b.h / 2;
+        const d = dist2(a.x, a.y, x, y);
+        if (d < bd) {
+          bd = d;
+          best = { x, y };
+        }
+      }
+      return best || { x: this.hall.x + this.hall.w / 2, y: this.hall.y + this.hall.h / 2 };
+    }
+
+    // the shortest way off the map from here
+    _edgeFor(a) {
+      const w = this.world;
+      const dl = a.x,
+        dr = w.w - a.x,
+        du = a.y,
+        dd = w.h - a.y;
+      const m = Math.min(dl, dr, du, dd);
+      if (m === dl) return { x: -20, y: a.y };
+      if (m === dr) return { x: w.w + 20, y: a.y };
+      if (m === du) return { x: a.x, y: -20 };
+      return { x: a.x, y: w.h + 20 };
+    }
+
+    _offMap(a) {
+      const w = this.world;
+      return a.x < 24 || a.y < 24 || a.x > w.w - 24 || a.y > w.h - 24;
+    }
+
+    _dropRaider(a) {
+      const i = this.raiders.indexOf(a);
+      if (i >= 0) this.raiders.splice(i, 1);
+    }
+
+    _killRaider(a, by) {
+      if (a.counted) return;
+      a.counted = 1;
+      this._dropRaider(a);
+      this.raidersKilled++;
+      if (this.stains) this.stains.corpse(a);
+      if (ZS.Factions) ZS.Factions.killed(this);
+      if (by && by.st === 0) {
+        if (by.kin) {
+          by.kin.kills++;
+          by.kin.morale = Math.min(1, by.kin.morale + 0.03);
+        }
+        this._pop(by.x, by.y - 30, "down", "#5a7a3a");
+        if (ZS.sound) ZS.sound.event("v_callout", by.x, by.y);
+      }
+      if (ZS.Chronicle)
+        ZS.Chronicle.add(this, "one of the Warrens will not be going home", "people");
+    }
+
+    // a club, a knife, a fist: it hurts, but it does not spread
+    _wound(v, dmg, by) {
+      if (v.dead) return;
+      v.hp -= dmg;
+      v.flash = 0.3;
+      v.panic = Math.max(v.panic, 2.6);
+      this.fx.push({ x: v.x, y: v.y - 8, t: 0.3, blood: 2, seed: v.seed });
+      if (this.stains) this.stains.splat(v.x, v.y + 2, "blood", v.seed + Math.random() * 99);
+      if (ZS.sound) ZS.sound.event("v_gasp", v.x, v.y);
+      this._pop(v.x, v.y - 28, "-" + Math.round(dmg), "#a04030");
+      if (v.hp <= 0) this.killVillager(v, "killed by the Warrens");
+      else if (ZS.Kin && v.kin && by) ZS.Kin.remember(v, "the Warrens set on " + v.name);
+    }
+
     /* ---------- the dead ---------- */
 
     _nearestZed(a, r, grid) {
       let best = null,
         bd = r * r;
       const f = (o) => {
-        if (o.st !== 2 || o.dead || o.gone || o.flee) return;
+        if ((o.st !== 2 && o.st !== 3) || o.dead || o.gone || o.flee) return;
         const d = dist2(a.x, a.y, o.x, o.y);
         if (d < bd) {
           bd = d;
@@ -2979,6 +3243,7 @@
       if (this.stains) this.stains.splat(z.x, z.y + 2, "blood", z.seed + Math.random() * 99);
       if (z.hp > 0) return;
       z.dead = true;
+      if (z.st === 3) return this._killRaider(z, a);
       if (this.stains) this.stains.corpse(z);
       if (this.nightLog) this.nightLog.killed++;
       const sc = BAL.ZED[z.zType].scrap;
@@ -3451,13 +3716,30 @@
       if (ZS.VillageUI) ZS.VillageUI.toast("dismantled · +" + ZS.VillageUI.costText(back));
     }
 
+    // what the workshop can study: what it has the learning for, and what
+    // the village has actually found out there
     researchList() {
       const out = [];
       for (const id in RESEARCH) {
         if (this.done[id] || (this.research && this.research.id === id)) continue;
         const def = RESEARCH[id];
         if (def.req && !def.req.every((r) => this.done[r])) continue;
+        if (ZS.Cure && !ZS.Cure.gate(this, id).ok) continue;
         out.push({ id, def });
+      }
+      return out;
+    }
+
+    // and why the thing you cannot study is grey: for the workshop panel
+    researchLocked() {
+      const out = [];
+      if (!ZS.Cure) return out;
+      for (const id in RESEARCH) {
+        if (this.done[id] || (this.research && this.research.id === id)) continue;
+        const def = RESEARCH[id];
+        if (def.req && !def.req.every((r) => this.done[r])) continue;
+        const gate = ZS.Cure.gate(this, id);
+        if (!gate.ok) out.push({ id, def, err: gate.err });
       }
       return out;
     }
@@ -3465,6 +3747,13 @@
     startResearch(id) {
       const def = RESEARCH[id];
       if (!def || this.done[id] || this.research) return;
+      if (ZS.Cure) {
+        const gate = ZS.Cure.gate(this, id);
+        if (!gate.ok) {
+          if (ZS.VillageUI) ZS.VillageUI.toast(gate.err);
+          return;
+        }
+      }
       if (!this.has("shop")) {
         if (ZS.VillageUI) ZS.VillageUI.toast("build a workshop first");
         return;
@@ -3492,6 +3781,7 @@
       this.done[r.id] = true;
       this.research = null;
       this._recalc();
+      if (r.id === "serum3" && ZS.Cure) ZS.Cure.brewed(this);
       this._pop(this.hall.x + this.hall.w / 2, this.hall.y - 10, r.def.name, "#5a7a3a");
       if (ZS.VillageUI) {
         ZS.VillageUI.toast("learned: " + r.def.name);

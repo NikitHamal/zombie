@@ -65,7 +65,9 @@ index.html
     js/village/structs.js  19 building kinds: cost, time, hp, and their art
     js/village/kin.js    named people: traits, memory, morale, birth, grief
     js/village/hazards.js  fire, fever, rats, cold, despair
-    js/village/overworld.js  the valley: 8 places, parties, fog, loot tables
+    js/village/overworld.js  the valley: 10 places, parties, fog, loot tables
+    js/village/people.js    other people: trade, tribute, raids (st === 3)
+    js/village/cure.js      the four steps, the dose, and the end of it
     js/village/chronicle.js  the ledger and the three save slots
     js/agents.js         generic entity engine (AI pass, separation, clamp)
     js/sim.js            game clock (day/night, tap)
@@ -205,9 +207,10 @@ can pay for. The horde pathfinds around them and piles at the gap.
 
 ### The valley (idea 1, 2, 9)
 
-Eight places beyond the wood, at 42–235 "minutes" out: the Alder
-farmstead, the quarry, the mill, the chapel (physic), the manor, the
-refugee camp, the river crossing (people), the dead city. Send **two** for
+Ten places beyond the wood, at 42–235 "minutes" out: the Alder
+farmstead, the quarry, the mill, the chapel (physic), the manor, Ashford,
+the Warrens, the refugee camp, the river crossing (people), the dead city.
+Send **two** for
 `10 food` and a walk of `def.d * 2.2` seconds each way. What comes back is
 rolled on the site: seed stock, nails, tools, a cure, a stranger — or a
 bite, or nobody (`rollSite`). Fog clears only where feet have been:
@@ -216,6 +219,55 @@ the map with a scribbled cloud over everything you have not walked to.
 
 `serialize()` carries parties in the field, so closing the browser does
 not strand anybody out there.
+
+### Other people (js/village/people.js)
+
+Two of them, and both of them keep an opinion (`0` blood enemies → `1`
+fast friends, drifting back to `0.5` by `DRIFT` 0.012 a dawn):
+
+- **Ashford** — a market town. Warm (`opinion ≥ 0.55`) and they send a
+  caravan every fourth day: 30 food for 26 scrap and 6 cloth.
+- **the Warrens** — a camp in the quarry terraces. Cold (`opinion < 0.46`)
+  and they send a demand: 34 food or they come within two days.
+
+You meet them by walking to their place (`Overworld` marks `met`, and the
+loot roll carries `met`/`cleared` home with the party). Answer with the
+buttons in the valley panel: `trade` · `pay` · `refuse`. Refusing sours
+them by 0.18 and starts the clock.
+
+**Raiders are `st === 3`** — living, hostile, and in `scen.raiders`
+(`spawnRaiders`, `_updateRaider`). They are not the dead: they walk to the
+nearest store, granary or hall, spend `STEAL_T` 2.4 s filling their arms
+with up to `STEAL` 9 of one thing, and run for the nearest map edge, where
+`Factions.escaped()` takes it out of your stores for good. Hurt below
+`FLEE_AT` 38% they drop everything and run. They club people (`_wound`):
+pain and blood, but no infection. Guards see them through `_nearestZed`,
+and a dead raider costs the Warrens 0.1 opinion and some anger. Send a
+party to the Warrens and there is a chance (`0.45`, if nobody was lost)
+that the camp is broken and the raids stop for good.
+
+A raid is not saved mid-fight: reload and it is over.
+
+### The cure (js/village/cure.js)
+
+Four steps, and the first three are places you have to go and come back
+from (`Cure.onReturn`, called from `Overworld.arrive`):
+
+1. **the physic's chest** — the chapel → research `physic`
+2. **the physician's ledger** — the manor → `serum1` (needs `physic`)
+3. **the cold box** — the dead city → `serum2` (needs `serum1`)
+4. **the course** — brewed at home in a **level-two infirmary** → `serum3`
+
+`Cure.gate(scen, id)` is consulted by `researchList()` (which hides what
+you cannot study) and `researchLocked()` (which shows it grey in the
+workshop panel, with the reason). `startResearch` refuses it too.
+
+Finishing `serum3` yields `BAL.DOSES` 2 doses; studying it again brews
+another course. A dose is spent the moment somebody's bite runs out
+(`Cure.dose`): it stops the infection dead and leaves them alive at 40%
+health. Three quiet dawns after the course is known (`FINAL_DAYS`), the
+plague is finished: `scen.cured = 1`, the card **the last night**, and
+`_startNight` stops putting anything in the wood.
 
 ### The people (idea 6, 7)
 
@@ -254,9 +306,11 @@ early game's real puzzle.
 
 ### Research (the workshop, `T`)
 
-Thirteen steps: sharp tools 1–2, spears, bows, rifles, shotguns, armour
-1–2, crop rotation 1–2, medicine, stone wall, towers 2. Powder weapons
-need a standing smithy; everything needs a workshop.
+Seventeen steps: sharp tools 1–2, spears, bows, rifles, shotguns, armour
+1–2, crop rotation 1–2, medicine, stone wall, towers 2, **and the four of
+the cure** (`physic` → `serum1` → `serum2` → `serum3`). Powder weapons
+need a standing smithy; everything needs a workshop, and the cure needs
+what it needs — see `Cure.gate` above.
 
 ### The record (idea 11)
 
@@ -369,9 +423,24 @@ building: `U` upgrade, `R` repair, `X` dismantle.
   rebuild itself under the cursor (a number that moves every tick must
   not be in it).
 
+## The tiers (the plan being worked through)
+
+Tier A (**shipped**) — A2 other people · A3 the cure. A1 the road out was
+left out by request.
+
+Tier B — B4 interiors and rooms · B5 items, wear, winter clothes ·
+B6 walk the valley.
+
+Tier C — C8 squad tactics. (C1 horde ecology was left out by request.)
+
+Tier D — D9 generations and legacy · D10 meta progression and challenge
+modes.
+
+Tier E — E11 climate with warnings · E12 trust between individuals ·
+E13 nights you actually watch · E14 onboarding and access.
+
 ## Future work (known, not started)
 
-Open-world travel on foot (the valley is a panel, not a map you walk);
-scout reports written in the hand of whoever went; more structure art;
+Scout reports written in the hand of whoever went; more structure art;
 veterancy shown on the figure itself. Whatever ships keeps the exact
 sketch style.

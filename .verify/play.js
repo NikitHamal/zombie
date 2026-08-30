@@ -251,6 +251,8 @@ console.log("  morale " + G.morale.toFixed(2) + " · grief " + G.grief.toFixed(2
 for (const l of log.slice(-6)) console.log("    " + l);
 const deaths = (G.chron || []).filter((e) => e.kind === "death");
 if (deaths.length) console.log("  the lost: " + deaths.map((e) => "d" + e.day + " " + e.txt).join(" · "));
+const folk = (G.chron || []).filter((e) => e.kind === "people" || e.kind === "cure");
+if (folk.length) console.log("  out there: " + folk.map((e) => "d" + e.day + " " + e.txt).join(" · "));
 
 check(!G.over, "the village is still standing", G.over ? G.over.title : "day " + G.day);
 check(G.day >= DAYS, "it reached day " + DAYS, "day " + G.day);

@@ -39,10 +39,24 @@ hall gives, they get in. Everything you build is in service of that door.
 **Bites.** Most bites kill. Some do not. Get the bitten to an infirmary
 and a healer, or watch the fever run its course.
 
-**The valley.** Eight places beyond the wood. Send two people with ten
+**The valley.** Ten places beyond the wood. Send two people with ten
 days' food and they walk out, come back with seed stock, nails, tools, a
 cure or a stranger — or come back bitten, or not at all. Fog clears only
 where feet have been.
+
+**Other people.** There is a market town that would rather sell to you
+than bury you, and a camp in the quarry terraces that would rather take
+what you have. Both keep an opinion. Trade with Ashford when they are
+well disposed; pay the Warrens off, or refuse them and hold the green
+when they come down the road. Raiders are not the dead — they walk to
+your granary, fill their arms, and run, and whatever reaches the road is
+gone. Send a party to their camp and you may end it for good.
+
+**The cure.** Four steps, and three of them are out in the valley: the
+physic's chest in the chapel, the physician's ledger in the manor, the
+cold box under the dead city. Bring them home, study them, and brew the
+course in a level-two infirmary. Then a dose stops a bite dead — and keep
+going, and one night nothing comes out of the wood at all.
 
 **The winter.** Summer grows, autumn is the harvest rush, winter stops
 the farms dead and burns a pile of wood every day to keep the cold out.
@@ -91,6 +105,10 @@ upgrade, `R` repair, `X` dismantle.
    healer is a story. A bite you cannot is a grave.
 6. **Feed them, and when the grief is heavy, hold a feast.** Morale is a
    multiplier on everything.
+7. **Go and meet the neighbours.** The workshop will tell you what it
+   cannot study and why — usually because you have not been to the place
+   yet. Ashford's iron is worth the walk, and the chapel's physic chest
+   is where the cure starts.
 
 ## Under the skin
 

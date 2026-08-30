@@ -966,6 +966,20 @@
       }
     },
 
+    // one of the Warrens: the same figure, but with a rag across the chest
+    // and a club in the hand (additive — nothing in draw() is touched)
+    raiderMark(c, a, t) {
+      const f = this.frameOf(a, t);
+      c.save();
+      c.strokeStyle = "rgba(122,54,40,0.85)";
+      c.lineWidth = 2.2;
+      ZS.wline(c, f.shx - 5, f.shy - 3, f.shx + 5, f.shy + 3, a.seed + 71, 0.9);
+      c.strokeStyle = "rgba(122,54,40,0.5)";
+      c.lineWidth = 1.6;
+      ZS.wline(c, f.shx - 5, f.shy + 2, f.shx + 4, f.shy - 4, a.seed + 77, 0.5);
+      c.restore();
+    },
+
     nearGrave(a) {
       const sc = ZS.scenario;
       if (!sc || !sc.props) return false;
@@ -1003,6 +1017,7 @@
         return;
       }
       this.mood(c, a, t);
+      if (a.st === 3) this.raiderMark(c, a, t);
       this.tool(c, a, t);
       this.load(c, a, t);
       if (a.inf > 0) this.infected(c, a, t);

@@ -19,9 +19,14 @@ console.log("The Hollow — the newer systems\n");
 frames(20);
 
 /* ---------------- the valley ---------------- */
-check(!!G.ow && G.ow.sites.length === 8, "the valley is there", G.ow ? G.ow.sites.length + " places" : "missing");
+check(!!G.ow && G.ow.sites.length === 10, "the valley is there", G.ow ? G.ow.sites.length + " places" : "missing");
 check(G.ow.sites.filter((s) => s.seen).length === 2, "two of them are known at the start");
-check(G.ow.sites.filter((s) => !s.seen).length === 6, "the rest are rumour and dark");
+check(G.ow.sites.filter((s) => !s.seen).length === 8, "the rest are rumour and dark");
+check(
+  !!ZS.Overworld.def("ashford") && !!ZS.Overworld.def("warrens"),
+  "and there are people out there",
+  "ashford · warrens",
+);
 
 const near = G.ow.sites.find((s) => s.seen);
 const def = ZS.Overworld.def(near.id);

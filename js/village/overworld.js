@@ -65,6 +65,26 @@
       loot: { scrap: 26, wood: 24, stone: 18 },
     },
     {
+      id: "ashford",
+      name: "Ashford",
+      kind: "town",
+      d: 100,
+      danger: 2,
+      desc: "a market town behind a palisade — bread for iron, if they like you",
+      loot: { scrap: 24, cloth: 8 },
+      people: "ashford",
+    },
+    {
+      id: "warrens",
+      name: "the Warrens",
+      kind: "raiders",
+      d: 130,
+      danger: 4,
+      desc: "a camp cut into the quarry terraces — going there is a fight, not an errand",
+      loot: { arms: 12, scrap: 18, food: 20 },
+      people: "warrens",
+    },
+    {
       id: "camp",
       name: "the army camp",
       kind: "arms",
@@ -252,6 +272,11 @@
       }
       if (def.cure && scen.done && !scen.done.medicine && Math.random() < 0.5) loot.cure = 1;
       if (def.recruit && Math.random() < 0.5) loot.people = 1;
+      // a settlement: you have been there, and now they know you too
+      if (def.people) {
+        loot.met = def.people;
+        if (def.people === "warrens" && !p.bad && Math.random() < 0.45) loot.cleared = 1;
+      }
       return loot;
     },
 
@@ -287,6 +312,32 @@
           if (k === "cloth") {
             scen.res.cloth = (scen.res.cloth || 0) + n;
             got.push(n + " cloth");
+            continue;
+          }
+          if (k === "met") {
+            if (ZS.Factions && scen.fac) {
+              const f = ZS.Factions.get(scen.fac, n);
+              if (f) {
+                f.met = 2;
+                f.opinion = ZS.clamp(f.opinion + (n === "ashford" ? 0.06 : -0.04), 0, 1);
+              }
+            }
+            continue;
+          }
+          if (k === "cleared") {
+            if (ZS.Factions && scen.fac) {
+              const f = ZS.Factions.get(scen.fac, "warrens");
+              if (f && !f.cleared) {
+                f.cleared = 1;
+                f.opinion = 0;
+                scen.fac.raidIn = 0;
+                got.push("the camp is broken");
+                if (ZS.Chronicle)
+                  ZS.Chronicle.add(scen, "the Warrens are broken — no more raids", "people");
+                if (ZS.VillageUI)
+                  ZS.VillageUI.toast("the Warrens are broken. They will not come again.");
+              }
+            }
             continue;
           }
           scen.res[k] = (scen.res[k] || 0) + n;

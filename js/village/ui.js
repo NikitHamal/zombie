@@ -262,6 +262,25 @@
         case "scout":
           this.expedition(arg, true);
           break;
+        case "fac-trade": {
+          const r = ZS.Factions.trade(s, arg);
+          if (!r.ok) this.toast(r.err);
+          else this.toast("traded — " + r.got);
+          this.refresh(true);
+          break;
+        }
+        case "fac-pay": {
+          const r = ZS.Factions.tribute(s, arg);
+          if (!r.ok) this.toast(r.err);
+          this.refresh(true);
+          break;
+        }
+        case "fac-refuse": {
+          const r = ZS.Factions.refuse(s, arg);
+          if (!r.ok) this.toast(r.err);
+          this.refresh(true);
+          break;
+        }
         case "feast": {
           const r = ZS.Hazards.feast(s);
           if (!r.ok) this.toast(r.err);
@@ -869,6 +888,89 @@
         h += "</div>";
       }
       h += '<div class="pfoot">loot: ' + this.lootLine() + "</div>";
+      h += this.peopleBlock(s);
+      h += this.cureBlock(s);
+      return h;
+    },
+
+    // the two of them, and whatever they are asking for just now
+    peopleBlock(s) {
+      if (!ZS.Factions || !s.fac) return "";
+      let h = '<div class="pfoot">other people</div>';
+      for (const f of ZS.Factions.lines(s)) {
+        h +=
+          '<div class="row' +
+          (f.dim ? " no" : "") +
+          '"><span>' +
+          f.name +
+          '</span><span class="who">';
+        h += f.cleared ? "wiped out" : f.word;
+        h += "</span></div>";
+        if (!f.dim && !f.cleared) {
+          h +=
+            '<div class="hp" style="flex:1 1 100%;height:4px"><i style="width:' +
+            f.op +
+            "%;background:" +
+            (f.op > 55 ? "#5a7a3a" : f.op > 40 ? "#8a7a3a" : "#a04030") +
+            '"></i></div>';
+          h += '<div class="pfoot">' + f.blurb + "</div>";
+        }
+      }
+      for (const ev of s.fac.events) {
+        h += '<div class="row"><span>' + ev.text + "</span><span>day " + ev.day + "</span></div>";
+        h += '<div class="tray">';
+        if (ev.kind === "caravan")
+          h +=
+            '<button data-act="fac-trade" data-arg="' +
+            ev.id +
+            '"' +
+            (s.res.food >= ev.give.food ? "" : ' class="no"') +
+            ">give " +
+            ev.give.food +
+            " food</button>";
+        else if (ev.kind === "demand") {
+          h +=
+            '<button data-act="fac-pay" data-arg="' +
+            ev.id +
+            '"' +
+            (s.res.food >= ev.give.food ? "" : ' class="no"') +
+            ">pay " +
+            ev.give.food +
+            " food</button>";
+          h +=
+            '<button data-act="fac-refuse" data-arg="' + ev.id + '" class="danger">refuse</button>';
+        }
+        h += "</div>";
+      }
+      const w = ZS.Factions.get(s.fac, "warrens");
+      if (w && !w.cleared && s.fac.raidIn > 0)
+        h += '<div class="pfoot">they are coming: ' + s.fac.raidIn + " day(s)</div>";
+      if (s.raiders && s.raiders.length)
+        h += '<div class="pfoot">' + s.raiders.length + " of them are in the village now</div>";
+      return h;
+    },
+
+    // the four steps, and which one the village is looking for
+    cureBlock(s) {
+      if (!ZS.Cure || !s.cure) return "";
+      const q = ZS.Cure.line(s);
+      if (!q) return "";
+      let h = '<div class="pfoot">the cure</div>';
+      if (q.done) {
+        h += '<div class="row"><span>the plague is done</span><span>in this valley</span></div>';
+        return h;
+      }
+      h +=
+        '<div class="row' +
+        (q.step ? " no" : "") +
+        '"><span>' +
+        (q.step ? "looking for " + q.name : "the course is known") +
+        "</span><span>" +
+        (q.step ? "" : q.doses + " doses") +
+        "</span></div>";
+      h += '<div class="pfoot">' + q.text + "</div>";
+      if (!q.step && q.doses > 0)
+        h += '<div class="pfoot">a dose is drawn the moment somebody is bitten</div>';
       return h;
     },
 
@@ -1083,7 +1185,14 @@
           "</kbd></span><span>" +
           costText(r.def.cost) +
           "</span></div>";
+        h += '<div class="pfoot">' + r.def.desc + "</div>";
       });
+      // the cure: what is still out there, and what it would take
+      const locked = s.researchLocked();
+      for (const r of locked) {
+        h += '<div class="row no"><span>' + r.def.name + "</span><span>not found</span></div>";
+        h += '<div class="pfoot">' + r.err + "</div>";
+      }
       h += '<div class="pfoot">' + s.weaponName() + " · " + s.armorName() + "</div>";
       return h;
     },
@@ -1095,6 +1204,10 @@
       if (!s || !e) return;
       if (!e) return;
       const list = ZS.Hazards && s.haz ? ZS.Hazards.alerts(s) : [];
+      if (ZS.Factions && s.fac) {
+        const f = ZS.Factions.alert(s);
+        if (f) list.unshift(f);
+      }
       // the door is the whole defence, so it says so
       if (s.hall && s.hall.ruined)
         list.unshift(["door", "the hall is a ruin — there is no door to hold"]);
