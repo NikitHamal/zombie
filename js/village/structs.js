@@ -283,6 +283,72 @@
       key: "z",
       desc: "a strip of mown grass · +2 to the army, and wings",
     },
+    /* ---- the war's own furniture ---- */
+    gate: {
+      name: "gate",
+      w: 62,
+      h: 22,
+      hp: 640,
+      cost: { w: 24, s: 6 },
+      time: 12,
+      lvlMax: 2,
+      key: "f",
+      desc: "a wall that opens for friends and stays shut for everyone else",
+    },
+    turret: {
+      name: "cannon turret",
+      w: 46,
+      h: 46,
+      hp: 540,
+      cost: { w: 30, s: 46, c: 26 },
+      time: 40,
+      lvlMax: 3,
+      key: "t",
+      desc: "a long gun on a stone base · reaches the sky too",
+    },
+    gunNest: {
+      name: "gun nest",
+      w: 44,
+      h: 34,
+      hp: 300,
+      cost: { w: 18, s: 10, c: 12 },
+      time: 22,
+      lvlMax: 2,
+      key: "n",
+      desc: "sandbags and a heavy gun · cheap, and it does not sleep",
+    },
+    oil: {
+      name: "oil derrick",
+      w: 44,
+      h: 60,
+      hp: 260,
+      cost: { w: 30, s: 12, c: 22 },
+      time: 34,
+      lvlMax: 2,
+      key: "o",
+      desc: "the money of this war · stands on an oil seep",
+    },
+    flag: {
+      name: "outpost flag",
+      w: 22,
+      h: 22,
+      hp: 90,
+      cost: { w: 10 },
+      time: 6,
+      key: "v",
+      desc: "marks the edge of what is yours · build out to here",
+    },
+    dock: {
+      name: "dock",
+      w: 88,
+      h: 52,
+      hp: 300,
+      cost: { w: 46, s: 10 },
+      time: 36,
+      lvlMax: 2,
+      key: "k",
+      desc: "a jetty and a slipway · where the gunboats are laid down",
+    },
   };
   // the build menu's order (the hall is never built, only repaired)
   const ORDER = [
@@ -686,6 +752,44 @@
     const x = s.x,
       yb = s.y + s.h,
       w = s.w;
+    if (s.rot) {
+      // a vertical run: stakes up the height, rails either side
+      const xr = s.x + s.w,
+        h = s.h;
+      if (s.lvl >= 2) {
+        ZS.wpoly(
+          c,
+          [
+            { x: s.x, y: s.y },
+            { x: xr, y: s.y },
+            { x: xr, y: s.y + h },
+            { x: s.x, y: s.y + h },
+          ],
+          s.seed + 1,
+          1,
+          true,
+        );
+        c.fillStyle = STONEF;
+        c.fill();
+        c.strokeStyle = INK;
+        c.lineWidth = 1.6;
+        c.stroke();
+        for (let i = 1; i < 4; i++) {
+          const py = s.y + (i * h) / 4;
+          seg(c, s.x, py, xr, py, s.seed + 10 + i, 0.9, INK2);
+        }
+        return;
+      }
+      const n = Math.max(3, Math.round(h / 11));
+      for (let i = 0; i < n; i++) {
+        const py = s.y + 4 + (i * (h - 8)) / (n - 1);
+        const sd = s.seed + i * 6.1;
+        seg(c, s.x + 2, py, xr - 2, py, sd, 2, "rgba(112,84,48,0.9)");
+      }
+      seg(c, s.x + 4, s.y, s.x + 4, s.y + h, s.seed + 40, 1.5, "rgba(96,74,44,0.8)");
+      seg(c, xr - 4, s.y, xr - 4, s.y + h, s.seed + 41, 1.5, "rgba(96,74,44,0.8)");
+      return;
+    }
     if (s.lvl >= 2) {
       // the stone version: a low block wall with brick courses
       ZS.wpoly(
@@ -2321,6 +2425,318 @@
     }
   }
 
+  /* ---- the war's own furniture ---- */
+
+  function drawGate(c, s, _t, _env) {
+    const x = s.x,
+      yb = s.y + s.h,
+      w = s.w;
+    // the palisade either side of the opening
+    for (const side of [0, 1]) {
+      const x0 = side ? x + w - 14 : x;
+      for (let i = 0; i < 2; i++) {
+        const px = x0 + 3 + i * 8;
+        const sd = s.seed + side * 30 + i * 6.1;
+        seg(c, px, yb, px, yb - 22, sd, 2, "rgba(112,84,48,0.9)");
+        seg(c, px, yb - 22, px - 3, yb - 16, sd + 1, 1, "rgba(112,84,48,0.9)");
+      }
+    }
+    seg(c, x, yb - 8, x + 14, yb - 8, s.seed + 40, 1.5, "rgba(96,74,44,0.8)");
+    seg(c, x + w - 14, yb - 8, x + w, yb - 8, s.seed + 41, 1.5, "rgba(96,74,44,0.8)");
+    // the posts the leaves hang on
+    seg(c, x + 15, yb, x + 15, yb - 27, s.seed + 42, 2.4, "rgba(92,68,42,0.95)");
+    seg(c, x + w - 15, yb, x + w - 15, yb - 27, s.seed + 43, 2.4, "rgba(92,68,42,0.95)");
+    const cx = x + w / 2;
+    if (!s.open) {
+      // two leaves meeting in the middle, with an X brace apiece
+      for (const side of [-1, 1]) {
+        const lx = cx + side * 8;
+        ZS.wpoly(
+          c,
+          [
+            { x: cx + side * 1, y: yb - 2 },
+            { x: lx, y: yb - 3 },
+            { x: lx, y: yb - 22 },
+            { x: cx + side * 1, y: yb - 24 },
+          ],
+          s.seed + 50 + side,
+          0.7,
+          true,
+        );
+        c.fillStyle = "rgba(138,98,52,0.4)";
+        c.fill();
+        c.strokeStyle = "rgba(84,56,26,0.85)";
+        c.lineWidth = 1.4;
+        c.stroke();
+        seg(c, cx + side * 2, yb - 21, lx, yb - 5, s.seed + 55 + side, 0.9, "rgba(84,56,26,0.5)");
+        seg(c, cx + side * 2, yb - 5, lx, yb - 21, s.seed + 57 + side, 0.9, "rgba(84,56,26,0.5)");
+      }
+    } else {
+      // swung wide, so the road runs through
+      for (const side of [-1, 1]) {
+        const hx = cx + side * 15;
+        ZS.wpoly(
+          c,
+          [
+            { x: hx, y: yb - 3 },
+            { x: hx + side * 13, y: yb - 12 },
+            { x: hx + side * 12, y: yb - 19 },
+            { x: hx, y: yb - 22 },
+          ],
+          s.seed + 60 + side,
+          0.6,
+          true,
+        );
+        c.fillStyle = "rgba(138,98,52,0.34)";
+        c.fill();
+        c.strokeStyle = "rgba(84,56,26,0.75)";
+        c.lineWidth = 1.3;
+        c.stroke();
+      }
+    }
+  }
+
+  function drawTurret(c, s, _t, _env) {
+    const cx = s.x + s.w / 2,
+      yb = s.y + s.h;
+    // the stone drum
+    ZS.wpoly(
+      c,
+      [
+        { x: cx - 18, y: yb },
+        { x: cx - 15, y: yb - 26 },
+        { x: cx + 15, y: yb - 26 },
+        { x: cx + 18, y: yb },
+      ],
+      s.seed + 1,
+      0.9,
+      true,
+    );
+    c.fillStyle = STONEF;
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.7;
+    c.stroke();
+    seg(c, cx - 16, yb - 9, cx + 16, yb - 9, s.seed + 4, 0.9, INK2);
+    seg(c, cx - 15, yb - 18, cx + 15, yb - 18, s.seed + 5, 0.9, INK2);
+    // the casemate, and the gun turned where the fighting is
+    ZS.wcirc(c, cx, yb - 30, 11, s.seed + 8, 1);
+    c.fillStyle = "rgba(142,138,128,0.5)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.6;
+    c.stroke();
+    const an = s.tAng === undefined ? -Math.PI / 2 : s.tAng;
+    const gx = Math.cos(an),
+      gy = Math.sin(an) * 0.55;
+    const kick = s.flash > 0 ? 3 : 0;
+    c.strokeStyle = "rgba(58,56,50,0.95)";
+    c.lineWidth = 3.4;
+    c.lineCap = "round";
+    ZS.wline(
+      c,
+      cx - gx * kick,
+      yb - 30 - gy * kick,
+      cx + gx * 24,
+      yb - 30 + gy * 24,
+      s.seed + 10,
+      0.25,
+    );
+    c.strokeStyle = "rgba(40,38,34,0.9)";
+    c.lineWidth = 1.3;
+    ZS.wcirc(c, cx + gx * 24, yb - 30 + gy * 24, 2.2, s.seed + 11, 0.3);
+    if (s.flash > 0) {
+      c.fillStyle = "rgba(240,196,104," + Math.min(1, s.flash * 4).toFixed(2) + ")";
+      c.beginPath();
+      c.ellipse(cx + gx * 27, yb - 30 + gy * 27, 5.5, 3.4, 0, 0, 6.2832);
+      c.fill();
+    }
+    // level pips hang on the drum
+    if (s.lvl > 1)
+      for (let i = 0; i < s.lvl; i++) {
+        c.fillStyle = "rgba(112,116,124,0.9)";
+        c.beginPath();
+        c.arc(cx - 12 + i * 6, yb - 4, 1.8, 0, 7);
+        c.fill();
+      }
+  }
+
+  function drawGunNest(c, s, _t, _env) {
+    const cx = s.x + s.w / 2,
+      yb = s.y + s.h;
+    // the sandbag crescent, two courses of lumpy bags
+    for (let i = 0; i < 7; i++) {
+      const an = Math.PI + (i / 6) * Math.PI;
+      const bx = cx + Math.cos(an) * 17,
+        by = yb - 6 + Math.sin(an) * 9;
+      ZS.wcirc(c, bx, by, 4.2, s.seed + i, 0.7);
+      c.fillStyle = "rgba(168,150,110,0.5)";
+      c.fill();
+      c.strokeStyle = "rgba(96,84,58,0.8)";
+      c.lineWidth = 1.1;
+      c.stroke();
+    }
+    for (let i = 0; i < 6; i++) {
+      const an = Math.PI + ((i + 0.5) / 6) * Math.PI;
+      const bx = cx + Math.cos(an) * 15,
+        by = yb - 12 + Math.sin(an) * 7;
+      ZS.wcirc(c, bx, by, 3.8, s.seed + 20 + i, 0.6);
+      c.fillStyle = "rgba(168,150,110,0.44)";
+      c.fill();
+      c.strokeStyle = "rgba(96,84,58,0.7)";
+      c.lineWidth = 1;
+      c.stroke();
+    }
+    // the gun over the bags, aimed out
+    const an = s.tAng === undefined ? -Math.PI / 2 : s.tAng;
+    const gx = Math.cos(an),
+      gy = Math.sin(an) * 0.55;
+    c.strokeStyle = "rgba(66,62,56,0.95)";
+    c.lineWidth = 2.2;
+    c.lineCap = "round";
+    ZS.wline(c, cx - gx * 3, yb - 12 - gy * 3, cx + gx * 15, yb - 12 + gy * 15, s.seed + 40, 0.25);
+    // the tripod
+    c.lineWidth = 1.1;
+    ZS.wline(c, cx - 2, yb - 11, cx - 7, yb - 4, s.seed + 41, 0.3);
+    ZS.wline(c, cx + 2, yb - 11, cx + 7, yb - 4, s.seed + 42, 0.3);
+    if (s.flash > 0) {
+      c.fillStyle = "rgba(240,196,104," + Math.min(1, s.flash * 5).toFixed(2) + ")";
+      c.beginPath();
+      c.ellipse(cx + gx * 17, yb - 12 + gy * 17, 4.2, 2.6, 0, 0, 6.2832);
+      c.fill();
+    }
+  }
+
+  function drawOil(c, s, t, _env) {
+    const cx = s.x + s.w / 2,
+      yb = s.y + s.h;
+    // the seep under it
+    c.fillStyle = "rgba(52,48,42,0.18)";
+    c.beginPath();
+    c.ellipse(cx, yb - 2, 19, 6, 0, 0, 6.2832);
+    c.fill();
+    // the derrick: a leaning lattice tower
+    const top = yb - s.h + 6;
+    seg(c, cx - 14, yb - 4, cx - 4, top, s.seed + 1, 1.8, "rgba(84,72,56,0.95)");
+    seg(c, cx + 14, yb - 4, cx + 4, top, s.seed + 2, 1.8, "rgba(84,72,56,0.95)");
+    seg(c, cx - 11, yb - 18, cx + 11, yb - 18, s.seed + 3, 1.1, "rgba(84,72,56,0.8)");
+    seg(c, cx - 8, yb - 32, cx + 8, yb - 32, s.seed + 4, 1.1, "rgba(84,72,56,0.8)");
+    seg(c, cx - 11, yb - 18, cx + 8, yb - 32, s.seed + 5, 0.8, "rgba(84,72,56,0.6)");
+    seg(c, cx + 11, yb - 18, cx - 8, yb - 32, s.seed + 6, 0.8, "rgba(84,72,56,0.6)");
+    seg(c, cx - 4, top, cx + 4, top, s.seed + 7, 1.6, "rgba(84,72,56,0.95)");
+    // the beam, nodding while it pumps
+    const nod = s.workT > 0 ? Math.sin(t * 2.6 + s.seed) * 0.32 : -0.1;
+    const px = cx,
+      py = top - 2;
+    const bx = px + Math.cos(nod) * 20,
+      by = py - Math.sin(nod + 0.5) * 10;
+    seg(c, px - 8, py + 2, bx, by, s.seed + 9, 2.2, "rgba(74,66,54,0.95)");
+    ZS.wcirc(c, px, py, 2.6, s.seed + 10, 0.4);
+    // the horse head and the rod down into the dark
+    seg(c, bx, by, bx + 2, by + 6, s.seed + 11, 2, "rgba(74,66,54,0.95)");
+    seg(c, bx + 2, by + 6, bx + 2, yb - 8, s.seed + 12, 1.1, "rgba(74,66,54,0.7)");
+    // the little hut, and the pipe that carries the money away
+    ZS.wpoly(
+      c,
+      [
+        { x: cx + 10, y: yb },
+        { x: cx + 10, y: yb - 12 },
+        { x: cx + 24, y: yb - 12 },
+        { x: cx + 24, y: yb },
+      ],
+      s.seed + 14,
+      0.6,
+      true,
+    );
+    c.fillStyle = WOOD;
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.3;
+    c.stroke();
+    seg(c, cx - 16, yb - 6, cx - 26, yb - 6, s.seed + 16, 1.6, "rgba(74,66,54,0.9)");
+    ZS.wcirc(c, cx - 26, yb - 6, 2.4, s.seed + 17, 0.3);
+  }
+
+  function drawFlag(c, s, t, _env) {
+    const x = s.x + s.w / 2,
+      yb = s.y + s.h;
+    seg(c, x, yb, x + 1, yb - 34, s.seed + 1, 1.6, "rgba(78,68,52,0.9)");
+    const wv = Math.sin(t * 2.4 + s.seed) * 2.2;
+    ZS.wpoly(
+      c,
+      [
+        { x: x + 1, y: yb - 34 },
+        { x: x + 19, y: yb - 30 + wv },
+        { x: x + 1, y: yb - 23 },
+      ],
+      s.seed + 3,
+      0.5,
+      true,
+    );
+    c.fillStyle = s.flagCol || "rgba(90,122,58,0.55)";
+    c.fill();
+    c.strokeStyle = "rgba(60,54,42,0.8)";
+    c.lineWidth = 1.1;
+    c.stroke();
+    // the stones at its foot
+    ZS.wcirc(c, x - 5, yb - 1, 2.2, s.seed + 6, 0.4);
+    ZS.wcirc(c, x + 5, yb - 2, 1.8, s.seed + 7, 0.4);
+  }
+
+  function drawDock(c, s, _t, _env) {
+    const x = s.x,
+      y = s.y,
+      w = s.w,
+      h = s.h;
+    // the jetty: planks running out on piles
+    ZS.wpoly(
+      c,
+      [
+        { x: x + w * 0.2, y: y + 6 },
+        { x: x + w * 0.8, y: y + 6 },
+        { x: x + w * 0.86, y: y + h - 4 },
+        { x: x + w * 0.14, y: y + h - 4 },
+      ],
+      s.seed + 1,
+      1,
+      true,
+    );
+    c.fillStyle = "rgba(160,118,68,0.3)";
+    c.fill();
+    c.strokeStyle = "rgba(92,72,50,0.85)";
+    c.lineWidth = 1.6;
+    c.stroke();
+    for (let i = 1; i < 6; i++) {
+      const py = y + 6 + (i * (h - 10)) / 6;
+      seg(c, x + w * 0.17, py, x + w * 0.83, py, s.seed + 10 + i, 0.9, "rgba(92,72,50,0.55)");
+    }
+    // the piles at the head of the jetty
+    for (const px of [x + w * 0.18, x + w * 0.82]) {
+      seg(c, px, y + h - 2, px, y + h - 14, s.seed + 20, 2.2, "rgba(84,64,40,0.9)");
+      ZS.wcirc(c, px, y + h - 15, 2.2, s.seed + 21, 0.3);
+    }
+    // the slipway shed, and a crate or two waiting
+    ZS.wpoly(
+      c,
+      [
+        { x: x + 2, y: y + h - 2 },
+        { x: x + 2, y: y + 12 },
+        { x: x + w * 0.16, y: y + 8 },
+        { x: x + w * 0.16, y: y + h - 2 },
+      ],
+      s.seed + 30,
+      0.7,
+      true,
+    );
+    c.fillStyle = WOOD;
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.4;
+    c.stroke();
+    seg(c, x + w * 0.88, y + h - 12, x + w * 0.88, y + h - 2, s.seed + 34, 1.6, INK2);
+    seg(c, x + w * 0.94, y + h - 10, x + w * 0.94, y + h - 2, s.seed + 35, 1.6, INK2);
+  }
+
   const ART = {
     hall: drawHall,
     hut: drawHut,
@@ -2345,6 +2761,12 @@
     stable: drawStable,
     foundry: drawFoundry,
     airfield: drawAirfield,
+    gate: drawGate,
+    turret: drawTurret,
+    gunNest: drawGunNest,
+    oil: drawOil,
+    flag: drawFlag,
+    dock: drawDock,
   };
 
   /* ---------- the module ---------- */
@@ -2416,6 +2838,20 @@
       return { ok: true, x: bx, y: by };
     },
 
+    // nav cells are 20 px and markRect keeps a centre that falls inside the
+    // rect it is handed: a 16 px wall lands between two cell-centres and
+    // blocks neither. Snap the footprint outward to cell boundaries so every
+    // cell it physically overlaps is stamped — a wall is always a wall.
+    mark(nav, s, v) {
+      const CELL = 20;
+      const x0 = Math.floor(s.x / CELL) * CELL;
+      const y0 = Math.floor(s.y / CELL) * CELL;
+      const x1 = Math.ceil((s.x + s.w) / CELL) * CELL;
+      const y1 = Math.ceil((s.y + s.h) / CELL) * CELL;
+      nav.markRect(x0, y0, x1 - x0, y1 - y0, v);
+      nav.version++;
+    },
+
     place(world, nav, kind, x, y, opt) {
       const chk = this.canPlace(world, nav, kind, x, y);
       if (!chk.ok) return chk;
@@ -2424,8 +2860,7 @@
         s.ruined = true;
         s.hp = Math.round(s.maxHp * 0.22);
       }
-      nav.markRect(s.x, s.y, s.w, s.h, 0);
-      nav.version++;
+      this.mark(nav, s, 0);
       world.buildings.push(s);
       return { ok: true, s };
     },
@@ -2433,8 +2868,7 @@
     remove(world, nav, s) {
       const i = world.buildings.indexOf(s);
       if (i >= 0) world.buildings.splice(i, 1);
-      nav.markRect(s.x, s.y, s.w, s.h, 1);
-      nav.version++;
+      this.mark(nav, s, 1);
     },
 
     // the topmost structure whose footprint holds (x, y)

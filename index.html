@@ -6,11 +6,11 @@
       name="viewport"
       content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"
     />
-    <title>The Hollow — rebuild the village</title>
-    <!-- a hut, drawn in the same ink, as the tab's mark -->
+    <title>The Hollow — the theatre</title>
+    <!-- a wall and a turret, drawn in the same ink, as the tab's mark -->
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23efe8d8'/%3E%3Cpath d='M6 17 L16 8 L26 17 M9 16 L9 26 L23 26 L23 16 M14 26 L14 19 L18 19 L18 26' fill='none' stroke='%233d342b' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23efe8d8'/%3E%3Cpath d='M4 22 L28 22 M6 22 L6 15 M12 22 L12 15 M20 22 L20 15 M26 22 L26 15 M6 15 L12 15 M20 15 L26 15 M16 22 L16 10 M13 10 L19 10 L19 6 L13 6 Z' fill='none' stroke='%233d342b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
     />
     <style>
       html,
@@ -55,7 +55,7 @@
       }
       #ui button {
         font:
-          15px "Segoe Script",
+          14px "Segoe Script",
           "Bradley Hand",
           "Comic Sans MS",
           cursive;
@@ -72,6 +72,9 @@
       }
       #ui button.on {
         background: rgba(112, 148, 72, 0.45);
+      }
+      #ui button.no {
+        opacity: 0.45;
       }
       kbd {
         font:
@@ -100,9 +103,9 @@
       #bar #clock {
         font-size: 17px;
       }
-      #bar #wx {
+      #bar #phase {
         opacity: 0.7;
-        font-size: 14px;
+        font-size: 13.5px;
       }
       #bar .sep {
         width: 1px;
@@ -110,7 +113,7 @@
         background: rgba(60, 50, 40, 0.3);
       }
 
-      /* the stores, top right */
+      /* the money and the supply, top right */
       #res {
         top: 12px;
         right: 12px;
@@ -146,12 +149,32 @@
         padding-top: 3px;
       }
 
-      /* the selection card, bottom left */
+      /* the warnings, top left */
+      #alerts {
+        left: 12px;
+        top: 12px;
+        width: 260px;
+        display: none;
+        padding: 6px 9px;
+        background: rgba(252, 246, 234, 0.94);
+        border-color: rgba(150, 60, 40, 0.5);
+        font-size: 12.5px;
+      }
+      #alerts.on {
+        display: block;
+      }
+      #alerts .al {
+        display: block;
+        padding: 1px 0;
+        color: #8c3428;
+      }
+
+      /* the selection, bottom left */
       #sel {
         pointer-events: auto;
         left: 12px;
         bottom: 12px;
-        width: 268px;
+        width: 250px;
         padding: 8px 11px 10px;
         transform: rotate(-0.4deg);
         display: none;
@@ -174,16 +197,7 @@
         font-size: 13px;
         opacity: 0.65;
         flex: 1;
-      }
-      #sel .head i {
-        cursor: pointer;
-        pointer-events: auto;
-        opacity: 0.5;
-        font-style: normal;
-        padding: 0 3px;
-      }
-      #sel .head i:hover {
-        opacity: 1;
+        text-align: right;
       }
       #sel .line {
         font-size: 13.5px;
@@ -191,187 +205,67 @@
       }
       #sel .line.dim {
         opacity: 0.55;
-      }
-      #sel .line.warn {
-        color: #a04030;
-      }
-      #sel .jobs {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-        margin-top: 7px;
-      }
-      #sel .jobs button {
-        font-size: 13px;
-        padding: 1px 6px;
-      }
-      #sel .jobs button.no {
-        opacity: 0.45;
-      }
-      #sel .jobs button.danger {
-        background: rgba(160, 64, 48, 0.12);
+        font-size: 12.5px;
       }
 
-      /* the build / research panel, right */
-      #panel {
+      /* the command card, bottom centre */
+      #cmd {
         pointer-events: auto;
-        top: 96px;
-        right: 12px;
-        width: 232px;
-        max-height: calc(100vh - 130px);
-        overflow-y: auto;
-        overscroll-behavior: contain;
-        padding: 7px 10px 9px;
-        transform: rotate(0.3deg);
-        display: none;
+        left: 50%;
+        bottom: 12px;
+        transform: translateX(-50%) rotate(-0.2deg);
+        padding: 7px 12px 8px;
+        min-width: 340px;
+        max-width: 620px;
+        text-align: center;
       }
-      #panel.on {
-        display: block;
-      }
-      #panel .ptitle {
-        font-size: 15px;
-        opacity: 0.7;
+      #cmd .ctitle {
+        font-size: 13px;
+        opacity: 0.6;
         border-bottom: 1px dashed rgba(60, 50, 40, 0.3);
-        padding-bottom: 3px;
+        padding-bottom: 2px;
         margin-bottom: 4px;
       }
-      #panel .row {
-        display: flex;
-        justify-content: space-between;
-        gap: 8px;
-        padding: 2px 4px;
-        border-radius: 4px;
-        cursor: pointer;
-        pointer-events: auto;
-        font-size: 14.5px;
-      }
-      #panel .row:hover {
-        background: rgba(112, 148, 72, 0.18);
-      }
-      #panel .row.on {
-        background: rgba(112, 148, 72, 0.34);
-      }
-      #panel .row.no {
-        opacity: 0.42;
-      }
-      #panel .row .hp {
-        flex: 0 0 38px;
-        height: 6px;
-        border: 1px solid rgba(60, 50, 40, 0.35);
-        border-radius: 3px;
-        overflow: hidden;
-      }
-      #panel .row .hp i {
-        display: block;
-        height: 100%;
-        background: rgba(112, 148, 72, 0.8);
-      }
-      #panel .row .who {
-        font-size: 12.5px;
-        opacity: 0.72;
-        min-width: 76px;
-        text-align: right;
-      }
-      #panel .row .who em {
-        color: #a04030;
-        font-style: normal;
-      }
-      #panel .tray {
+      #cmd .tray {
         display: flex;
         flex-wrap: wrap;
-        gap: 3px;
-        padding: 2px 4px 6px;
+        justify-content: center;
+        gap: 4px;
+        padding: 2px 0 4px;
       }
-      #panel .tray button {
-        font-size: 12px;
-        padding: 0 5px;
-      }
-      #panel .tray button kbd {
-        font-size: 10px;
-        margin-left: 3px;
-      }
-      /* a button set in a line of text: small, flat, no box */
-      #panel .pfoot button.link {
-        font-size: 12px;
-        padding: 0 3px;
-        background: none;
-        border: none;
-        border-bottom: 1px dashed rgba(60, 50, 40, 0.5);
-        border-radius: 0;
-      }
-      #panel .pfoot button.link:hover {
-        background: rgba(112, 148, 72, 0.3);
-      }
-      /* the alarm strip: fire, fever, rats, cold, despair */
-      #alerts {
-        left: 12px;
-        top: 96px;
-        width: 268px;
-        display: none;
-        padding: 6px 9px;
-        background: rgba(252, 246, 234, 0.94);
-        border-color: rgba(150, 60, 40, 0.5);
+      #cmd .tray button {
         font-size: 12.5px;
+        padding: 1px 6px;
       }
-      #alerts.on {
-        display: block;
+      #cmd .qline {
+        font-size: 12.5px;
+        opacity: 0.7;
+        border-top: 1px dashed rgba(60, 50, 40, 0.25);
+        padding-top: 3px;
       }
-      #alerts .al {
-        display: block;
-        padding: 1px 0;
-      }
-      #alerts .al.fire {
-        color: #a04030;
-      }
-      #alerts .al.sick {
-        color: #7a6a30;
-      }
-      #alerts .al.cold {
-        color: #3f6a86;
-      }
-      #alerts .al.despair {
-        color: #6a4a70;
-      }
-      #alerts .al.rats {
-        color: #6a5a44;
-      }
-      #alerts .al.raid {
-        color: #8c3428;
-      }
-      #alerts .al.trade {
-        color: #6a5a2c;
-      }
-      #alerts .al.supply {
-        color: #8a6a2c;
-      }
-      #alerts .al.field {
-        color: #4a6a34;
-      }
-      #alerts button {
-        margin-top: 4px;
-      }
-      /* the valley, sketched: the hollow, the roads, and the fog */
-      #panel .valleymap {
-        display: block;
-        margin: 2px 0 6px;
-        width: 252px;
-        height: 168px;
-        border-bottom: 1px solid rgba(120, 112, 92, 0.25);
-      }
-      #panel .pfoot .dim,
-      #sel .dim {
-        opacity: 0.6;
-      }
-      #panel .pfoot {
-        margin-top: 6px;
-        font-size: 12px;
+      #cmd .pfoot {
+        font-size: 11.5px;
         opacity: 0.55;
         line-height: 1.4;
       }
 
-      /* the toast, bottom centre */
+      /* the map of the theatre, bottom right */
+      #miniwrap {
+        right: 12px;
+        bottom: 12px;
+        padding: 6px;
+        transform: rotate(0.3deg);
+      }
+      #mini {
+        display: block;
+        border: 1px solid rgba(60, 50, 40, 0.35);
+        border-radius: 3px;
+        cursor: crosshair;
+      }
+
+      /* the toast, above the command card */
       #toast {
-        bottom: 16px;
+        bottom: 92px;
         left: 50%;
         transform: translateX(-50%);
         padding: 4px 14px;
@@ -400,7 +294,7 @@
         top: 50%;
         transform: translate(-50%, -50%) rotate(-0.4deg);
         padding: 16px 22px;
-        width: 460px;
+        width: 520px;
         font-size: 14.5px;
         line-height: 1.65;
       }
@@ -411,7 +305,7 @@
       }
       #helpwrap .k {
         display: inline-block;
-        min-width: 62px;
+        min-width: 74px;
         opacity: 0.6;
       }
       #helpwrap .foot {
@@ -425,89 +319,61 @@
     <canvas id="c"></canvas>
     <div id="ui">
       <div id="bar" class="paper">
-        <span id="clock">DAY 1 · 06:00</span>
-        <span id="wx">spring · clear</span>
+        <span id="clock">DAY 1 · daylight</span>
+        <span id="phase">the field is open</span>
         <span class="sep"></span>
         <button id="sp0" title="pause (space)">II</button>
         <button id="sp1" title="normal speed (1)">&#9654;</button>
         <button id="sp2" title="fast (2)">&#9654;&#9654;</button>
         <button id="sp3" title="faster (3)">&#9654;&#9654;&#9654;</button>
         <span class="sep"></span>
-        <button id="roles" title="the roster — who does what (V)">roles</button>
-        <button id="buildb" title="build something (B)">build</button>
-        <button id="workb" title="the workshop — what the village learns (T)">workshop</button>
-        <button id="armyb" title="the field — train and order the army (A)">field</button>
-        <button id="natb" title="the world beyond — the nations (D)">nations</button>
-        <button id="mapb" title="the valley — send parties out (M)">valley</button>
-        <button id="bookb" title="the record — what has happened, and saving (L)">record</button>
-        <button id="pilotb" title="the steward — let him play the village for you (P)">steward</button>
-        <button id="watchb" title="watch — the camera follows the trouble, and the quiet runs on (W)">watch</button>
-        <span class="sep"></span>
-        <button id="home" title="centre on the hall (H)">hall</button>
-        <button id="fit" title="fit the whole map (F)">map</button>
-        <button id="bell" title="ring the bell — bring them home (N) · shift+N calls the dark down early">bell</button>
+        <button id="buildb" title="raise something (B)">build</button>
+        <button id="homeb" title="centre on the hall (F)">hall</button>
         <button id="qualb" title="picture quality (Q)">quality</button>
-        <button id="sound" title="mute (K)">sound</button>
+        <button id="soundb" title="mute (K)">sound</button>
         <button id="helpb" title="keys (?)">?</button>
       </div>
 
       <div id="res" class="paper"></div>
       <div id="alerts" class="paper"></div>
       <div id="sel" class="paper"></div>
-      <div id="panel" class="paper"></div>
+      <div id="cmd" class="paper"></div>
+      <div id="miniwrap" class="paper"><canvas id="mini"></canvas></div>
       <div id="toast" class="paper"></div>
 
       <div id="helpwrap">
         <div class="card paper">
-          <h2>the hollow</h2>
-          Nothing here is yours to control directly — only to direct. The
-          village works by day and hides by night.
+          <h2>the theatre</h2>
+          Five nations, one vast sheet of paper, and the dead in the broken
+          places between. The derricks pay the war — take them, hold them,
+          and burn every enemy hall down.
           <div style="margin-top: 8px">
-            <div><span class="k">V</span>the roster — everybody, and the work you give them</div>
-            <div><span class="k">M</span>the valley — send parties out for what you need</div>
-            <div><span class="k">L</span>the record — everything that has happened, and saving</div>
-            <div><span class="k">Q</span>picture quality · <span class="k">F3</span>the numbers</div>
-            <div><span class="k">click</span>a villager, then pick their work</div>
-            <div><span class="k">L W S F</span>labourer · wood · stone · forage</div>
-            <div><span class="k">M B R G</span>farm · build · repair · guard</div>
-            <div><span class="k">C X</span>heal · idle</div>
-            <div><span class="k">tab</span>next villager</div>
-            <div><span class="k">B</span>build menu — the ghost follows the cursor, click to set it down</div>
-            <div><span class="k">T</span>the workshop's research</div>
-            <div>
-              <span class="k">A</span>the field — train soldiers, carts, cannon, wings
-            </div>
-            <div>
-              <span class="k">D</span>the world beyond — the nations, their wagons and
-              their wars
-            </div>
-            <div>
-              <span class="k">P</span>the steward — he sets the work, raises and mends,
-              and tells you what he did
-            </div>
-            <div>
-              <span class="k">W</span>watch — the camera follows the trouble, and the
-              quiet stretches run on
-            </div>
-            <div><span class="k">A</span>then <i>rally</i>, and click the ground to place it</div>
-            <div><span class="k">U R X</span>on a building: upgrade · rebuild · dismantle</div>
+            <div><span class="k">drag left</span>gather your guns into a box</div>
+            <div><span class="k">right-click</span>send them · an enemy to attack, the ground to move</div>
+            <div><span class="k">ctrl+right</span>attack-move to the ground</div>
+            <div><span class="k">S · H · A</span>stop · hold · attack-move mode</div>
+            <div><span class="k">B</span>the build menu · walls drag out in a line</div>
+            <div><span class="k">U · R · X</span>on a building of yours: upgrade · repair · sell</div>
+            <div><span class="k">ctrl+1-9</span>a group keeps its number · the number recalls it</div>
+            <div><span class="k">WASD / edges</span>the camera walks · wheel zooms</div>
+            <div><span class="k">F</span>centre on the hall · the minimap jumps</div>
             <div><span class="k">space</span>pause · <span class="k">1 2 3</span>speed</div>
-            <div><span class="k">H F</span>centre on the hall · fit the map</div>
-            <div><span class="k">N</span>ring the bell — everyone comes home</div>
-            <div><span class="k">J</span>job icons · <span class="k">shift+V</span>names</div>
-            <div><span class="k">K</span>mute · <span class="k">esc</span>cancel</div>
+            <div><span class="k">Q · F3 · K</span>picture quality · the numbers · mute</div>
+            <div><span class="k">esc</span>put down what you are carrying</div>
           </div>
           <div class="foot">
-            drag to pan · wheel to zoom · the hall falling ends the run
+            right-click an oil derrick with your cars to capture it · the
+            hall falling ends a nation · build out past your walls, but not
+            farther than a flag can carry you
           </div>
         </div>
       </div>
     </div>
 
     <script>
-      var ZS_WW = 2200;
-      var ZS_WH = 1600;
-      var ZS_SCEN = "ScenarioVillage";
+      var ZS_WW = 7200;
+      var ZS_WH = 5400;
+      var ZS_SCEN = "ScenarioRTS";
     </script>
     <script src="js/sketch.js"></script>
     <script src="js/village/perf.js"></script>
@@ -517,33 +383,24 @@
     <script src="js/world.js"></script>
     <script src="js/buildings.js"></script>
     <script src="js/stains.js"></script>
-    <script src="js/village/art.js"></script>
+    <script src="js/village/chronicle.js"></script>
     <script src="js/village/figures.js"></script>
     <script src="js/village/structs.js"></script>
-    <script src="js/village/kin.js"></script>
-    <script src="js/village/hazards.js"></script>
-    <script src="js/village/overworld.js"></script>
-    <script src="js/village/people.js"></script>
-    <script src="js/village/cure.js"></script>
-    <script src="js/village/chronicle.js"></script>
-    <script src="js/village/ages.js"></script>
     <script src="js/village/units.js"></script>
     <script src="js/village/fx.js"></script>
-    <script src="js/village/army.js"></script>
-    <script src="js/village/nations.js"></script>
-    <script src="js/village/autopilot.js"></script>
-    <script src="js/village/coach.js"></script>
-    <script src="js/village/watch.js"></script>
+    <script src="js/rts/roster.js"></script>
     <script src="js/agents.js"></script>
     <script src="js/sim.js"></script>
-    <script src="js/scenarios/village.js"></script>
-    <script src="js/village/ui.js"></script>
+    <script src="js/rts/nations.js"></script>
+    <script src="js/rts/horde.js"></script>
+    <script src="js/scenarios/rts.js"></script>
+    <script src="js/rts/ui.js"></script>
     <script src="js/draw.js"></script>
     <script src="js/sound.js"></script>
     <script src="js/main.js"></script>
     <script>
-      // the UI binds itself to the scenario main.js just built
-      ZS.VillageUI.init(ZS.scenario);
+      // the overlay binds itself to the scenario main.js just built
+      ZS.RtsUI.init(ZS.scenario);
     </script>
   </body>
 </html>

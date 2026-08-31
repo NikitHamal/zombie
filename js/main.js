@@ -64,6 +64,9 @@
   if (perf) perf.onTier = resize; // stepping down re-sizes the canvas
   cam.fit(W, H);
   cam.minZoom = cam.zoom * 0.8; // a little paper margin around the world frame
+  // a scenario may prefer its own opening view (the RTS starts over the
+  // home base, not fitted to the whole theatre)
+  if (typeof scenario.camSetup === "function") scenario.camSetup(cam, W, H);
   ZS.Sim.init(world, W, H);
 
   // debug/verification handle (also a hook for future player/vehicle work)
@@ -117,6 +120,8 @@
   let pinch = null;
   let tap = null;
   const eaten = new Set(); // pointer ids a scenario gesture has claimed
+
+  cv.addEventListener("contextmenu", (e) => e.preventDefault()); // the right button is the scenario's
 
   cv.addEventListener("pointerdown", (e) => {
     if (ZS.sound) ZS.sound.unlock(); // first gesture may unlock audio

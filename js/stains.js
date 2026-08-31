@@ -7,17 +7,20 @@
   "use strict";
   const ZS = (window.ZS = window.ZS || {});
 
+  const BUDGET = 10e6; // pixel budget: vast theatres stamp at a smaller scale
+
   class Stains {
     constructor(world) {
       this.cv = document.createElement("canvas");
-      this.cv.width = world.w;
-      this.cv.height = world.h;
+      this.k = Math.min(1, Math.sqrt(BUDGET / (world.w * world.h)));
+      this.cv.width = Math.max(1, Math.round(world.w * this.k));
+      this.cv.height = Math.max(1, Math.round(world.h * this.k));
       this.c = this.cv.getContext("2d");
       this.p = {};
     }
 
     draw(c) {
-      c.drawImage(this.cv, 0, 0, this.cv.width, this.cv.height);
+      c.drawImage(this.cv, 0, 0, this.cv.width / this.k, this.cv.height / this.k);
     }
 
     register(kind, painter) {
@@ -29,6 +32,7 @@
       if (!f) return;
       const sc = this.c;
       sc.save();
+      sc.scale(this.k, this.k);
       f(sc, x, y, seed, this);
       sc.restore();
     }
@@ -38,6 +42,7 @@
       if (!f) return;
       const sc = this.c;
       sc.save();
+      sc.scale(this.k, this.k);
       f(sc, a, this);
       sc.restore();
     }

@@ -215,10 +215,24 @@ globalThis.Image = class Image {
 };
 globalThis.HTMLElement = class HTMLElement {};
 
+// the overlay keeps clocks; they must not hold the verifier's process open
+const _si = globalThis.setInterval.bind(globalThis);
+const _st = globalThis.setTimeout.bind(globalThis);
+globalThis.setInterval = (fn, ms) => {
+  const t = _si(fn, ms);
+  if (t.unref) t.unref();
+  return t;
+};
+globalThis.setTimeout = (fn, ms) => {
+  const t = _st(fn, ms);
+  if (t.unref) t.unref();
+  return t;
+};
+
 /* ---------- load the page ---------- */
 // the file order comes from index.html itself, so it cannot drift
-const page = fs
-  .readFileSync(path.join(ROOT, "index.html"), "utf8")
+const htmlSrc = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
+const page = htmlSrc
   .split("\n")
   .map((l) => (/<script src="([^"]+)"/.exec(l) || [])[1])
   .filter(Boolean);
@@ -233,9 +247,17 @@ if (RNG) {
     return s / 4294967296;
   };
 }
-win.ZS_WW = 2200;
-win.ZS_WH = 1600;
-win.ZS_SCEN = "ScenarioVillage";
+const numVar = (name, dflt) => {
+  const m = new RegExp("var " + name + " = (\\d+)").exec(htmlSrc);
+  return m ? +m[1] : dflt;
+};
+const strVar = (name, dflt) => {
+  const m = new RegExp("var " + name + ' = "([^"]+)"').exec(htmlSrc);
+  return m ? m[1] : dflt;
+};
+win.ZS_WW = numVar("ZS_WW", 2200);
+win.ZS_WH = numVar("ZS_WH", 1600);
+win.ZS_SCEN = strVar("ZS_SCEN", "ScenarioZombie");
 globalThis.ZS_WW = win.ZS_WW;
 globalThis.ZS_WH = win.ZS_WH;
 globalThis.ZS_SCEN = win.ZS_SCEN;
@@ -246,8 +268,9 @@ for (const f of page) {
 
 const ZS = win.ZS || globalThis.ZS;
 globalThis.ZS = ZS;
-// the page's last line
-if (ZS.VillageUI) ZS.VillageUI.init(ZS.scenario);
+// the page's last line: whichever overlay the game ships with
+if (ZS.RtsUI) ZS.RtsUI.init(ZS.scenario);
+else if (ZS.VillageUI) ZS.VillageUI.init(ZS.scenario);
 const G = ZS.scenario;
 
 /* ---------- driving it ---------- */

@@ -247,8 +247,13 @@
 
   const HAND = '"Segoe Script","Bradley Hand","Comic Sans MS",cursive';
 
-  // ink, with a sash of the village green or the enemy red
+  // ink, with a sash of whoever they belong to — a faction paint table
+  // (ZS.FACPAINT) wins when the agent carries a faction, else the old
+  // village green against the enemy red
   function kit(a) {
+    const paint = ZS.FACPAINT && a.fac !== undefined ? ZS.FACPAINT[a.fac] : null;
+    if (paint)
+      return { ink: paint.ink || "rgba(46,42,34,0.92)", cloth: paint.cloth, steel: paint.steel };
     return a.foe
       ? { ink: "rgba(58,52,44,0.92)", cloth: "#a04030", steel: "rgba(104,104,112,0.9)" }
       : { ink: "rgba(46,42,34,0.92)", cloth: "#5a7a3a", steel: "rgba(112,116,124,0.9)" };
@@ -971,7 +976,9 @@
     },
 
     ring(c, a, t, d) {
-      c.strokeStyle = a.foe ? "rgba(150,60,40,0.9)" : "rgba(64,96,52,0.9)";
+      const paint = ZS.FACPAINT && a.fac !== undefined ? ZS.FACPAINT[a.fac] : null;
+      c.strokeStyle =
+        (paint && paint.ring) || (a.foe ? "rgba(150,60,40,0.9)" : "rgba(64,96,52,0.9)");
       c.lineWidth = 1.8;
       const r = (d.fly ? 20 : d.mounted ? 18 : 14) + Math.sin(t * 4) * 0.8;
       ZS.wcirc(c, a.x, a.y - (d.fly ? 34 : 4), r, a.seed + 1, 1.1);

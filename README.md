@@ -1,114 +1,70 @@
-# The Hollow
+# The Hollow — the theatre
 
-A hand-drawn zombie survival village. There is no main character. There
-are a handful of people in a ruined valley, and you tell them what to do.
-By day they chop, quarry, sow, reap, build and mend. By night the dead
-come out of the treeline and try to pull the village down around them.
+A hand-drawn war on one vast sheet of paper. Five nations stand on the
+same ground — yours in the middle, four more at the compass — and the
+dead leak out of the broken places between. The derricks pay for the war.
+Walls hold the line. Every enemy hall that falls brings the quiet closer;
+yours falling ends it.
 
-Rebuild it. Grow it. Arm it. Keep the hall standing — when the hall
-falls, the village falls with it.
+This is a real-time strategy game in the sketch style: drag a box around
+your guns, right-click the ground, and send them.
 
 ## Run it
 
 Double-click `index.html`. That is the whole build — no server, no
-install, no bundler (`file://` works, including saving).
+install, no bundler (`file://` works).
 
-- `?seed=20250830` in the address bar pins the map and the valley, so you
-  can replay the same world. Without it every reload is a new village.
-- Save slots live in `localStorage` under `zs.hollow.*`.
+- `?seed=20250830` in the address bar pins the theatre, so you can fight
+  the same war again. Without it, every reload is a new map.
 
 ## How to play
 
-You never control anyone directly. You pick the work, you mark out the
-buildings, and you decide what the village learns.
+**The money.** The hall pays a little; oil derricks pay the war. One
+derrick stands near every base, belonging to no one — park a car on it
+and it changes hands. The map keeps more seeps, marked with a dark
+bloom; raise a derrick of your own on any of them, out past your walls,
+and your build line follows.
 
-**The day.** Ten jobs — labourer, woodcutter, quarrier, forager, farmer,
-builder, repairer, guard, healer, idle. Labourers take whatever needs
-doing. Everything they gather is a round trip: cut it, carry it, and the
-stores only grow when the load lands in the hall.
+**The walls.** Every base is wall-bound with a gate that opens for its
+own people and stays shut for everyone else. Walls drag out in a line.
+Cannon turrets and gun nests can stand inside the ring or out in front of
+it, and the turret's gun reaches the sky. Upgrade them (`U`), repair them
+(`R`), sell them (`X`).
 
-**The night.** It has a shape: two or three drift in early while it is
-still light enough to watch them come, a trickle through the dark, a push
-in the small hours, and stragglers at first light. Guards hold a line
-between the hall and the wood and will not follow the fight past it.
+**The army.** Nobody fights on foot. Scout cars and tanks out of the
+factory; helicopters and fighters off the airfield; gunboats down at the
+dock (which needs water beside it). Select with a box, right-click to
+move, right-click an enemy to attack, `A` then right-click to
+attack-move, `ctrl+1`–`9` to keep a group and the number to recall it.
+Supply caps the army; houses and production buildings raise the cap.
 
-**The door.** While the hall stands, the dead cannot reach anyone pressed
-up against it — they throw themselves at the timber instead. When the
-hall gives, they get in. Everything you build is in service of that door.
+**The nations.** The Grange fights on your side. Kell, the Rustworks and
+the Order fight you, each other, and whoever stands nearest when a wave
+is ready. They take derricks, raise walls, and come in growing waves.
 
-**Bites.** Most bites kill. Some do not. Get the bitten to an infirmary
-and a healer, or watch the fever run its course.
+**The dead.** Nests in the ruins leak packs by day and surge at
+nightfall, at every flag — including yours. A nest stops when everything
+in it is burned down to nothing. Tanks and bombers do that work.
 
-**The valley.** Ten places beyond the wood. Send two people with ten
-days' food and they walk out, come back with seed stock, nails, tools, a
-cure or a stranger — or come back bitten, or not at all. Fog clears only
-where feet have been.
-
-**Other people.** There is a market town that would rather sell to you
-than bury you, and a camp in the quarry terraces that would rather take
-what you have. Both keep an opinion. Trade with Ashford when they are
-well disposed; pay the Warrens off, or refuse them and hold the green
-when they come down the road. Raiders are not the dead — they walk to
-your granary, fill their arms, and run, and whatever reaches the road is
-gone. Send a party to their camp and you may end it for good.
-
-**The cure.** Four steps, and three of them are out in the valley: the
-physic's chest in the chapel, the physician's ledger in the manor, the
-cold box under the dead city. Bring them home, study them, and brew the
-course in a level-two infirmary. Then a dose stops a bite dead — and keep
-going, and one night nothing comes out of the wood at all.
-
-**The winter.** Summer grows, autumn is the harvest rush, winter stops
-the farms dead and burns a pile of wood every day to keep the cold out.
-
-**The people.** Named, with a face and one trait, and a memory of who
-pulled them out of a fire. Children are born when there is food, a spare
-bed and quiet; they grow up and take work. The dead are mourned, and
-grief slows every pair of hands in the village.
-
-**Everything else that goes wrong.** Fire that spreads hut to hut. Fever.
-Rats in the granary. Cold. Despair, which is answered with a feast.
+**Winning.** Burn every enemy hall down. Lose your own hall and your last
+gun, and the card comes up.
 
 ## Controls
 
 | key | what |
 |---|---|
-| click · drag | select · pan. **With a wall or barricade armed, drag to lay a line of them** |
-| wheel · pinch | zoom |
-| `V` | the roster (`shift+V` names, `tab` cycles people) |
-| `B` | build (number/letter keys pick, `esc` cancels) |
-| `T` | the workshop — what the village learns |
-| `M` | the valley — send parties, read the map |
-| `L` | the record — the ledger and the three save slots |
-| `N` | ring the bell — everyone comes home (`shift+N` calls the dark down early) |
-| `H` · `F` | centre on the hall · fit the map |
-| `J` | job icons |
-| `Q` | picture quality · `F3` the numbers |
+| left-drag | select your guns in a box |
+| right-click | move · attack a unit or building · set a rally on a production building · toggle a gate |
+| `ctrl+right` | attack-move |
+| `S · H · A` | stop · hold · attack-move mode |
+| `B` | the build menu · walls and barricades drag out in a line |
+| `U · R · X` | on a building of yours: upgrade · repair · sell |
+| `ctrl+1`–`9` · `1`–`9` | save a group · recall it |
+| `WASD` / edges | the camera walks · wheel zooms |
+| `F` | centre on the hall · the minimap jumps too |
 | `space` · `1`–`3` | pause · speed |
-| `K` · `?` | mute · help |
-
-On a villager: the job keys `L W S F M B R G C X`. On a building: `U`
-upgrade, `R` repair, `X` dismantle.
-
-## A short guide to surviving the first week
-
-1. **Two woodcutters, one forager, one guard.** Four people cannot do
-   more than that.
-2. **Mend the ruined huts before you raise anything new.** A roof is
-   cheaper to fix than to build, and beds are the wall that stops you
-   growing.
-3. **Wall the green.** A ring of palisade round the hall, with a gap the
-   dead want to walk into. This is the single thing that decides whether
-   you see day twenty.
-4. **A workshop, then spears.** Clubs lose fights. Spears hold them.
-5. **An infirmary before the first bad night.** A bite you can walk to a
-   healer is a story. A bite you cannot is a grave.
-6. **Feed them, and when the grief is heavy, hold a feast.** Morale is a
-   multiplier on everything.
-7. **Go and meet the neighbours.** The workshop will tell you what it
-   cannot study and why — usually because you have not been to the place
-   yet. Ashford's iron is worth the walk, and the chapel's physic chest
-   is where the cure starts.
+| `Q` · `F3` · `K` | picture quality · the numbers · mute |
+| `esc` | put down whatever you are carrying |
 
 ## Under the skin
 
@@ -124,5 +80,4 @@ document — the balance numbers, the systems, the frame budget, and how to
 change any of it.
 
 Verification is headless: `.verify/harness.js` boots the real page in
-Node, and `.verify/ui-smoke.js`, `.verify/systems-smoke.js` and
-`.verify/play.js` (a bot that plays the game) run against it.
+Node, and `.verify/rts-smoke.js` runs the whole war against it.

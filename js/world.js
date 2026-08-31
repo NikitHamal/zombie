@@ -9,6 +9,11 @@
   const ZS = (window.ZS = window.ZS || {});
 
   const SS = 1.25; // pre-render supersample (crisp from fit-zoom up to max zoom)
+  const GROUND_BUDGET = 14e6; // pixel budget for the pre-rendered sheet: a
+  // vast theatre scales down instead of eating hundreds of megabytes
+  function groundSS(w, h) {
+    return Math.min(SS, Math.sqrt(GROUND_BUDGET / (w * h)));
+  }
 
   // strict point-in-polygon (raycast): a local copy of the nav.js one, so
   // placement can reject footprints that touch a water polygon
@@ -564,8 +569,9 @@
     build() {
       const c = this.canvas,
         g = c.getContext("2d");
-      c.width = Math.round(this.w * SS);
-      c.height = Math.round(this.h * SS);
+      const SS = groundSS(this.w, this.h);
+      c.width = Math.max(1, Math.round(this.w * SS));
+      c.height = Math.max(1, Math.round(this.h * SS));
       g.setTransform(SS, 0, 0, SS, 0, 0);
       const W = this.w,
         H = this.h;
