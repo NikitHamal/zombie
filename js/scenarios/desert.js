@@ -341,7 +341,36 @@
         this.sel = { k: "u", o: hit, all: [hit] };
         return;
       }
-      if (this.sel && this.sel.k === "u" && this.sel.all) this._moveSelected(x, y);
+      if (this.sel && this.sel.k === "u" && this.sel.all) {
+        // an enemy structure under the cursor: attack it, not just the point
+        const b = this._structAt(x, y);
+        if (b && b.enemy) {
+          this._attackStruct(b);
+          return;
+        }
+        this._moveSelected(x, y);
+      }
+    }
+
+    _structAt(x, y) {
+      for (const b of this.world.buildings) {
+        const pad = b.kind === "wall" ? 10 : 4;
+        if (x < b.x - pad || x > b.x + b.w + pad || y < b.y - pad || y > b.y + b.h + pad) continue;
+        return b;
+      }
+      return null;
+    }
+
+    _attackStruct(b) {
+      if (!this.sel || !this.sel.all) return;
+      this._atkTarget = b;
+      for (const a of this.sel.all) {
+        a.goal = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+        a.targStruct = b;
+        a.path = null;
+        a.wantMove = true;
+      }
+      if (ZS.sound) ZS.sound.event("order", b.x + b.w / 2, b.y + b.h / 2);
     }
 
     _deselect() {
@@ -378,6 +407,7 @@
         const a = all[i];
         // individual waypoints, slightly spread, so they don't stack
         a.goal = { x: x + (i - (n - 1) / 2) * 18, y: y + ((i % 3) - 1) * 16 };
+        a.targStruct = null;
         a.path = null;
         a.wantMove = true;
         if (ZS.sound) ZS.sound.event("order", a.x, a.y);
@@ -561,6 +591,8 @@
         if (this.nat) this.nat.news.unshift("an enemy stronghold falls — the ground is ours");
       }
       super._damageStruct(b, amt);
+      // a unit told to take a specific structure looks for something else
+      if (this.agents) for (const a of this.agents) if (a.targStruct === b) a.targStruct = null;
     }
 
     // the village's first-of-a-kind and counts are for the player's own
@@ -577,6 +609,82 @@
       for (const b of this.world.buildings)
         if (b.kind === kind && b.built && !b.ruined && !b.enemy && this._own.has(b)) n++;
       return n;
+    }
+
+    // units fight structures too, not just the living. A soldier in range of
+    // a hostile building opens fire on it (and an armour piece or a bomber
+    // pulls the wall down), which is what makes an RTS about ground.
+    // Delegates to the base agent/army update for everything else.
+    update(a, dt, t, grid, nav) {
+      if (a.st === 4) {
+        const d = ZS.Units.def(a.unit);
+        const tgt = this._hostileStruct(a, d.rng || 26);
+        if (tgt && this._fireStruct(a, tgt, d, dt, t)) return;
+      }
+      super.update(a, dt, t, grid, nav);
+    }
+
+    _hostileStruct(a, rng) {
+      // an explicit attack order on a structure wins
+      if (a.targStruct && !a.targStruct.dead && !a.targStruct.ruined) {
+        const tb = a.targStruct;
+        const hostile = a.foe ? this._own.has(tb) : tb.enemy;
+        if (hostile) return tb;
+      }
+      let best = null,
+        bd = rng * rng;
+      for (const b of this.world.buildings) {
+        if (b.dead || b.ruined) continue;
+        if (b.kind === "wall" && !a.siege) continue; // soft targets only
+        const hostile = a.foe ? this._own.has(b) : b.enemy;
+        if (!hostile) continue;
+        const dx = Math.max(b.x - a.x, 0, a.x - (b.x + b.w));
+        const dy = Math.max(b.y - a.y, 0, a.y - (b.y + b.h));
+        const dd = Math.hypot(dx, dy);
+        if (dd > rng) continue;
+        if (dd < bd) {
+          bd = dd;
+          best = b;
+        }
+      }
+      return best;
+    }
+
+    _fireStruct(a, b, d, dt, t) {
+      const cx = b.x + b.w / 2,
+        cy = b.y + b.h / 2;
+      a.a = Math.atan2(cy - a.y, cx - a.x);
+      const rng = d.rng || 26;
+      // stay at the edge of the weapon's reach, not on top of the wall
+      const dd = Math.hypot(cx - a.x, cy - a.y);
+      if (dd > rng * 0.9) {
+        a.wantMove = true;
+        ZS.planAndFollow(
+          a,
+          { x: cx, y: cy },
+          false,
+          d.spd * (a.sup > 0 ? 0.9 : 0.7),
+          dt,
+          t,
+          this.nav,
+        );
+        return true;
+      }
+      a.vx *= 0.86;
+      a.vy *= 0.86;
+      if (a.atkT > 0) return true;
+      a.atkT = d.rate;
+      a.kick = 0.35;
+      a.muzzle = 0.12;
+      // the wall only falls to shell or bomb; a rifle scuffs it
+      const dmg = d.siege ? d.dmg * d.siege : d.dmg * 0.25;
+      if (d.shot && d.shot !== "arrow" && ZS.Fx) {
+        if (d.shot === "bomb") ZS.Fx.bomb(this, a.x, a.y - (d.fly ? 44 : 14), cx, cy, a.seed | 0);
+        else ZS.Fx.shell(this, a.x, a.y - 14, cx, cy, d.splash > 30 ? 1 : 0, a.seed | 0);
+      }
+      this._damageStruct(b, dmg);
+      if (ZS.sound) ZS.sound.event(d.shot === "bomb" ? "air" : "shot_rifle", a.x, a.y);
+      return true;
     }
 
     camInterest(dt) {

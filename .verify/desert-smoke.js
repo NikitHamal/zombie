@@ -106,6 +106,16 @@ ok(!!G.hostileBetween(a1, a2, G), "nations at war will fight each other");
 const foe = ZS.Army.spawn(G, "militia", true);
 ok(G.hostileBetween(ours()[0], foe, G), "the dead of the player are always at odds with a foe");
 
+// units take ground: an attack order on an enemy structure damages it
+if (ehall) {
+  const atk = ["tank", "cannon"].map((id) => ZS.Army.spawn(G, id, false)).filter(Boolean);
+  G.sel = { k: "u", o: atk[0], all: atk };
+  const hpBefore = ehall.hp;
+  G._attackStruct(ehall);
+  frames(500);
+  ok(ehall.hp < hpBefore || ehall.dead, "an attack order pulls a structure down", ehall.hp + " hp");
+}
+
 // the defensive works fight on their own
 const tur = G.world.buildings.find((bb) => bb.kind === "gunTurret" && !bb.enemy);
 if (tur) {
