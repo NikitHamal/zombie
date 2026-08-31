@@ -33,6 +33,7 @@
     MAPH = R.MAPH;
   const T = R.T;
   const PAL = R.PAL;
+  const HAND = '"Segoe Script","Bradley Hand","Comic Sans MS",cursive';
 
   /* ---------- tunables ---------- */
 
@@ -336,7 +337,8 @@
       const sh = R.Cam.shakeOffset();
 
       /* ---- clear to page ---- */
-      c.setTransform(1, 0, 0, 1, 0, 0);
+      const dpr = (g.app && g.app.dpr) || window.devicePixelRatio || 1;
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
       c.fillStyle = PAL.pageDark;
       c.fillRect(0, 0, vw, vh);
 
@@ -476,20 +478,10 @@
 
       c.restore();
 
-      /* ---- 15. night wash (screen space) ---- */
-      const dl = R.daylight(g.time);
-      if (dl < 0.99) {
-        c.setTransform(1, 0, 0, 1, 0, 0);
-        c.globalAlpha = (1 - dl) * 0.52;
-        c.fillStyle = "#2a3352";
-        c.fillRect(0, 0, vw, vh);
-        c.globalAlpha = 1;
-      }
-
       /* ---- 16. the selection box (screen space) ---- */
       if (this.box) {
         const b = this.box;
-        c.setTransform(1, 0, 0, 1, 0, 0);
+        c.setTransform(dpr, 0, 0, dpr, 0, 0);
         const x = Math.min(b.x0, b.x1),
           y = Math.min(b.y0, b.y1);
         const w = Math.abs(b.x1 - b.x0),
@@ -506,66 +498,8 @@
 
     /* ---------- settlement rings ---------- */
 
-    drawSites(g, c, view, zoom) {
-      const t = g.t;
-      for (const s of t.sites) {
-        if (
-          s.x < view.x0 - 400 ||
-          s.x > view.x1 + 400 ||
-          s.y < view.y0 - 400 ||
-          s.y > view.y1 + 400
-        )
-          continue;
-        if (this.showFog && g.visible(s.x, s.y) === 0) continue;
-        const r = (s.r + (s.tier - 1) * 3) * TILE;
-        const owned = s.owner >= 0;
-        const col = owned ? R.factionTint[s.owner] : "rgba(120,108,88,1)";
-        c.save();
-        // the territory disc: a soft wash inside the ring
-        c.globalAlpha = owned ? 0.07 : 0.04;
-        c.fillStyle = col;
-        c.beginPath();
-        c.arc(s.x, s.y, r, 0, R.TAU);
-        c.fill();
-        c.globalAlpha = 0.75;
-        c.strokeStyle = col;
-        c.lineWidth = 2.2 / Math.max(1, zoom * 0.9);
-        c.setLineDash([14, 10]);
-        c.beginPath();
-        c.arc(s.x, s.y, r, 0, R.TAU);
-        c.stroke();
-        c.setLineDash([]);
-        c.restore();
-
-        // the name and the owner, big enough to read when zoomed out
-        if (zoom > 0.32) {
-          c.save();
-          const fs = Math.max(11, 15 / Math.max(0.7, zoom));
-          c.font = "600 " + fs + "px ui-sans-serif, system-ui, sans-serif";
-          c.textAlign = "center";
-          c.fillStyle = "rgba(58,50,42,0.72)";
-          c.fillText(s.name, s.x, s.y - r + fs * 1.5);
-          if (owned) {
-            c.fillStyle = col;
-            c.fillText(
-              R.FACTIONS[s.owner].short +
-                " · " +
-                (R.BASE_TYPES[s.kind] ? R.BASE_TYPES[s.kind].name : "ground") +
-                (s.open ? " — OPEN" : ""),
-              s.x,
-              s.y - r + fs * 2.9,
-            );
-          } else {
-            c.fillStyle = "rgba(96,86,70,0.7)";
-            c.fillText(
-              "UNCLAIMED" + (R.BASE_TYPES[s.kind] ? " · " + R.BASE_TYPES[s.kind].name : ""),
-              s.x,
-              s.y - r + fs * 2.9,
-            );
-          }
-          c.restore();
-        }
-      }
+    drawSites(_g, _c, _view, _zoom) {
+      // Dotted lines and floating base names removed for clean tactical view
     },
 
     /* ---------- decor ---------- */
@@ -574,102 +508,146 @@
       const d = g.t.decor;
       if (!d) return;
       const n = d.n;
-      const lod = zoom > 0.9 ? 1 : 0;
+      const lod = zoom > 0.8 ? 1 : 0;
       c.lineCap = "round";
       for (let i = 0; i < n; i++) {
         const x = d.x[i],
           y = d.y[i];
-        if (x < view.x0 - 30 || x > view.x1 + 30 || y < view.y0 - 30 || y > view.y1 + 30) continue;
+        if (x < view.x0 - 60 || x > view.x1 + 60 || y < view.y0 - 60 || y > view.y1 + 60) continue;
         if (this.showFog && g.visible(x, y) === 0) continue;
         const k = d.k[i],
           s = d.s[i];
-        const sc = d.r[i];
+        const sc = d.r[i] * 1.8; // Scale up 1.8x - 2.2x to authentic Desert Order size
         switch (k) {
-          case 0: // ripple: two short arcs in the sand
-            c.strokeStyle = "rgba(158,142,110,0.4)";
-            c.lineWidth = 1.1;
+          case 0: // Sand dune ripples
+            c.strokeStyle = "rgba(148,132,100,0.45)";
+            c.lineWidth = 1.6;
             c.beginPath();
-            c.arc(x, y, 6 * sc, 0.2, 1.5);
+            c.arc(x, y, 12 * sc, 0.2, 1.5);
             c.stroke();
             if (lod) {
               c.beginPath();
-              c.arc(x + 3, y + 4, 9 * sc, 0.4, 1.9);
+              c.arc(x + 6, y + 8, 18 * sc, 0.35, 1.85);
               c.stroke();
             }
             break;
-          case 1: // pebble
-            c.fillStyle = "rgba(138,124,98,0.55)";
+          case 1: // Pebbles & rock gravel cluster
+            c.fillStyle = "rgba(128,114,88,0.65)";
             c.beginPath();
-            c.ellipse(x, y, 2.4 * sc, 1.6 * sc, s * 3, 0, R.TAU);
+            c.ellipse(x, y, 5.5 * sc, 3.5 * sc, s * 3, 0, R.TAU);
+            c.fill();
+            c.beginPath();
+            c.ellipse(x + 4 * sc, y + 2 * sc, 3.2 * sc, 2.2 * sc, s * 2, 0, R.TAU);
             c.fill();
             break;
-          case 2: // bush
-            c.fillStyle = "rgba(118,128,74,0.5)";
+          case 2: // Rich Desert Sagebrush
+            // Shadow
+            c.fillStyle = "rgba(40,34,26,0.18)";
             c.beginPath();
-            c.arc(x, y, 5.5 * sc, 0, R.TAU);
+            c.ellipse(x + 2, y + 4, 11 * sc, 7 * sc, 0, 0, R.TAU);
+            c.fill();
+            // Bush foliage
+            c.fillStyle = "rgba(110,122,68,0.78)";
+            c.beginPath();
+            c.arc(x, y, 10 * sc, 0, R.TAU);
+            c.fill();
+            c.fillStyle = "rgba(132,148,82,0.85)";
+            c.beginPath();
+            c.arc(x - 3 * sc, y - 3 * sc, 6.5 * sc, 0, R.TAU);
             c.fill();
             if (lod) {
-              c.strokeStyle = "rgba(86,98,54,0.6)";
-              c.lineWidth = 1.2;
-              for (let q = 0; q < 4; q++) {
-                const an = s * 6 + q * 1.57;
+              c.strokeStyle = "rgba(76,88,44,0.7)";
+              c.lineWidth = 1.3;
+              for (let q = 0; q < 5; q++) {
+                const an = s * 6 + q * 1.25;
                 c.beginPath();
                 c.moveTo(x, y);
-                c.lineTo(x + Math.cos(an) * 7 * sc, y + Math.sin(an) * 5 * sc);
+                c.lineTo(x + Math.cos(an) * 12 * sc, y + Math.sin(an) * 9 * sc);
                 c.stroke();
               }
             }
             break;
-          case 3: // rock chunk: a little drawn boulder with a shadow side
-            c.fillStyle = "rgba(154,138,110,0.72)";
+          case 3: // Chiseled Desert Boulder
+            // Drop Shadow
+            c.fillStyle = "rgba(35,30,22,0.25)";
             c.beginPath();
-            c.moveTo(x - 6 * sc, y + 3 * sc);
-            c.lineTo(x - 2 * sc, y - 5 * sc);
-            c.lineTo(x + 5 * sc, y - 3 * sc);
-            c.lineTo(x + 7 * sc, y + 3 * sc);
+            c.ellipse(x + 3 * sc, y + 5 * sc, 14 * sc, 8 * sc, 0, 0, R.TAU);
+            c.fill();
+            // Boulder body
+            c.fillStyle = "#8a7b64";
+            c.strokeStyle = "#2e271e";
+            c.lineWidth = 1.4;
+            c.beginPath();
+            c.moveTo(x - 12 * sc, y + 5 * sc);
+            c.lineTo(x - 5 * sc, y - 11 * sc);
+            c.lineTo(x + 9 * sc, y - 7 * sc);
+            c.lineTo(x + 13 * sc, y + 6 * sc);
             c.closePath();
             c.fill();
-            if (lod) {
-              c.strokeStyle = "rgba(96,84,64,0.7)";
-              c.lineWidth = 1.2;
-              c.stroke();
-              c.strokeStyle = "rgba(96,84,64,0.4)";
-              c.beginPath();
-              c.moveTo(x + 1 * sc, y - 3 * sc);
-              c.lineTo(x + 2 * sc, y + 2 * sc);
-              c.stroke();
-            }
+            c.stroke();
+            // Top highlight facet
+            c.fillStyle = "#b5a388";
+            c.beginPath();
+            c.moveTo(x - 5 * sc, y - 11 * sc);
+            c.lineTo(x + 9 * sc, y - 7 * sc);
+            c.lineTo(x + 4 * sc, y - 1 * sc);
+            c.lineTo(x - 7 * sc, y - 3 * sc);
+            c.closePath();
+            c.fill();
             break;
-          case 5: // palm: a leaning trunk and six fronds
-            c.strokeStyle = "rgba(112,96,70,0.75)";
-            c.lineWidth = 2.4 * sc;
+          case 5: // Large Lush Date Palm
+            // Ground Drop Shadow
+            c.fillStyle = "rgba(35,30,22,0.26)";
+            c.beginPath();
+            c.ellipse(x + 8 * sc, y + 10 * sc, 22 * sc, 11 * sc, 0, 0, R.TAU);
+            c.fill();
+
+            // Segmented Palm Trunk
+            const trunkCurve = (s - 0.5) * 18;
+            const topX = x + trunkCurve * sc;
+            const topY = y - 36 * sc;
+            c.strokeStyle = "#6e5d42";
+            c.lineWidth = 4.2 * sc;
             c.beginPath();
             c.moveTo(x, y + 6);
-            c.quadraticCurveTo(x + 3 * (s - 0.5) * 8, y - 8, x + 5 * (s - 0.5) * 8, y - 20 * sc);
+            c.quadraticCurveTo(x + trunkCurve * 0.4 * sc, y - 16 * sc, topX, topY);
             c.stroke();
-            c.strokeStyle = "rgba(96,116,58,0.72)";
-            c.lineWidth = 2;
-            const tx = x + 5 * (s - 0.5) * 8,
-              ty = y - 20 * sc;
-            for (let q = 0; q < 6; q++) {
-              const an = (q / 6) * R.TAU + s;
+            c.strokeStyle = "#4a3c28";
+            c.lineWidth = 1.2;
+            c.stroke();
+
+            // Lush Palm Fronds radiating outward
+            const numFronds = 8;
+            for (let q = 0; q < numFronds; q++) {
+              const an = (q / numFronds) * R.TAU + s * 2;
+              const fLen = (22 + (q % 3) * 6) * sc;
+              const midX = topX + Math.cos(an) * (fLen * 0.55);
+              const midY = topY + Math.sin(an) * (fLen * 0.4) - 6 * sc;
+              const endX = topX + Math.cos(an) * fLen;
+              const endY = topY + Math.sin(an) * (fLen * 0.7) + 6 * sc;
+
+              c.strokeStyle = q % 2 === 0 ? "#4a6828" : "#628834";
+              c.lineWidth = 3.2 * sc;
               c.beginPath();
-              c.moveTo(tx, ty);
-              c.quadraticCurveTo(
-                tx + Math.cos(an) * 9,
-                ty + Math.sin(an) * 6 - 3,
-                tx + Math.cos(an) * 15,
-                ty + Math.sin(an) * 8 + 3,
-              );
+              c.moveTo(topX, topY);
+              c.quadraticCurveTo(midX, midY, endX, endY);
               c.stroke();
             }
-            break;
-          case 6: // tyre tracks
-            c.strokeStyle = "rgba(140,124,96,0.3)";
-            c.lineWidth = 1.6;
+
+            // Hanging Dates Cluster
+            c.fillStyle = "#8a5824";
             c.beginPath();
-            c.moveTo(x - 10, y - 3);
-            c.lineTo(x + 10, y + 3);
+            c.arc(topX - 2 * sc, topY + 4 * sc, 3.5 * sc, 0, R.TAU);
+            c.fill();
+            break;
+          case 6: // Highway convoy tracks
+            c.strokeStyle = "rgba(130,114,86,0.38)";
+            c.lineWidth = 2.4;
+            c.beginPath();
+            c.moveTo(x - 16, y - 5);
+            c.lineTo(x + 16, y + 5);
+            c.moveTo(x - 16, y - 1);
+            c.lineTo(x + 16, y + 9);
             c.stroke();
             break;
           case 7: // an old wreck by the road
@@ -695,25 +673,9 @@
 
     /* ---------- orders, rally points ---------- */
 
-    drawOrders(g, c) {
+    drawOrders(_g, c) {
       c.save();
       c.lineWidth = 1.6;
-      // rally points on selected (or hovered) production buildings
-      for (const b of g.buildings) {
-        if (b.dead || !b.rally || !b.built) continue;
-        if (b.fac !== 0) continue;
-        c.strokeStyle = "rgba(74,102,52,0.5)";
-        c.setLineDash([8, 6]);
-        c.beginPath();
-        c.moveTo(b.x, b.y);
-        c.lineTo(b.rally.x, b.rally.y);
-        c.stroke();
-        c.setLineDash([]);
-        c.fillStyle = "rgba(74,102,52,0.75)";
-        c.beginPath();
-        c.arc(b.rally.x, b.rally.y, 5, 0, R.TAU);
-        c.fill();
-      }
 
       /* ---- shift-queued waypoints ----
          A unit with orders stacked behind it draws a dashed chain from
@@ -1035,7 +997,7 @@
             e.upgrading ? "rgba(96,120,168,0.95)" : "rgba(190,150,60,0.95)",
           );
           c.save();
-          c.font = "600 " + 11 * Math.max(1, k * 0.9) + "px ui-sans-serif, system-ui, sans-serif";
+          c.font = "bold " + Math.round(11 * Math.max(1, k * 0.9)) + "px " + HAND;
           c.textAlign = "center";
           c.fillStyle = "rgba(58,50,42,0.85)";
           const left = e.built ? e.upT : e.buildT;
@@ -1050,7 +1012,7 @@
             const w = 34 * k;
             bar(c, e.x - w / 2, ay - 40 * k, w, 5 * k, f, "rgba(96,120,168,0.95)");
             c.save();
-            c.font = "600 " + 10 * Math.max(1, k) + "px ui-sans-serif, system-ui, sans-serif";
+            c.font = "bold " + Math.round(10 * Math.max(1, k)) + "px " + HAND;
             c.textAlign = "center";
             c.fillStyle = "rgba(58,50,42,0.9)";
             c.fillText("CLAIMING", e.x, ay - 43 * k);

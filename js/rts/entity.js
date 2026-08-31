@@ -64,7 +64,7 @@
       const n = list.length;
       let rad = 0;
       for (const u of list) rad = Math.max(rad, u.def.big ? 26 : u.def.cls === "arm" ? 22 : 14);
-      const spacing = rad * 2.1 + 8;
+      const spacing = rad * 2.4 + 10;
       const cols = Math.max(3, Math.ceil(Math.sqrt(n) * 1.5));
       const cx = list.reduce((s, u) => s + u.x, 0) / n;
       const cy = list.reduce((s, u) => s + u.y, 0) / n;
@@ -567,38 +567,74 @@
     },
 
     separate(g, u, dt) {
-      const want = u.def.big
-        ? 34
+      const r1 = u.def.big
+        ? 18
         : u.def.cls === "arm"
-          ? 30
+          ? 14
           : u.def.cls === "sea"
-            ? 40
+            ? 20
             : u.def.cls === "inf"
-              ? 15
-              : 24;
+              ? 7
+              : 11;
+      const want = r1 * 2.2;
       let px = 0,
         py = 0,
         n = 0;
+
       g.grid.query(u.x, u.y, want, (o) => {
         if (o === u || o.kind !== "u" || o.dead || o.inside) return;
         if (o.layer !== u.layer) return;
         const dx = u.x - o.x,
           dy = u.y - o.y;
         const d2 = dx * dx + dy * dy;
-        if (d2 > want * want || d2 < 0.001) return;
+        const r2 = o.def.big
+          ? 18
+          : o.def.cls === "arm"
+            ? 14
+            : o.def.cls === "sea"
+              ? 20
+              : o.def.cls === "inf"
+                ? 7
+                : 11;
+        const minDist = r1 + r2;
+
+        if (d2 < 0.001) {
+          // Exactly on top of each other: jitter apart immediately
+          const ang = Math.random() * R.TAU;
+          u.x += Math.cos(ang) * 4;
+          u.y += Math.sin(ang) * 4;
+          return;
+        }
+
         const d = Math.sqrt(d2);
-        const f = (want - d) / want;
-        px += (dx / d) * f;
-        py += (dy / d) * f;
-        n++;
+        if (d < minDist) {
+          // Hard geometric displacement pushback (prevents all overlap)
+          const overlap = minDist - d;
+          const pushX = (dx / d) * overlap * 0.55;
+          const pushY = (dy / d) * overlap * 0.55;
+          u.x += pushX;
+          u.y += pushY;
+          if (!o.dead && !o.inside) {
+            o.x -= pushX;
+            o.y -= pushY;
+          }
+        }
+
+        if (d < want) {
+          const f = (want - d) / want;
+          px += (dx / d) * f;
+          py += (dy / d) * f;
+          n++;
+        }
       });
+
       if (!n) return;
-      const push = u.def.cls === "inf" ? 42 : 74;
-      u.vx += (px / n) * push * dt * 3;
-      u.vy += (py / n) * push * dt * 3;
+      const push = u.def.cls === "inf" ? 48 : 80;
+      u.vx += (px / n) * push * dt * 4;
+      u.vy += (py / n) * push * dt * 4;
       if (u.order && u.order.type === "hold") {
-        u.vx *= 0.2;
-        u.vy *= 0.2;
+        u.vx *= 0.15;
+        u.vy *= 0.15;
       }
     },
   };

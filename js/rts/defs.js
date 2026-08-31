@@ -2935,11 +2935,6 @@
       name: "Take a settlement with a Conquest Truck",
       reward: { gold: 5, steel: 100000 },
     },
-    {
-      key: "q_flaks",
-      name: "Raise six flaks on your own ground",
-      reward: { gold: 5, concrete: 120000 },
-    },
   ];
 
   /* =======================================================================

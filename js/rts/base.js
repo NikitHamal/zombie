@@ -317,13 +317,19 @@
               const ry = pt ? (pt.ty + 0.5) * TILE : b.rally.y;
               R.Entity.setOrder(g, u, { type: "amove", x: rx, y: ry });
             } else if (u.layer === 0 || u.layer === 3) {
-              // drift a little way out of the door so the next one fits
-              const an = Math.atan2(p.y - b.y, p.x - b.x);
-              R.Entity.setOrder(g, u, {
-                type: "move",
-                x: p.x + Math.cos(an) * 44,
-                y: p.y + Math.sin(an) * 44,
-              });
+              // March out of the gate onto the road frontage outside the base
+              if (b.site && b.site.gateX) {
+                const rx = b.site.gateX + (Math.random() - 0.5) * 80;
+                const ry = b.site.gateY + Math.random() * 80;
+                R.Entity.setOrder(g, u, { type: "amove", x: rx, y: ry });
+              } else {
+                const an = Math.atan2(p.y - b.y, p.x - b.x);
+                R.Entity.setOrder(g, u, {
+                  type: "move",
+                  x: p.x + Math.cos(an) * 44,
+                  y: p.y + Math.sin(an) * 44,
+                });
+              }
             }
             if (b.fac === 0 && q.key === "stonehammer") g.stats.bredaBuilt++;
             if (b.fac === 0 && b.queue.length === 1) R.FX.marker(g, u.x, u.y, "move");

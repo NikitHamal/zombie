@@ -47,20 +47,36 @@
 
     boot() {
       const q = new URLSearchParams(location.search);
+      const STORED_SEED_KEY = "zs.sandstorm.seed";
       let seed = q.get("seed");
-      seed =
-        seed !== null && seed !== ""
-          ? parseInt(seed, 10) >>> 0
-          : (Math.random() * 0xffffffff) >>> 0;
+      if (seed !== null && seed !== "") {
+        seed = parseInt(seed, 10) >>> 0;
+        try {
+          localStorage.setItem(STORED_SEED_KEY, String(seed));
+        } catch {}
+      } else {
+        try {
+          const kept = localStorage.getItem(STORED_SEED_KEY);
+          if (kept) seed = parseInt(kept, 10) >>> 0;
+        } catch {}
+        if (seed === null || seed === undefined || isNaN(seed)) {
+          seed = (Math.random() * 0xffffffff) >>> 0;
+          try {
+            localStorage.setItem(STORED_SEED_KEY, String(seed));
+          } catch {}
+        }
+      }
       this.seed = seed;
 
       this.canvas = document.getElementById("view");
       this.ctx = this.canvas.getContext("2d");
 
+      this.resize();
       ZS.Perf.init();
       ZS.Perf.onTier = () => this.resize();
 
       const g = (this.g = new R.Game(seed));
+      g.app = this;
       g.ctx = this.ctx;
       g.start();
 
@@ -78,9 +94,8 @@
       cam.x = home.x;
       cam.y = home.y;
       cam.zoom = 0.9;
-      cam.clamp(this.vw || window.innerWidth, this.vh || window.innerHeight);
+      cam.clamp(this.vw, this.vh);
 
-      this.resize();
       this.bind();
 
       g.say(
@@ -112,7 +127,7 @@
       this.canvas.style.width = vw + "px";
       this.canvas.style.height = vh + "px";
       this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      this.cam.clamp(vw, vh);
+      if (this.cam) this.cam.clamp(vw, vh);
       if (R.Mini.canvas) R.Mini.resize(236);
     },
 

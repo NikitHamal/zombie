@@ -248,8 +248,8 @@
     placeSites(rnd) {
       // a huge map wants its grounds far apart: the war is a walk of
       // minutes between settlements, not seconds
-      const want = 46;
-      const minGap = 46;
+      const want = 38;
+      const minGap = 68;
       let guard = 0;
       while (this.sites.length < want && guard++ < 120000) {
         const tx = 20 + ((rnd() * (MAPW - 40)) | 0);
@@ -538,6 +538,16 @@
       }
     }
 
+    nearAnySite(tx, ty, r) {
+      const r2 = r * r;
+      for (const s of this.sites) {
+        const dx = s.tx - tx,
+          dy = s.ty - ty;
+        if (dx * dx + dy * dy <= r2) return true;
+      }
+      return false;
+    }
+
     buildDecor(rnd) {
       const dx = new Float32Array(DECOR_MAX),
         dy = new Float32Array(DECOR_MAX),
@@ -549,28 +559,35 @@
       // 6 tyre track, 7 wreck, 8 rail spike
       for (let ty = 0; ty < MAPH && n < DECOR_MAX - 8; ty++) {
         for (let tx = 0; tx < MAPW && n < DECOR_MAX - 8; tx++) {
+          // Generous clean buffer zone around all settlement bases
+          if (this.nearAnySite(tx, ty, 24)) continue;
+
           const i = ty * MAPW + tx;
           const t = this.type[i];
           const h = R.hash2(tx, ty, this.seed + 4242);
           let kind = -1,
             chance = 0;
           if (t === T.SAND) {
-            chance = 0.3;
-            kind = h > 0.72 ? 3 : h > 0.3 ? 0 : 1;
+            // Open sand: gentle dune ripples and rare pebbles, no stone clutter
+            chance = 0.05;
+            kind = h > 0.4 ? 0 : 1;
           } else if (t === T.FIRM) {
-            chance = 0.16;
-            kind = h > 0.66 ? 3 : h > 0.4 ? 1 : 0;
+            // Packed flats: rare tiny pebble
+            chance = 0.02;
+            kind = 1;
           } else if (t === T.SCRUB) {
-            chance = 0.72;
-            kind = h > 0.9 ? 5 : 2;
+            // Oases & green brush: lush date palms near water, clean sagebrush
+            chance = 0.16;
+            kind = h > 0.8 ? 5 : 2;
           } else if (t === T.ROCK) {
-            chance = 0.55;
+            // Mountain mesa ridges: curated granite boulders
+            chance = 0.09;
             kind = 3;
           } else if (t === T.ROAD) {
-            chance = 0.1;
+            chance = 0.03;
             kind = 6;
           } else if (t === T.RAIL) {
-            chance = 0.3;
+            chance = 0.08;
             kind = 8;
           }
           if (kind < 0) continue;
@@ -581,13 +598,14 @@
           dy[n] = (ty + 0.5 + jy * 0.8) * TILE;
           dk[n] = kind;
           ds[n] = R.hash2(tx, ty, this.seed + 63);
-          dr[n] = 0.5 + R.hash2(tx, ty, this.seed + 64) * 0.9;
+          dr[n] = 0.7 + R.hash2(tx, ty, this.seed + 64) * 0.6;
           n++;
         }
       }
-      for (let k = 0; k < 40 && n < DECOR_MAX; k++) {
+      for (let k = 0; k < 18 && n < DECOR_MAX; k++) {
         const tx = 6 + ((rnd() * (MAPW - 12)) | 0);
         const ty = 6 + ((rnd() * (MAPH - 12)) | 0);
+        if (this.nearAnySite(tx, ty, 24)) continue;
         const i = ty * MAPW + tx;
         if (this.type[i] !== T.ROAD && this.type[i] !== T.SAND) continue;
         dx[n] = (tx + 0.5) * TILE;
