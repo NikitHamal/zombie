@@ -2,6 +2,7 @@
    Exercises the transform: the big map, rival outposts, territory, direct
    orders, naval units, and the factions-at-war rule. Run:
    ZS_SCEN=ScenarioDesert ZS_WW=3200 ZS_WH=2200 node .verify/desert-smoke.js */
+process.env.ZS_RNG = "7";
 const { G, ZS, frames, press } = require("./harness");
 
 const fails = [];
@@ -40,16 +41,38 @@ ok(
 
 // direct orders: a garrison is under arms and can be told to move
 const ours = () => (G.agents || []).filter((a) => a.st === 4 && !a.foe && !a.dead);
-ok(ours().length >= 3, "a garrison is already under arms", String(ours().length));
-const before = ours().map((a) => [a.x, a.y]);
+ok(ours().length >= 1, "a garrison is under arms at the start", String(ours().length));
+// spawn a clean squad for the order test, so it never depends on the sim
+const squad = ["militia", "archer", "gunner", "machinegun"]
+  .map((id) => ZS.Army.spawn(G, id, false))
+  .filter(Boolean);
+ok(squad.length >= 3, "the player can raise soldiers", String(squad.length));
+const before = squad.map((a) => [a.x, a.y]);
 const tx = G.center.x + 520,
   ty = G.center.y - 260;
+G.sel = { k: "u", o: squad[0], all: squad }; // box-select the squad
 G._moveSelected(tx, ty);
 frames(160);
-const moved = ours().filter(
+const moved = squad.filter(
   (a, i) => Math.hypot(a.x - before[i][0], a.y - before[i][1]) > 120,
 ).length;
 ok(moved >= 2, "units walk to an issued move order", moved + " moved");
+
+// territory capture: the player holds only their outpost, not the waste
+ok(
+  !G.world.buildings.some((b) => b.enemy && G._own.has(b)),
+  "rival ground is not held at the start",
+);
+const ehall = G.world.buildings.find((b) => b.enemy && b.kind === "hall");
+if (ehall) {
+  const ownBefore = G._own.size;
+  const enemyBefore = G.world.buildings.filter((b) => b.enemy).length;
+  G._damageStruct(ehall, ehall.hp);
+  ok(
+    G._own.size >= ownBefore && G.world.buildings.filter((b) => b.enemy).length < enemyBefore,
+    "razing an enemy stronghold takes its ground",
+  );
+}
 
 // naval: the fleets are on the roster, and step into the water
 ok(

@@ -113,8 +113,9 @@
       nav.version++;
       this.trees0 = world.trees.length;
 
-      // claim the whole walled outpost the player starts in
-      for (const b of world.buildings) this._own.add(b);
+      // claim the whole walled outpost the player starts in (the ring laid
+      // before the outposts) — not the rival ground out in the waste
+      for (const b of world.buildings) if (!b.enemy) this._own.add(b);
     }
 
     // a handful of rival nation outposts, at home sites out in the waste
@@ -520,6 +521,62 @@
       if (sum) this.res.scrap = Math.min(this.storeCap("scrap"), this.res.scrap + sum * 0.28 * dt);
       // giving strongholds a place to build: a nominal build allowance
       this._buildAllow = sum;
+    }
+
+    // a building the player raises is ground the player holds; a capture
+    // post takes the ground around it, and a razed enemy hall unlocks its
+    // yard to a fresh claim.
+    onBuilt(b) {
+      super.onBuilt(b);
+      if (this._own) this._own.add(b);
+      if (b.kind === "capture") this._claimAround(b, 220);
+    }
+
+    // territory the player holds is fed by the ground they own. A capture
+    // post claims a ring of open ground; an enemy hall, once razed, hands
+    // its yard over to whoever beats the ground.
+    _claimAround(b, r) {
+      const cx = b.x + b.w / 2,
+        cy = b.y + b.h / 2;
+      for (const o of this.world.buildings) {
+        if (o === b || this._own.has(o)) continue;
+        if (o.enemy) continue; // only neutral ground is claimed freely
+        const d = Math.hypot(o.x + o.w / 2 - cx, o.y + o.h / 2 - cy);
+        if (d <= r) this._own.add(o);
+      }
+    }
+
+    _damageStruct(b, amt) {
+      // an enemy hall that is about to fall hands its yard over first
+      if (b.enemy && b.kind === "hall" && !b._razed && b.hp - amt <= 0) {
+        b._razed = true;
+        const cx = b.x + b.w / 2,
+          cy = b.y + b.h / 2;
+        for (const o of this.world.buildings) {
+          if (o === b || !o.enemy || o.dead) continue;
+          if (Math.hypot(o.x + o.w / 2 - cx, o.y + o.h / 2 - cy) > 240) continue;
+          o.enemy = false;
+          this._own.add(o);
+        }
+        if (this.nat) this.nat.news.unshift("an enemy stronghold falls — the ground is ours");
+      }
+      super._damageStruct(b, amt);
+    }
+
+    // the village's first-of-a-kind and counts are for the player's own
+    // works; in an RTS there is enemy ground, so both must skip it (or the
+    // player's new troops would muster at an enemy barracks)
+    _first(kind) {
+      for (const b of this.world.buildings)
+        if (b.kind === kind && b.built && !b.ruined && !b.enemy && this._own.has(b)) return b;
+      return null;
+    }
+
+    count(kind) {
+      let n = 0;
+      for (const b of this.world.buildings)
+        if (b.kind === kind && b.built && !b.ruined && !b.enemy && this._own.has(b)) n++;
+      return n;
     }
 
     camInterest(dt) {
