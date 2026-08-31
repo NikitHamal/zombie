@@ -455,6 +455,22 @@
       super.maintain(agents, dt);
       this._tickTerritory(dt);
       this._defenseFire(dt);
+      // the order wins the desert when the last rival stronghold falls
+      if (!this._victory && !this.over && (this.outposts || []).length) {
+        const halls = this.world.buildings.filter((b) => b.enemy && b.kind === "hall");
+        if (!halls.length) {
+          this._victory = true;
+          this.over = {
+            title: "the desert is ours",
+            lines: [
+              "the last rival stronghold falls.",
+              "every flag on the waste flies for the order.",
+              "the dead still wander, but the ground is yours.",
+            ],
+          };
+          if (ZS.VillageUI) ZS.VillageUI.toast("the desert is ours");
+        }
+      }
     }
 
     // the defensive works fight on their own: a gun turret shells the line,
