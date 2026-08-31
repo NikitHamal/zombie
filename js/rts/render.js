@@ -334,9 +334,10 @@
       const zoom = cam.zoom;
       const view = cam.visible(vw, vh, 80);
       const sh = R.Cam.shakeOffset();
+      const dpr = (g.app && g.app.dpr) || window.devicePixelRatio || 1;
 
       /* ---- clear to page ---- */
-      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
       c.fillStyle = PAL.pageDark;
       c.fillRect(0, 0, vw, vh);
 
@@ -476,20 +477,10 @@
 
       c.restore();
 
-      /* ---- 15. night wash (screen space) ---- */
-      const dl = R.daylight(g.time);
-      if (dl < 0.99) {
-        c.setTransform(1, 0, 0, 1, 0, 0);
-        c.globalAlpha = (1 - dl) * 0.52;
-        c.fillStyle = "#2a3352";
-        c.fillRect(0, 0, vw, vh);
-        c.globalAlpha = 1;
-      }
-
-      /* ---- 16. the selection box (screen space) ---- */
+      /* ---- 15. the selection box (screen space) ---- */
       if (this.box) {
         const b = this.box;
-        c.setTransform(1, 0, 0, 1, 0, 0);
+        c.setTransform(dpr, 0, 0, dpr, 0, 0);
         const x = Math.min(b.x0, b.x1),
           y = Math.min(b.y0, b.y1);
         const w = Math.abs(b.x1 - b.x0),

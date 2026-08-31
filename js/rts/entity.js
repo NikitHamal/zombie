@@ -63,8 +63,8 @@
     assignFormation(g, list, ord) {
       const n = list.length;
       let rad = 0;
-      for (const u of list) rad = Math.max(rad, u.def.big ? 26 : u.def.cls === "arm" ? 22 : 14);
-      const spacing = rad * 2.1 + 8;
+      for (const u of list) rad = Math.max(rad, u.def.big ? 28 : u.def.cls === "arm" ? 22 : 16);
+      const spacing = rad * 2.5 + 12;
       const cols = Math.max(3, Math.ceil(Math.sqrt(n) * 1.5));
       const cx = list.reduce((s, u) => s + u.x, 0) / n;
       const cy = list.reduce((s, u) => s + u.y, 0) / n;
@@ -568,34 +568,56 @@
 
     separate(g, u, dt) {
       const want = u.def.big
-        ? 34
-        : u.def.cls === "arm"
-          ? 30
-          : u.def.cls === "sea"
-            ? 40
-            : u.def.cls === "inf"
-              ? 15
-              : 24;
+        ? 46
+        : u.def.cls === "sea"
+          ? 52
+          : u.def.cls === "arm"
+            ? 36
+            : u.def.cls === "soft"
+              ? 30
+              : u.def.cls === "inf"
+                ? 20
+                : 28;
       let px = 0,
         py = 0,
+        maxOverlap = 0,
         n = 0;
       g.grid.query(u.x, u.y, want, (o) => {
         if (o === u || o.kind !== "u" || o.dead || o.inside) return;
         if (o.layer !== u.layer) return;
-        const dx = u.x - o.x,
+        let dx = u.x - o.x,
           dy = u.y - o.y;
-        const d2 = dx * dx + dy * dy;
-        if (d2 > want * want || d2 < 0.001) return;
+        let d2 = dx * dx + dy * dy;
+        if (d2 < 0.001) {
+          const ang = (((u.id || 1) * 17 + (o.id || 2) * 31) % 360) * (Math.PI / 180);
+          dx = Math.cos(ang) * 0.1;
+          dy = Math.sin(ang) * 0.1;
+          d2 = 0.01;
+        }
+        if (d2 > want * want) return;
         const d = Math.sqrt(d2);
         const f = (want - d) / want;
         px += (dx / d) * f;
         py += (dy / d) * f;
+        if (f > maxOverlap) maxOverlap = f;
         n++;
       });
       if (!n) return;
-      const push = u.def.cls === "inf" ? 42 : 74;
-      u.vx += (px / n) * push * dt * 3;
-      u.vy += (py / n) * push * dt * 3;
+      const push = u.def.cls === "inf" ? 55 : 95;
+      const fx = (px / n) * push;
+      const fy = (py / n) * push;
+      u.vx += fx * dt * 3;
+      u.vy += fy * dt * 3;
+      if (maxOverlap > 0.2) {
+        // Direct soft displacement to ensure heavy overlaps untangle cleanly
+        const nudge = Math.min(18, maxOverlap * 14);
+        const nx = u.x + (px / n) * nudge * dt * 4;
+        const ny = u.y + (py / n) * nudge * dt * 4;
+        if (g.nav.openAt(nx, ny, u.layer, u.fac)) {
+          u.x = nx;
+          u.y = ny;
+        }
+      }
       if (u.order && u.order.type === "hold") {
         u.vx *= 0.2;
         u.vy *= 0.2;

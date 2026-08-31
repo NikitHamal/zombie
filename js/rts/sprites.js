@@ -522,20 +522,29 @@
   }
 
   function flak(c, u, _t) {
-    shadow(c, u.x, u.y + 2, 19, 8, 0.18);
-    tracks(c, u.x, u.y, u.va, 30, 7, 6.5, u.tread, u.seed + 3);
-    carBody(c, u.x, u.y, u.va, 34, 16, u.seed, u.fac);
-    // twin barrels on a rotating mount, tipped up
+    shadow(c, u.x, u.y + 2, 21, 9, 0.2);
+    tracks(c, u.x, u.y, u.va, 32, 7.5, 7, u.tread, u.seed + 3);
+    carBody(c, u.x, u.y, u.va, 36, 17, u.seed, u.fac);
+    // open armored AA turret pit
     const ta = u.turretA !== undefined ? u.turretA : u.va;
     const tx = u.x,
       ty = u.y;
-    ink(c, "rgba(44,38,32,0.95)", 1.4);
-    ZS.wcirc(c, tx, ty, 5.6, u.seed + 61, 0.5);
-    const bl = 17;
-    for (const off of [-2.2, 2.2]) {
+    shape(
+      c,
+      boxPts(tx, ty, 14, 13, ta, 0, 0),
+      u.seed + 59,
+      facetTint(u.fac, 0.5),
+      "rgba(44,38,32,0.95)",
+      1.6,
+      0.4,
+    );
+    ink(c, "rgba(44,38,32,0.95)", 1.6);
+    ZS.wcirc(c, tx, ty, 6, u.seed + 61, 0.5);
+    const bl = 20;
+    for (const off of [-2.8, 2.8]) {
       const ox = -Math.sin(ta) * off,
         oy = Math.cos(ta) * off;
-      ink(c, "rgba(46,42,36,0.95)", 2.6);
+      ink(c, "rgba(46,42,36,0.95)", 2.8);
       ZS.wline(
         c,
         tx + ox - Math.cos(ta) * 4,
@@ -993,59 +1002,86 @@
 
   function hq(c, b, t) {
     const s = b.size * TILE;
-    const w = s * 0.8,
-      h = s * 0.66,
-      ht = 26 + b.lvl * 4;
-    slab(c, b.x, b.y, w, h, ht, b.seed, facetTint(b.fac, 0.2), "rgba(224,210,180,0.96)");
+    const w = s * 0.84,
+      h = s * 0.72,
+      ht = 28 + b.lvl * 4;
+
+    // sandbag apron surrounding foundation
+    shape(
+      c,
+      [
+        { x: b.x - w * 0.58, y: b.y - h * 0.48 },
+        { x: b.x + w * 0.58, y: b.y - h * 0.48 },
+        { x: b.x + w * 0.54, y: b.y + h * 0.52 },
+        { x: b.x - w * 0.54, y: b.y + h * 0.52 },
+      ],
+      b.seed + 1,
+      "rgba(180,162,130,0.85)",
+      "rgba(52,45,37,0.85)",
+      1.4,
+      0.8,
+    );
+
+    slab(c, b.x, b.y, w, h, ht, b.seed, facetTint(b.fac, 0.22), "rgba(224,210,180,0.96)");
     const x = b.x,
       y = b.y - ht;
-    // a second storey and a tower
+
+    // a second storey and command observation tower
     slab(
       c,
       x,
-      y + h * 0.1,
-      w * 0.56,
-      h * 0.56,
-      16,
+      y + h * 0.08,
+      w * 0.58,
+      h * 0.58,
+      18,
       b.seed + 9,
-      facetTint(b.fac, 0.26),
+      facetTint(b.fac, 0.28),
       "rgba(216,202,172,0.96)",
     );
     shape(
       c,
       [
-        { x: x - 7, y: y - h * 0.22 - 30 },
-        { x: x + 7, y: y - h * 0.22 - 30 },
-        { x: x + 7, y: y - h * 0.22 + 6 },
-        { x: x - 7, y: y - h * 0.22 + 6 },
+        { x: x - 8, y: y - h * 0.22 - 32 },
+        { x: x + 8, y: y - h * 0.22 - 32 },
+        { x: x + 8, y: y - h * 0.22 + 6 },
+        { x: x - 8, y: y - h * 0.22 + 6 },
       ],
       b.seed + 17,
-      facetTint(b.fac, 0.34),
+      facetTint(b.fac, 0.36),
       "rgba(52,45,37,0.95)",
       1.6,
       0.5,
     );
-    // the flag: this is the building you are defending
-    ink(c, "rgba(52,45,37,0.95)", 1.4);
-    ZS.wline(c, x, y - h * 0.22 - 30, x, y - h * 0.22 - 46, b.seed + 21, 0.3);
-    const fw = Math.sin(t * 2.2 + b.seed) * 2;
+
+    // double entrance steel doors
+    ink(c, "rgba(52,45,37,0.9)", 1.6);
+    ZS.wline(c, x - 6, b.y + h * 0.36 - ht, x - 6, b.y + h * 0.52, b.seed + 19, 0.3);
+    ZS.wline(c, x + 6, b.y + h * 0.36 - ht, x + 6, b.y + h * 0.52, b.seed + 20, 0.3);
+    ZS.wline(c, x, b.y + h * 0.36 - ht, x, b.y + h * 0.52, b.seed + 21, 0.2);
+
+    // the flag: fluttering faction banner
+    ink(c, "rgba(52,45,37,0.95)", 1.5);
+    ZS.wline(c, x, y - h * 0.22 - 32, x, y - h * 0.22 - 50, b.seed + 22, 0.3);
+    const fw = Math.sin(t * 2.4 + b.seed) * 2.5;
     shape(
       c,
       [
-        { x: x, y: y - h * 0.22 - 46 },
-        { x: x + 16, y: y - h * 0.22 - 42 + fw },
-        { x: x, y: y - h * 0.22 - 36 },
+        { x, y: y - h * 0.22 - 50 },
+        { x: x + 18, y: y - h * 0.22 - 45 + fw },
+        { x, y: y - h * 0.22 - 38 },
       ],
       b.seed + 23,
       R.factionTint[b.fac],
       "rgba(52,45,37,0.9)",
-      1.3,
+      1.4,
       0.4,
     );
-    // a radio mast
+
+    // comms antenna & radar
     if (LOD >= 2) {
-      ink(c, "rgba(52,45,37,0.6)", 1);
-      ZS.wline(c, x + w * 0.3, y - h * 0.1, x + w * 0.3 + 6, y - h * 0.1 - 26, b.seed + 27, 0.3);
+      ink(c, "rgba(52,45,37,0.7)", 1.1);
+      ZS.wline(c, x + w * 0.32, y - h * 0.1, x + w * 0.32 + 8, y - h * 0.1 - 28, b.seed + 27, 0.3);
+      ZS.wcirc(c, x + w * 0.32 + 8, y - h * 0.1 - 28, 4, b.seed + 28, 0.3);
     }
   }
 
@@ -2043,92 +2079,137 @@
     const f = b.fac >= 0 && g ? g.factions[b.fac] : null;
     const l2 = f && f.flakL2,
       l3 = f && f.flakL3;
-    const hgt = (l3 ? 46 : l2 ? 38 : 30) + b.lvl * 2;
-    // the plinth
+    const hgt = (l3 ? 48 : l2 ? 40 : 32) + b.lvl * 2;
+
+    // Outer sandbag revetment wall at ground level
     shape(
       c,
       [
-        { x: b.x - s * 0.34, y: b.y - s * 0.26 },
-        { x: b.x + s * 0.34, y: b.y - s * 0.28 },
-        { x: b.x + s * 0.32, y: b.y + s * 0.3 },
-        { x: b.x - s * 0.32, y: b.y + s * 0.28 },
+        { x: b.x - s * 0.44, y: b.y - s * 0.36 },
+        { x: b.x + s * 0.44, y: b.y - s * 0.38 },
+        { x: b.x + s * 0.42, y: b.y + s * 0.38 },
+        { x: b.x - s * 0.42, y: b.y + s * 0.34 },
       ],
       b.seed,
-      "rgba(196,180,150,0.9)",
+      "rgba(180,162,130,0.9)",
       "rgba(52,45,37,0.9)",
       1.7,
-      0.7,
+      0.8,
     );
-    // the tower itself: taller as it is plated
+
+    // Inner heavy concrete pedestal
     shape(
       c,
       [
-        { x: b.x - 10, y: b.y - hgt },
-        { x: b.x + 10, y: b.y - hgt },
-        { x: b.x + 13, y: b.y + s * 0.1 },
-        { x: b.x - 13, y: b.y + s * 0.1 },
+        { x: b.x - s * 0.3, y: b.y - s * 0.22 },
+        { x: b.x + s * 0.3, y: b.y - s * 0.24 },
+        { x: b.x + s * 0.28, y: b.y + s * 0.24 },
+        { x: b.x - s * 0.28, y: b.y + s * 0.22 },
+      ],
+      b.seed + 2,
+      "rgba(156,146,128,0.92)",
+      "rgba(52,45,37,0.95)",
+      1.8,
+      0.6,
+    );
+
+    // Main tower body
+    shape(
+      c,
+      [
+        { x: b.x - 12, y: b.y - hgt },
+        { x: b.x + 12, y: b.y - hgt },
+        { x: b.x + 15, y: b.y + s * 0.1 },
+        { x: b.x - 15, y: b.y + s * 0.1 },
       ],
       b.seed + 5,
-      l2 ? "rgba(150,146,132,0.92)" : "rgba(198,184,154,0.9)",
+      l3 ? "rgba(128,124,112,0.95)" : l2 ? "rgba(148,142,128,0.94)" : "rgba(196,182,152,0.92)",
       "rgba(52,45,37,0.95)",
-      1.7,
+      1.8,
       0.5,
     );
-    // the plated version gets visible bolts
-    if (l2 && LOD >= 1) {
-      ink(c, "rgba(52,45,37,0.6)", 1.2);
-      for (let m = 0; m < 3; m++) {
-        const by = b.y - hgt * (0.25 + m * 0.24);
-        ZS.wline(c, b.x - 12, by, b.x + 12, by, b.seed + 9 + m, 0.2);
+
+    // Armor plating and rivet lines for L2 / L3 upgrades
+    if ((l2 || l3) && LOD >= 1) {
+      ink(c, "rgba(52,45,37,0.7)", 1.3);
+      for (let m = 0; m < (l3 ? 4 : 3); m++) {
+        const by = b.y - hgt * (0.2 + m * 0.22);
+        ZS.wline(c, b.x - 13, by, b.x + 13, by, b.seed + 9 + m, 0.2);
       }
     }
-    // the barrels, sweeping on their own bearing
+
+    // Gun platform mount and barrels
     const mx = b.x,
       my = b.y - hgt - 4;
     const ta = b.turretA !== undefined ? b.turretA : Math.sin(t * 0.5 + b.seed) * 0.6 - Math.PI / 2;
-    ink(c, "rgba(52,45,37,0.95)", 1.5);
-    ZS.wcirc(c, mx, my, 8, b.seed + 13, 0.5);
+
+    // Turret shield
+    shape(
+      c,
+      boxPts(mx, my, l3 ? 22 : 18, l3 ? 18 : 15, ta, 0, 0),
+      b.seed + 12,
+      facetTint(b.fac, 0.5),
+      "rgba(52,45,37,0.95)",
+      1.6,
+      0.4,
+    );
+
+    ink(c, "rgba(52,45,37,0.95)", 1.6);
+    ZS.wcirc(c, mx, my, 8.5, b.seed + 13, 0.5);
+
     if (l3) {
-      // the long double gun
-      ink(c, "rgba(52,45,37,0.95)", 3.2);
-      for (const off of [-3, 3]) {
+      // Long double high-caliber anti-air gun with muzzle brakes & radar
+      ink(c, "rgba(42,36,30,0.98)", 3.8);
+      for (const off of [-3.5, 3.5]) {
         const ox = -Math.sin(ta) * off,
           oy = Math.cos(ta) * off;
+        const bx = mx + ox + Math.cos(ta) * 34;
+        const by = my + oy + Math.sin(ta) * 34;
+        ZS.wline(c, mx + ox, my + oy, bx, by, b.seed + 17 + off, 0.3);
+        // Muzzle brake
+        ink(c, "rgba(42,36,30,0.98)", 5.2);
         ZS.wline(
           c,
-          mx + ox,
-          my + oy,
-          mx + ox + Math.cos(ta) * 30,
-          my + oy + Math.sin(ta) * 30,
-          b.seed + 17 + off,
-          0.3,
+          bx - Math.cos(ta) * 2,
+          by - Math.sin(ta) * 2,
+          bx + Math.cos(ta) * 3,
+          by + Math.sin(ta) * 3,
+          b.seed + 19 + off,
+          0.2,
         );
       }
     } else {
-      // the quad mount
-      ink(c, "rgba(52,45,37,0.95)", 2.4);
-      for (const off of [-5.5, 5.5]) {
+      // Quad / twin flak mount
+      ink(c, "rgba(42,36,30,0.98)", 2.6);
+      for (const off of [-5, 5]) {
         const ox = -Math.sin(ta) * off,
           oy = Math.cos(ta) * off;
         for (const dd of [-1, 1]) {
-          const da = ta + dd * 0.16;
+          const da = ta + dd * 0.14;
           ZS.wline(
             c,
             mx + ox,
             my + oy,
-            mx + ox + Math.cos(da) * 20,
-            my + oy + Math.sin(da) * 20,
+            mx + ox + Math.cos(da) * 24,
+            my + oy + Math.sin(da) * 24,
             b.seed + 17 + off + dd,
             0.3,
           );
         }
       }
     }
+
     if (b.flash > 0) {
       const f = b.flash / 0.08;
-      c.fillStyle = "rgba(252,220,140," + (0.85 * f).toFixed(2) + ")";
+      c.fillStyle = "rgba(255,224,130," + (0.9 * f).toFixed(2) + ")";
       c.beginPath();
-      c.arc(mx + Math.cos(ta) * 26, my + Math.sin(ta) * 26, 6 * f, 0, R.TAU);
+      c.arc(
+        mx + Math.cos(ta) * (l3 ? 36 : 26),
+        my + Math.sin(ta) * (l3 ? 36 : 26),
+        7 * f,
+        0,
+        R.TAU,
+      );
       c.fill();
     }
   }
