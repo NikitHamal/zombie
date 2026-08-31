@@ -404,6 +404,7 @@
     attack(g, ai, dt) {
       ai.nextWave -= dt;
       if (ai.nextWave > 0) return;
+      const f = g.factions[ai.fac];
 
       // gather everything that is armed and not busy defending
       const army = [];
@@ -433,14 +434,48 @@
       ai.nextWave = ai.p.wave * (0.85 + Math.random() * 0.4);
       ai.target = target;
 
-      // send the army: attack-move on the objective, in one formation
+      // send the army: attack-move on the objective, in one formation.
+      // A walled yard is attacked at its door — the mouth of the gate is
+      // where the defenders' guns are, and it is the only way in worth
+      // the walk. Wall-less yards are simply overrun.
+      let ax = target.x,
+        ay = target.y;
+      if (target.gateX !== undefined) {
+        ax = target.gateX - (target.ux || 0) * 140;
+        ay = target.gateY - (target.uy || 0) * 140;
+      } else if (target.owner >= 0) {
+        // somebody's home: their HQ is the objective — the ground does
+        // not turn until it falls, so that is where the army goes
+        const hq = g.buildings.find((b) => !b.dead && b.fac === target.owner && b.key === "hq");
+        if (hq) {
+          ax = hq.x;
+          ay = hq.y;
+        }
+      }
       const list = army.slice(0, 60);
-      R.Entity.assignFormation(g, list, { type: "amove", x: target.x, y: target.y });
+      R.Entity.assignFormation(g, list, { type: "amove", x: ax, y: ay });
+      // and the trucks go with them. The tanks are there to open the
+      // gate; the truck is the thing that actually takes the ground.
+      this.sendTrucks(g, ai, target);
       // and tell the world, if it concerns the player
       if (target.owner === 0 || (target.kind === "b" && target.fac === 0)) {
         g.say(ai.fac, ai.name + " is moving on " + (target.name || "your ground"), "warn");
         R.FX.ping(g, target.x, target.y, "bad");
         if (R.Cam) R.Cam.shake(3);
+      }
+    },
+
+    // The trucks are the point of a raid, not the baggage. A truck on its
+    // own will only ever park outside somebody's wall, so they follow the
+    // army to the objective and plant the flag once the yard is open.
+    sendTrucks(g, ai, target) {
+      let sent = 0;
+      for (const u of g.units) {
+        if (u.dead || u.fac !== ai.fac || u.inside) continue;
+        if (!u.def.capture) continue;
+        if (u.order && u.order.type === "capture" && u.order.site === target) continue;
+        R.Entity.setOrder(g, u, { type: "capture", site: target, x: target.x, y: target.y });
+        if (++sent >= 3) break;
       }
     },
 
@@ -465,10 +500,16 @@
       for (const s of g.t.sites) {
         if (s.owner === ai.fac) continue;
         if (s.owner >= 0 && !R.hostileTo(ai.fac, s.owner)) continue;
+        // the first raid of the war is always at the player's gate: the
+        // eight flaks exist to be tested, and the player exists to watch
+        // them work. Everything after that is ordinary strategy.
+        if (ai.wave === 0 && s.home && s.owner === 0) return s;
         const d = R.dist(ax, ay, s.x, s.y);
         let score = -d * 0.0016;
-        // the player is the prize: everyone wants a piece
-        if (s.owner === 0) score += 0.55 * ai.p.aggro;
+        // the player is the protagonist of this war: the pull toward
+        // their gate grows with every wave, until late in the game
+        // everyone is at their walls
+        if (s.owner === 0) score += 1.2 + ai.wave * 0.4 + ai.p.aggro * 0.6;
         if (s.home) score += 0.3;
         // and a soft target is a tempting one
         let guard = 0;

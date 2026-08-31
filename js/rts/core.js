@@ -187,6 +187,15 @@
       B = R.diplo[b];
     return !(A.ally[b] || B.ally[a]);
   };
+  // the same side: same flag, or a sworn ally. Gates answer to this — one
+  // nation drives through its own door, and its friends go with it.
+  R.sameTeam = function (a, b) {
+    if (a === b) return true;
+    if (a === 6 || b === 6) return false; // nobody shares a door with the Rot
+    const A = R.diplo[a],
+      B = R.diplo[b];
+    return !!(A.ally[b] || B.ally[a]);
+  };
   R.diplo = FACTIONS.map((f, i) => ({
     id: i,
     ally: FACTIONS.map((g, j) => i === j),

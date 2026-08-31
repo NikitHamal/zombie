@@ -34,16 +34,28 @@
 
     capture(g, site, fac) {
       const old = site.owner;
-      // an enemy settlement only turns once its buildings are gone
+      // An enemy settlement only turns once you have broken its command.
+      // Walls and guns are not what holds ground — the command centre is.
+      // Everything else they left standing burns when the flag turns.
       if (old >= 0 && old !== fac && R.hostileTo(fac, old)) {
-        let standing = 0;
+        const ring = Math.pow((site.r + 6) * TILE, 2);
+        let hq = null;
         for (const b of g.buildings) {
-          if (b.dead || b.fac !== old) continue;
-          if (R.dist2(b.x, b.y, site.x, site.y) < Math.pow((site.r + 6) * TILE, 2)) standing++;
+          if (b.dead || b.fac !== old || b.key !== "hq") continue;
+          if (R.dist2(b.x, b.y, site.x, site.y) < ring) {
+            hq = b;
+            break;
+          }
         }
-        if (standing > 0) {
-          if (fac === 0) g.say(0, site.name + " will not turn while their buildings stand", "warn");
+        if (hq) {
+          if (fac === 0)
+            g.say(0, site.name + " will not turn while their command centre stands", "warn");
           return false;
+        }
+        // the garrison's buildings go up with the place
+        for (const b of g.buildings.slice()) {
+          if (b.dead || b.fac !== old) continue;
+          if (R.dist2(b.x, b.y, site.x, site.y) < ring) g.removeBuilding(b, true);
         }
       }
       site.owner = fac;

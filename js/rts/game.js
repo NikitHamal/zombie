@@ -21,6 +21,7 @@
       this.seed = seed >>> 0;
       this.t = new R.Terrain(seed);
       this.nav = new R.Nav(this.t);
+      this.nav.game = this; // so a full rebuild can ask who owns each door
       this.units = [];
       this.buildings = [];
       this.shots = [];
@@ -120,89 +121,194 @@
       }
     }
 
+    /* ---------- the home base ----------
+       A Desert Order base is a walled yard with ONE way in, and guns
+       looking at that way in. Everything else follows from it: the
+       industry sits at the back where a raid has to walk past everything
+       to reach it, the eight starter flaks stand in an arc across the
+       mouth, and an attack has to come up the drive.
+
+       The door faces the road — the bearing of the nearest neighbouring
+       settlement, which is where the highway runs and where their
+       conquest trucks will arrive from. */
+
+    // which way is out: toward the nearest other settlement, snapped to a
+    // face of the yard. Returns a unit vector in tile space.
+    exitBearing(site) {
+      let best = null,
+        bd = 1e18;
+      for (const s of this.t.sites) {
+        if (s === site) continue;
+        const d = (s.tx - site.tx) ** 2 + (s.ty - site.ty) ** 2;
+        if (d < bd) {
+          bd = d;
+          best = s;
+        }
+      }
+      let ux = best ? best.tx - site.tx : 1,
+        uy = best ? best.ty - site.ty : 0;
+      if (Math.abs(ux) >= Math.abs(uy)) return { ux: ux < 0 ? -1 : 1, uy: 0 };
+      return { ux: 0, uy: uy < 0 ? -1 : 1 };
+    }
+
     buildStartBase() {
-      // the player begins exactly as a Desert Order base begins: a walled
-      // yard, a command centre, industry, and guns on the wall
       const site = this.t.homeSite;
       const f = 0;
       const cx = site.tx,
         cy = site.ty;
+      const { ux, uy } = this.exitBearing(site);
+      const vx = -uy,
+        vy = ux; // along the wall, not through it
 
-      const put = (key, dx, dy, lvl) => {
-        const b = this.addBuilding(key, f, cx + dx, cy + dy, lvl || 1, true);
-        return b;
-      };
+      const R0 = 10; // the wall ring
+      const GATE_W = 3; // tiles of doorway — a column can march through
+      const FLAKS = 8; // the starter umbrella
+      const FLAK_R = 7; // how far behind the door it stands
+      const FLAK_ARC = 2.8; // radians the arc spans (±80°)
+      const APPROACH = 18; // tiles of road laid out from the door
 
-      put("hq", -2, -2, 2);
-      put("concrete", 3, -3, 2);
-      put("concrete", -3, 4, 1);
-      put("steelmill", 3, 0, 2);
-      put("aluworks", -5, -1, 1);
-      put("refinery", -5, 3, 1);
-      put("works", -5, -5, 1);
-      put("radar", 0, 4, 1);
-      put("repair", -1, 4, 1);
+      // remember which way the door faces; the camera and the AI both
+      // want to know where the front of the house is
+      site.gateX = (cx + ux * R0 + 0.5) * TILE;
+      site.gateY = (cy + uy * R0 + 0.5) * TILE;
+      site.ux = ux;
+      site.uy = uy;
 
-      // the wall ring and the gates, with a gun on each corner
-      const R0 = 8;
-      const ring = [];
-      for (let a = -R0; a <= R0; a++) {
-        ring.push([a, -R0], [a, R0], [-R0, a], [R0, a]);
+      const kk = (dx, dy) => dx + ":" + dy;
+      const reserved = new Set();
+
+      /* ---- the doorway: a gap in the ring, three tiles wide ---- */
+      const gateTiles = [];
+      for (let k = -(GATE_W >> 1); k <= GATE_W >> 1; k++) {
+        const dx = Math.round(ux * R0 + vx * k),
+          dy = Math.round(uy * R0 + vy * k);
+        gateTiles.push([dx, dy]);
+        reserved.add(kk(dx, dy));
       }
-      const gates = [
-        [0, -R0],
-        [0, R0],
-        [-R0, 0],
-        [R0, 0],
+
+      /* ---- the eight baby flaks, in an arc across the mouth ---- */
+      const flakTiles = [];
+      for (let i = 0; i < FLAKS; i++) {
+        const th = -FLAK_ARC / 2 + (FLAK_ARC * i) / (FLAKS - 1);
+        const c = Math.cos(th),
+          s = Math.sin(th);
+        const dx = Math.round((ux * c - uy * s) * FLAK_R),
+          dy = Math.round((ux * s + uy * c) * FLAK_R);
+        if (reserved.has(kk(dx, dy))) continue; // never stack two on a tile
+        flakTiles.push([dx, dy]);
+        reserved.add(kk(dx, dy));
+      }
+
+      /* ---- industry, in the back half where a raid cannot reach it ----
+         Laid out in door-relative coordinates: `a` runs outward through
+         the gate, `b` runs along the wall. Everything here sits behind
+         a = 0 so the flak arc keeps the whole mouth to itself. */
+      const PLAN = [
+        ["hq", -6.5, -4.5, 2],
+        ["works", -6.5, 0, 1],
+        ["refinery", -6.5, 4.5, 1],
+        ["concrete", -2.5, -6.5, 2],
+        ["steelmill", -2.5, -3, 1],
+        ["aluworks", -2.5, 0.5, 1],
+        ["repair", -2.5, 4, 1],
+        ["radar", -2.5, 7.5, 1],
       ];
-      const isGate = (dx, dy) => gates.some((g) => g[0] === dx && g[1] === dy);
-      const seen = new Set();
-      for (const [dx, dy] of ring) {
-        const k = dx + ":" + dy;
-        if (seen.has(k)) continue;
-        seen.add(k);
-        if (isGate(dx, dy)) {
-          put("gate", dx, dy, 1);
-          continue;
+      const put = (key, a, b, lvl) => {
+        const size = R.BDEF[key].size;
+        const wx = cx + ux * a + vx * b,
+          wy = cy + uy * a + vy * b;
+        const tx0 = Math.round(wx - size / 2),
+          ty0 = Math.round(wy - size / 2);
+        // the plan is a sketch, not a blueprint: if the ground will not
+        // have it, walk outward until it will
+        for (let r = 0; r <= 5; r++) {
+          for (let s = 0; s < (r ? r * 8 : 1); s++) {
+            const an = (s / (r * 8)) * R.TAU;
+            const tx = Math.round(tx0 + (r ? Math.cos(an) * r : 0)),
+              ty = Math.round(ty0 + (r ? Math.sin(an) * r : 0));
+            if (!this.yardClear(tx, ty, size, cx, cy, R0, reserved)) continue;
+            return this.addBuilding(key, f, tx, ty, lvl || 1, true);
+          }
         }
-        put("wall", dx, dy, 1);
-      }
-      // corner guns, and a flak pair to make the point about aircraft
-      put("mgnest", -R0 + 1, -R0 + 1, 1);
-      put("atgun", R0 - 2, -R0 + 1, 1);
-      put("mgnest", R0 - 2, R0 - 2, 1);
-      put("atgun", -R0 + 1, R0 - 2, 1);
-      put("flaktower", -R0 + 1, 1, 1);
-      put("flaktower", R0 - 2, 1, 1);
-
-      // a starting garrison, so the base is not empty
-      const open = (dx, dy) => {
-        const x = (cx + dx + 0.5) * TILE,
-          y = (cy + dy + 0.5) * TILE;
-        return this.nav.openAt(x, y, 0) ? { x, y } : null;
+        return null;
       };
+      for (const [key, a, b, lvl] of PLAN) put(key, a, b, lvl);
+
+      /* ---- the flak line ---- */
+      for (const [dx, dy] of flakTiles) this.addBuilding("flaknest", f, cx + dx, cy + dy, 1, true);
+
+      /* ---- the wall, with the door left open ---- */
+      const seen = new Set();
+      for (let a = -R0; a <= R0; a++) {
+        const ring = [
+          [a, -R0],
+          [a, R0],
+          [-R0, a],
+          [R0, a],
+        ];
+        for (const [dx, dy] of ring) {
+          const k = kk(dx, dy);
+          if (seen.has(k)) continue;
+          seen.add(k);
+          // the doorway itself — and only the doorway. The walls butt
+          // straight against the gates: a flanking gap would hand the
+          // enemy a free way in past the door.
+          let doorway = false;
+          for (const [gdx, gdy] of gateTiles)
+            if (gdx === dx && gdy === dy) doorway = true;
+          if (doorway) continue;
+          this.addBuilding("wall", f, cx + dx, cy + dy, 1, true);
+        }
+      }
+      // and the gates themselves, which open for us and nobody else
+      for (const [dx, dy] of gateTiles) this.addBuilding("gate", f, cx + dx, cy + dy, 1, true);
+
+      /* ---- the drive: a road out to the world, so the approach reads ---- */
+      const g0 = gateTiles[gateTiles.length >> 1];
+      this.t.paintRoad(
+        cx + g0[0] + ux * 2,
+        cy + g0[1] + uy * 2,
+        cx + g0[0] + ux * (2 + APPROACH),
+        cy + g0[1] + uy * (2 + APPROACH),
+        1,
+      );
+
+      /* ---- a garrison, standing in the mouth of the yard ---- */
       const spots = [];
-      for (let dy = -4; dy <= 4; dy++)
-        for (let dx = -4; dx <= 4; dx++) {
-          const p = open(dx, dy);
-          if (p) spots.push(p);
+      for (let a = 2; a <= 5; a++)
+        for (let b = -3; b <= 3; b++) {
+          const x = (cx + ux * a + vx * b + 0.5) * TILE,
+            y = (cy + uy * a + vy * b + 0.5) * TILE;
+          if (this.nav.openAt(x, y, 0, f)) spots.push({ x, y });
         }
       const give = (key, n) => {
         for (let i = 0; i < n; i++) {
-          const p = spots[(i * 5 + 2) % spots.length];
-          if (p)
-            this.addUnit(
-              key,
-              0,
-              p.x + (Math.random() - 0.5) * 20,
-              p.y + (Math.random() - 0.5) * 20,
-            );
+          if (!spots.length) break;
+          const p = spots[(i * 3 + 1) % spots.length];
+          const u = this.addUnit(key, f, p.x, p.y);
+          if (u) R.Entity.setOrder(this, u, { type: "hold", x: p.x, y: p.y });
         }
       };
       give("ltank", 4);
       give("scout", 3);
       give("truck", 1);
       give("supply", 1);
+
+      this.say(0, "Eight flak nests cover the gate at " + site.name + ".", "good");
+    }
+
+    // is this footprint inside the yard, on clear ground, and not where
+    // the flaks or the door are meant to go?
+    yardClear(tx, ty, size, cx, cy, R0, reserved) {
+      for (let dy = 0; dy < size; dy++)
+        for (let dx = 0; dx < size; dx++) {
+          const x = tx + dx,
+            y = ty + dy;
+          if (Math.abs(x - cx) >= R0 || Math.abs(y - cy) >= R0) return false;
+          if (reserved && reserved.has(x - cx + ":" + (y - cy))) return false;
+          if (!this.t.canBuild(tx, ty, size, {})) return false;
+        }
+      return true;
     }
 
     /* ==================================================================
@@ -275,6 +381,8 @@
       }
       // a gun that cannot reach aircraft means the unit needs flak cover
       u.hasAA = !!(w && w.aa) || !!(u.w2 && u.w2.aa);
+      // nothing is ever born inside a wall, whatever the caller handed us
+      this.nav.legalize(this, u);
       this.units.push(u);
       return u;
     }
@@ -345,7 +453,7 @@
       }
       this.buildings.push(b);
       this.t.markBuilding(tx, ty, size, b.id);
-      this.nav.markFootprint(tx, ty, size, true);
+      this.nav.markFootprint(tx, ty, size, true, fac, !!def.gate);
       const f = this.factions[fac];
       f.counts[key] = (f.counts[key] || 0) + 1;
       if (def.cap) f.cap += def.cap;
@@ -357,7 +465,7 @@
       if (b.dead) return;
       b.dead = true;
       this.t.clearBuilding(b.tx, b.ty, b.size);
-      this.nav.markFootprint(b.tx, b.ty, b.size, false);
+      this.nav.markFootprint(b.tx, b.ty, b.size, false, b.fac, !!b.def.gate);
       const f = this.factions[b.fac];
       f.counts[b.key] = Math.max(0, (f.counts[b.key] || 1) - 1);
       if (b.def.cap) f.cap = Math.max(0, f.cap - b.def.cap);
@@ -482,7 +590,7 @@
     }
 
     // nearest enemy entity of `e` within `range`, that `e` can actually hurt
-    nearestTarget(e, range, needAir) {
+    nearestTarget(e, range, needAir, noBld) {
       const g = this.grid;
       let best = null,
         bd = range * range;
@@ -491,6 +599,9 @@
         if (o.dead) return;
         if (o.fac === e.fac) return;
         if (!R.hostileTo(e.fac, o.fac)) return;
+        // an army on the march does not stop to duel every wall it can
+        // see — it shoots what blocks it, and walks on past the rest
+        if (noBld && o.kind === "b") return;
         const d2 = R.dist2(e.x, e.y, o.x, o.y);
         if (d2 >= bd) return;
         if (!this.canHit(e, o, needAir)) return;
@@ -660,7 +771,7 @@
     update(dt) {
       if (this.paused || this.over) return;
       this.time += dt;
-      this.nav.sync();
+      this.nav.sync(this);
       this.rebuildGrid();
 
       R.Economy.update(this, dt);

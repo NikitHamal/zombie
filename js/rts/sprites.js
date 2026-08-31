@@ -1385,6 +1385,70 @@
     }
   }
 
+  /* A baby flak: a sandbag ring, a slab, and a short pair of barrels
+     tipped up at the sky. Deliberately small — eight of them stand across
+     the mouth of the yard, and they must not hide the base behind them. */
+  function flaknest(c, b, _t) {
+    const x = b.x,
+      y = b.y,
+      a = b.turretA;
+    const s = TILE;
+    // the pit: a low ring of earth, thrown up in a hurry
+    shape(
+      c,
+      [
+        { x: x - s * 0.4, y: y - s * 0.3 },
+        { x: x + s * 0.38, y: y - s * 0.32 },
+        { x: x + s * 0.4, y: y + s * 0.3 },
+        { x: x - s * 0.36, y: y + s * 0.32 },
+      ],
+      b.seed,
+      "rgba(198,182,150,0.85)",
+      "rgba(52,45,37,0.85)",
+      1.4,
+      0.8,
+    );
+    // sandbags, three courses of them, counted in one at a time
+    ink(c, "rgba(52,45,37,0.45)", 1);
+    for (let i = 0; i < 3; i++) ZS.wcirc(c, x, y + 2, s * (0.18 + i * 0.07), b.seed + 21 + i, 0.3);
+    // the mount the turret sits on
+    shape(
+      c,
+      boxPts(x, y, s * 0.22, s * 0.19, 0, 0, 0),
+      b.seed + 5,
+      facetTint(b.fac, 0.34),
+      "rgba(52,45,37,0.95)",
+      1.5,
+      0.5,
+    );
+    const mx = x,
+      my = y - 3;
+    ink(c, "rgba(52,45,37,0.95)", 1.2);
+    ZS.wcirc(c, mx, my, 5, b.seed + 13, 0.4);
+    // twin barrels, short, and pointed up at whatever is coming
+    for (const off of [-2.2, 2.2]) {
+      const ox = -Math.sin(a) * off,
+        oy = Math.cos(a) * off;
+      ink(c, "rgba(52,45,37,0.95)", 2.6);
+      ZS.wline(
+        c,
+        mx + ox - Math.cos(a) * 4,
+        my + oy - Math.sin(a) * 4,
+        mx + ox + Math.cos(a) * 16,
+        my + oy + Math.sin(a) * 16,
+        b.seed + 17 + off,
+        0.3,
+      );
+    }
+    if (b.flash > 0) {
+      const f = b.flash / 0.08;
+      c.fillStyle = "rgba(252,220,140," + (0.85 * f).toFixed(2) + ")";
+      c.beginPath();
+      c.arc(mx + Math.cos(a) * 18, my + Math.sin(a) * 18, 4.5 * f, 0, R.TAU);
+      c.fill();
+    }
+  }
+
   /* ---- defences: a pit, a shield, and a gun on a bearing ---- */
 
   function defence(c, b, _t) {
@@ -1598,6 +1662,7 @@
     radar,
     wall,
     gate: wall,
+    flaknest,
     mgnest: defence,
     atgun: defence,
     flaktower: defence,

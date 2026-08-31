@@ -131,20 +131,28 @@
     },
 
     spawnPoint(g, b, def) {
-      // out of the door, on open ground, nearest the rally point
+      // out of the door, on open ground, nearest the rally point. Our own
+      // gates count as open ground, so a factory behind a wall can still
+      // put its tanks on the drive.
       const layer = def.cls === "sea" ? 2 : 0;
       const size = b.size;
-      for (let ring = 1; ring < 8; ring++) {
+      const rnd = (b.seed + b.queue.length * 37) % 1000;
+      for (let ring = 1; ring < 12; ring++) {
         const r = size / 2 + ring * 0.9;
         const n = 8 + ring * 4;
         for (let k = 0; k < n; k++) {
-          const an = (k / n) * R.TAU + ring;
+          // start somewhere different each time so a queue of tanks does
+          // not all fight over the same doorway
+          const an = ((k + rnd) / n) * R.TAU + ring;
           const x = b.x + Math.cos(an) * r * TILE;
           const y = b.y + Math.sin(an) * r * TILE;
-          if (g.nav.openAt(x, y, layer)) return { x, y };
+          if (g.nav.openAt(x, y, layer, b.fac)) return { x, y };
         }
       }
-      return { x: b.x, y: b.y + size * TILE };
+      // nothing around this building at all: hand back something legal
+      // rather than something inside a wall
+      const near = g.nav.nearestOpen((b.x / TILE) | 0, (b.y / TILE) | 0, 12, layer, b.fac);
+      return near ? { x: (near.tx + 0.5) * TILE, y: (near.ty + 0.5) * TILE } : { x: b.x, y: b.y };
     },
 
     /* ==================================================================
@@ -225,6 +233,7 @@
                 (b.rally.y / TILE) | 0,
                 6,
                 u.layer,
+                b.fac,
               );
               const rx = pt ? (pt.tx + 0.5) * TILE : b.rally.x;
               const ry = pt ? (pt.ty + 0.5) * TILE : b.rally.y;
@@ -264,7 +273,14 @@
           b.turretW = want;
           b.turretA = R.turnToward(b.turretA, want, dt * 3.4);
           const aligned = Math.abs(R.angDiff(b.turretA, want)) < 0.12;
-          if (aligned && b.cd <= 0 && g.nav.fireLine(b.x, b.y, b.tgt.x, b.tgt.y)) {
+          // the muzzle sits at the near face of the emplacement, not its
+          // middle: a turret that sights from its own centre is blind —
+          // its own footprint is in the way of every shot it takes
+          const td = R.dist(b.x, b.y, b.tgt.x, b.tgt.y) || 1;
+          const off = (b.size * TILE) * 0.75 + 4;
+          const mx = b.x + ((b.tgt.x - b.x) / td) * off,
+            my = b.y + ((b.tgt.y - b.y) / td) * off;
+          if (aligned && b.cd <= 0 && g.nav.fireLine(mx, my, b.tgt.x, b.tgt.y)) {
             b.cd = 1 / w.rof;
             b.flash = 0.08;
             b.recoil = 1;

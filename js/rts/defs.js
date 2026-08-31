@@ -168,6 +168,17 @@
       as: true,
       vs: { air: 1.7, inf: 1.05, soft: 0.85, arm: 0.3, bld: 0.35 },
     },
+    babyflak: {
+      dmg: 9,
+      rof: 4.4,
+      range: 320,
+      pen: 9,
+      speed: 1250,
+      kind: "bullet",
+      aa: true,
+      as: true,
+      vs: { air: 1.8, inf: 1.15, soft: 0.7, arm: 0.24, bld: 0.3 },
+    },
     flak_hv: {
       dmg: 26,
       rof: 3.4,
@@ -830,6 +841,23 @@
       gate: true,
       desc: "Your own units drive through. Everybody else has to break it.",
     },
+    flaknest: {
+      name: "Baby Flak",
+      short: "BF",
+      cat: "def",
+      size: 1,
+      hp: 640,
+      arm: 13,
+      cost: { concrete: 110, steel: 155 },
+      time: 12,
+      max: 40,
+      w: "babyflak",
+      turret: 1,
+      hard: true,
+      startFlak: true,
+      desc:
+        "A light flak nest. Eight of them come with the base. Nearly useless against a heavy tank, and the only reason a bomber is not.",
+    },
     mgnest: {
       name: "Machine Gun Nest",
       short: "MG",
@@ -922,7 +950,7 @@
     {
       key: "def",
       name: "Defence",
-      keys: ["wall", "gate", "mgnest", "atgun", "flaktower", "howitzer", "sam"],
+      keys: ["flaknest", "wall", "gate", "mgnest", "atgun", "flaktower", "howitzer", "sam"],
     },
   ];
 

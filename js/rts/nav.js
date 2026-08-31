@@ -16,7 +16,24 @@
 
    The search itself is weighted A* (the heuristic is inflated a little,
    which is the usual RTS trade: it explores far less and the path is
-   marginally longer, never wrong). Work arrays are allocated once. */
+   marginally longer, never wrong). Work arrays are allocated once.
+
+   Two rules own everything else in here:
+
+   1. A GATE IS A DOOR, NOT A WALL. Every tile remembers whose building
+      stands on it, and a gate belongs to the nation that raised it: their
+      units drive straight through, everybody else has to break it. A base
+      with no door is a box, and a garrison that cannot march out is not a
+      garrison.
+   2. IF YOU CANNOT GO ROUND IT, GO THROUGH IT. Hostile A* is allowed to
+      route through enemy walls at a cost — a gate costs little, a wall
+      costs a lot, so an attack walks up the drive rather than chewing a
+      random hole. It only ever applies when there is no open route, so a
+      unit that can walk round a wall still walks round it.
+
+   And one invariant, enforced in `legalize()`: no unit ever occupies a
+   tile a unit could not stand on. Not at spawn, not on unload, not after
+   the shove that frees a stuck tank. Tanks do not live inside walls. */
 (() => {
   "use strict";
   const ZS = (window.ZS = window.ZS || {});
@@ -29,6 +46,11 @@
 
   const CACHE_MAX = 220;
   const WEIGHT = 1.22; // heuristic inflation
+  // what it costs to shoot your way through, in tiles of walking.
+  // The gap between them is the design: the door must be the way in
+  // from ANY direction, or the flak arc guards a mouth nobody uses.
+  const GATE_COST = 14; // knock the gate down and pour through
+  const WALL_COST = 96; // chewing a wall is a siege — walk round instead
   const DIRS = [
     [1, 0, 1],
     [-1, 0, 1],
@@ -46,16 +68,21 @@
       this.blockG = new Uint8Array(N); // 1 = ground units cannot enter
       this.blockS = new Uint8Array(N); // 1 = ships cannot enter
       this.blockA = new Uint8Array(N); // 1 = ground fire cannot pass (rock, buildings)
+      this.gateOf = new Int8Array(N); // whose gate stands on this tile, -1 = none
+      this.bFac = new Int8Array(N); // who owns the building on this tile, -1 = none
       this.version = 0;
       this.tver = -1;
+      this.game = null; // the game, for the full rebuild (set by Game)
 
       this.g = new Float32Array(N);
       this.from = new Int32Array(N);
       this.stamp = new Int32Array(N);
       this.gen = 0;
-      // the heap is two flat arrays: no objects, no allocation per search
-      this.hf = new Float32Array(8192);
-      this.hi = new Int32Array(8192);
+      // the heap is two flat arrays: no objects, no allocation per search.
+      // It grows (doubling, capped) when a frontier outgrows it — a full
+      // drop would make a route that exists look like no route at all.
+      this.hf = new Float32Array(16384);
+      this.hi = new Int32Array(16384);
       this.hn = 0;
 
       this.cache = new Map();
@@ -74,6 +101,8 @@
       const bG = this.blockG,
         bS = this.blockS,
         bA = this.blockA;
+      const gO = this.gateOf,
+        bF = this.bFac;
       for (let i = 0; i < N; i++) {
         const v = typ[i];
         const rock = v === T.ROCK;
@@ -82,6 +111,27 @@
         bG[i] = rock || water || built ? 1 : 0;
         bS[i] = water && !built ? 0 : 1;
         bA[i] = rock || built ? 1 : 0;
+        gO[i] = -1;
+        bF[i] = -1;
+      }
+      // occupancy alone cannot tell a gate from a wall, so the buildings
+      // themselves say whose door is where. Shots fly through an open
+      // gate — that is what makes the entrance a killing ground rather
+      // than a blind spot.
+      if (this.game) {
+        for (const b of this.game.buildings) {
+          if (b.dead) continue;
+          for (let dy = 0; dy < b.size; dy++)
+            for (let dx = 0; dx < b.size; dx++) {
+              const i = t.idx(b.tx + dx, b.ty + dy);
+              if (i < 0) continue;
+              bF[i] = b.fac;
+              if (b.def.gate) {
+                gO[i] = b.fac;
+                bA[i] = 0;
+              }
+            }
+        }
       }
       this.tver = t.version;
       this.version++;
@@ -89,16 +139,19 @@
     }
 
     // a building went up or came down: patch just its footprint
-    markFootprint(tx, ty, size, solid) {
+    markFootprint(tx, ty, size, solid, fac, isGate) {
       const t = this.t;
       const v = solid ? 1 : 0;
+      const owner = solid && fac !== undefined ? fac : -1;
       for (let dy = 0; dy < size; dy++)
         for (let dx = 0; dx < size; dx++) {
           const i = t.idx(tx + dx, ty + dy);
           if (i < 0) continue;
           this.blockG[i] = v;
-          this.blockA[i] = v;
+          this.blockA[i] = v && !isGate ? 1 : 0;
           this.blockS[i] = 1;
+          this.bFac[i] = owner;
+          this.gateOf[i] = solid && isGate ? owner : -1;
         }
       this.version++;
       this.cache.clear();
@@ -106,21 +159,64 @@
 
     // called once per frame: if the terrain changed underneath us (a new
     // wall, a fallen tower) the grids and the cache are rebuilt
-    sync() {
+    sync(game) {
+      if (game) this.game = game;
       if (this.tver !== this.t.version) this.rebuild();
       this.budget = 24;
       this.searches = 0;
     }
 
-    open(tx, ty, layer) {
+    /* ---------- who may stand where ----------
+       `fac` is the faction doing the moving. Omit it and you get the
+       cautious answer — every door shut — which is what a query that
+       does not know who is asking should hear. */
+
+    passTile(i, fac) {
+      if (this.blockG[i] === 0) return true;
+      const go = this.gateOf[i];
+      if (go < 0) return false;
+      return fac >= 0 && R.sameTeam(fac, go);
+    }
+
+    // a tile we cannot stand on but could shoot our way through.
+    // Returns the extra cost in tiles of walking, or -1 for "not at all".
+    breachCost(i, fac) {
+      if (this.passTile(i, fac)) return -1;
+      const bf = this.bFac[i];
+      if (bf < 0) return -1; // rock and water do not negotiate
+      if (R.sameTeam(fac, bf)) return -1;
+      return this.gateOf[i] >= 0 ? GATE_COST : WALL_COST;
+    }
+
+    open(tx, ty, layer, fac) {
       if (tx < 0 || ty < 0 || tx >= MAPW || ty >= MAPH) return false;
       const i = ty * MAPW + tx;
-      if (!layer) return this.blockG[i] === 0;
+      if (!layer) return this.passTile(i, fac === undefined ? -1 : fac);
       if (layer === 2) return this.blockS[i] === 0;
       return true;
     }
-    openAt(x, y, layer) {
-      return this.open((x / TILE) | 0, (y / TILE) | 0, layer);
+    openAt(x, y, layer, fac) {
+      return this.open((x / TILE) | 0, (y / TILE) | 0, layer, fac);
+    }
+
+    /* ---------- the hard rule: nothing stands inside a building ----------
+       Every hand-placed move (spawning out of a factory, climbing out of
+       a transport, the nudge that frees something wedged against a wall)
+       goes through here. If the tile is not one this unit could have
+       walked onto, it is put back on the nearest one it could. */
+    legalize(g, u) {
+      if (u.layer === 1) return false;
+      const i = g.t.at(u.x, u.y);
+      if (i >= 0 && this.passTile(i, u.fac)) return false;
+      const near = this.nearestOpen((u.x / TILE) | 0, (u.y / TILE) | 0, 10, u.layer, u.fac);
+      if (!near) return false;
+      u.x = (near.tx + 0.5) * TILE;
+      u.y = (near.ty + 0.5) * TILE;
+      u.vx = 0;
+      u.vy = 0;
+      u.path = null;
+      u.stuck = 0;
+      return true;
     }
 
     /* ---------- line of sight ---------- */
@@ -128,24 +224,25 @@
     // tile DDA: does a straight run of tiles stay clear? Aircraft always
     // see; ships need water the whole way; ground fire stops on rock and
     // on buildings but not on brush.
-    los(x1, y1, x2, y2, layer) {
+    los(x1, y1, x2, y2, layer, fac) {
       if (layer === 1) return true;
-      const grid = layer === 2 ? this.blockS : this.blockG;
-      const pass = layer === 2 ? 0 : 0;
+      const sea = layer === 2;
+      const who = fac === undefined ? -1 : fac;
+      const ok = (i) => (sea ? this.blockS[i] === 0 : this.passTile(i, who));
       // walk the segment in tile-sized steps
       const dx = x2 - x1,
         dy = y2 - y1;
       const d = Math.hypot(dx, dy);
       if (d < TILE * 0.5) {
         const i = this.t.idx((x2 / TILE) | 0, (y2 / TILE) | 0);
-        return i >= 0 && grid[i] === pass;
+        return i >= 0 && ok(i);
       }
       const steps = Math.ceil(d / (TILE * 0.45));
       for (let s = 1; s <= steps; s++) {
         const px = x1 + (dx * s) / steps,
           py = y1 + (dy * s) / steps;
         const i = this.t.idx((px / TILE) | 0, (py / TILE) | 0);
-        if (i < 0 || grid[i] !== pass) return false;
+        if (i < 0 || !ok(i)) return false;
       }
       return true;
     }
@@ -169,9 +266,24 @@
     heapClear() {
       this.hn = 0;
     }
+
+    // double the frontier arrays, up to a hard ceiling (~1 MB). The space
+    // is kept for every later search — this is capacity, not churn.
+    heapGrow(need) {
+      const MAX = 131072;
+      let cap = this.hf.length;
+      while (cap < need && cap < MAX) cap *= 2;
+      if (cap <= this.hf.length) return; // at the ceiling: nothing to be done
+      const hf = new Float32Array(cap),
+        hi = new Int32Array(cap);
+      hf.set(this.hf);
+      hi.set(this.hi);
+      this.hf = hf;
+      this.hi = hi;
+    }
     heapPush(f, i) {
       let n = this.hn;
-      if (n >= this.hf.length) return; // the cap keeps the worst case bounded
+      if (n >= this.hf.length) this.heapGrow(n + 1); // rare, and it sticks
       const hf = this.hf,
         hi = this.hi;
       hf[n] = f;
@@ -222,10 +334,13 @@
     }
 
     /* Returns an array of world waypoints (or null). `layer`: 0 ground,
-       1 air, 2 sea. `cap` overrides the expansion limit. */
-    astar(sx, sy, gx, gy, layer, cap) {
+       1 air, 2 sea. `fac` is who is walking — it decides which doors are
+       open. `breach` allows routing through enemy walls when there is no
+       other way in. `cap` overrides the expansion limit. */
+    astar(sx, sy, gx, gy, layer, fac, breach, cap) {
       layer = layer || 0;
       if (layer === 1) return [{ x: gx, y: gy }];
+      const who = fac === undefined ? -1 : fac;
       let stx = R.clamp((sx / TILE) | 0, 0, MAPW - 1),
         sty = R.clamp((sy / TILE) | 0, 0, MAPH - 1);
       let gtx = R.clamp((gx / TILE) | 0, 0, MAPW - 1),
@@ -234,18 +349,23 @@
       const grid = layer === 2 ? this.blockS : this.blockG;
       // the goal itself may be occupied (you clicked a tank): take the
       // nearest open tile to it instead
-      if (grid[gty * MAPW + gtx] !== 0) {
-        const alt = this.nearestOpen(gtx, gty, 6, layer);
-        if (!alt) return null;
-        gtx = alt.tx;
-        gty = alt.ty;
+      if (!this.open(gtx, gty, layer, who)) {
+        // with breach allowed we are happy to aim at the wall itself —
+        // that is the point of a siege
+        if (!(breach && layer !== 2 && this.bFac[gty * MAPW + gtx] >= 0)) {
+          const alt = this.nearestOpen(gtx, gty, 6, layer, who);
+          if (!alt) return null;
+          gtx = alt.tx;
+          gty = alt.ty;
+        }
       }
       const si = sty * MAPW + stx,
         ti = gty * MAPW + gtx;
       if (si === ti) return [{ x: gx, y: gy }];
 
-      // cache: a squad walking to the same place shares one search
-      const key = si * N + ti;
+      // cache: a squad walking to the same place shares one search. The
+      // faction is part of the key — my route home is not your route in.
+      const key = (si * N + ti) * 16 + (who + 1) * 2 + (breach ? 1 : 0);
       const hit = this.cache.get(key);
       if (hit) {
         // refresh LRU
@@ -255,7 +375,11 @@
       }
 
       const straight = Math.hypot(gtx - stx, gty - sty);
-      const limit = cap || R.clamp(straight * 70 + 400, 1200, 7000);
+      // a breacher walks the whole way round the wall ring to reach the
+      // door — its route is nothing like the straight line, so it gets
+      // the wider budget
+      const base = R.clamp(straight * 70 + 400, 1200, 7000);
+      const limit = cap || (breach ? base * 7 : base);
 
       const gen = ++this.gen;
       const g = this.g,
@@ -293,12 +417,21 @@
             ny = iy + DIRS[d][1];
           if (nx < 0 || ny < 0 || nx >= MAPW || ny >= MAPH) continue;
           const ni = ny * MAPW + nx;
-          if (grid[ni] !== 0) continue;
+          let step = DIRS[d][2];
+          if (grid[ni] !== 0) {
+            if (d >= 4) continue; // no squeezing diagonally through a wall
+            if (!this.passTile(ni, who)) {
+              // not our door. Chew through it, or go round.
+              const bc = breach ? this.breachCost(ni, who) : -1;
+              if (bc < 0) continue;
+              step += bc;
+            }
+          }
           if (d >= 4) {
             // no cutting a diagonal past a corner
             if (grid[iy * MAPW + nx] !== 0 || grid[ny * MAPW + ix] !== 0) continue;
           }
-          const ng = gi + DIRS[d][2];
+          const ng = gi + step;
           if (stamp[ni] === gen && ng >= g[ni]) continue;
           stamp[ni] = gen;
           g[ni] = ng;
@@ -355,31 +488,33 @@
       return path.slice();
     }
 
-    nearestOpen(tx, ty, r, layer) {
-      if (this.open(tx, ty, layer)) return { tx, ty };
+    nearestOpen(tx, ty, r, layer, fac) {
+      const who = fac === undefined ? -1 : fac;
+      if (this.open(tx, ty, layer, who)) return { tx, ty };
       for (let rr = 1; rr <= (r || 8); rr++) {
         const n = Math.max(8, rr * 8);
         for (let k = 0; k < n; k++) {
           const an = (k / n) * R.TAU;
           const x = Math.round(tx + Math.cos(an) * rr),
             y = Math.round(ty + Math.sin(an) * rr);
-          if (this.open(x, y, layer)) return { tx: x, ty: y };
+          if (this.open(x, y, layer, who)) return { tx: x, ty: y };
         }
       }
       return null;
     }
 
     // a random open tile near (tx,ty) — rally points, scatter, retreats
-    randomOpenNear(tx, ty, r, layer, rnd) {
+    randomOpenNear(tx, ty, r, layer, rnd, fac) {
       rnd = rnd || Math.random;
+      const who = fac === undefined ? -1 : fac;
       for (let k = 0; k < 24; k++) {
         const an = rnd() * R.TAU,
           rr = rnd() * r;
         const x = Math.round(tx + Math.cos(an) * rr),
           y = Math.round(ty + Math.sin(an) * rr);
-        if (this.open(x, y, layer)) return { tx: x, ty: y };
+        if (this.open(x, y, layer, who)) return { tx: x, ty: y };
       }
-      return this.nearestOpen(tx, ty, r, layer) || { tx, ty };
+      return this.nearestOpen(tx, ty, r, layer, who) || { tx, ty };
     }
   }
 

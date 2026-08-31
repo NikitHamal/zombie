@@ -305,26 +305,33 @@
       this.sites.forEach((s, i) => (s.name = NAMES[i % NAMES.length]));
     }
 
+    /* Lay a strip of highway between two tiles. Nothing that could not
+       carry a truck is ever paved over, so a road never eats a cliff, a
+       lake or an oil seep. The home base calls this to lay its own drive
+       out to the world once it knows which way the door faces. */
+    paintRoad(x0, y0, x1, y1, w) {
+      const steps = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 1.6);
+      for (let s = 0; s <= steps; s++) {
+        const t = s / steps;
+        // a lazy S so the roads read as roads, not as rulers
+        const bx = R.lerp(x0, x1, t) + Math.sin(t * 6.283) * 1.6;
+        const by = R.lerp(y0, y1, t) + Math.cos(t * 5.1) * 1.2;
+        for (let dy = -w; dy <= w; dy++)
+          for (let dx = -w; dx <= w; dx++) {
+            const tx = Math.round(bx + dx),
+              ty = Math.round(by + dy);
+            if (tx < 0 || ty < 0 || tx >= MAPW || ty >= MAPH) continue;
+            const i = ty * MAPW + tx;
+            const tt = this.type[i];
+            if (tt === T.ROCK || tt === T.WATER || tt === T.OIL) continue;
+            this.type[i] = T.ROAD;
+          }
+      }
+      this.version++;
+    }
+
     layRoads() {
-      const road = (x0, y0, x1, y1, w) => {
-        const steps = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 1.6);
-        for (let s = 0; s <= steps; s++) {
-          const t = s / steps;
-          // a lazy S so the roads read as roads, not as rulers
-          const bx = R.lerp(x0, x1, t) + Math.sin(t * 6.283) * 1.6;
-          const by = R.lerp(y0, y1, t) + Math.cos(t * 5.1) * 1.2;
-          for (let dy = -w; dy <= w; dy++)
-            for (let dx = -w; dx <= w; dx++) {
-              const tx = Math.round(bx + dx),
-                ty = Math.round(by + dy);
-              if (tx < 0 || ty < 0 || tx >= MAPW || ty >= MAPH) continue;
-              const i = ty * MAPW + tx;
-              const tt = this.type[i];
-              if (tt === T.ROCK || tt === T.WATER || tt === T.OIL) continue;
-              this.type[i] = T.ROAD;
-            }
-        }
-      };
+      const road = (x0, y0, x1, y1, w) => this.paintRoad(x0, y0, x1, y1, w);
 
       // site-to-site: everyone links to their nearest two neighbours
       for (const s of this.sites) {

@@ -103,6 +103,7 @@
           (slots[bi].y / TILE) | 0,
           5,
           u.layer,
+          u.fac,
         );
         const tx = free ? (free.tx + 0.5) * TILE : slots[bi].x;
         const ty = free ? (free.ty + 0.5) * TILE : slots[bi].y;
@@ -123,7 +124,7 @@
         u.pi = 0;
         return;
       }
-      if (g.nav.los(u.x, u.y, gx, gy, u.layer)) {
+      if (g.nav.los(u.x, u.y, gx, gy, u.layer, u.fac)) {
         u.path = [{ x: gx, y: gy }];
         u.pi = 0;
         return;
@@ -131,7 +132,10 @@
       if (u.repathT > 0) return;
       if (g.nav.budget <= 0) return;
       g.nav.budget--;
-      const p = g.nav.astar(u.x, u.y, gx, gy, u.layer);
+      // breach is on: if there is no way round their wall, the search is
+      // allowed to route straight through it, and the unit will shoot
+      // whatever stands in the doorway when it gets there
+      const p = g.nav.astar(u.x, u.y, gx, gy, u.layer, u.fac, true);
       u.repathT = REPATH_MIN;
       if (p) {
         u.path = p;
@@ -220,9 +224,21 @@
     tryShoot(g, u, tgt) {
       const w = this.gunFor(u, tgt);
       if (!w) return false;
-      const d = R.dist(u.x, u.y, tgt.x, tgt.y);
+      // a building is shot at its near face, not its centre. A big
+      // footprint sits on the tiles between here and its own middle, and
+      // a target that blocks its own line of fire can never be hit —
+      // which is how sieges used to freeze.
+      let tx = tgt.x,
+        ty = tgt.y;
+      if (tgt.kind === "b" && tgt.size > 1) {
+        const nx = R.clamp(Math.floor(u.x / TILE), tgt.tx, tgt.tx + tgt.size - 1),
+          ny = R.clamp(Math.floor(u.y / TILE), tgt.ty, tgt.ty + tgt.size - 1);
+        tx = (nx + 0.5) * TILE;
+        ty = (ny + 0.5) * TILE;
+      }
+      const d = R.dist(u.x, u.y, tx, ty);
       if (d > w.range) return false;
-      if (u.layer === 0 && !g.nav.fireLine(u.x, u.y, tgt.x, tgt.y)) return false;
+      if (u.layer === 0 && !g.nav.fireLine(u.x, u.y, tx, ty)) return false;
       if (u.cd > 0) return true; // in range, waiting on the reload
       u.cd = 1 / w.rof;
       u.flash = 0.07;
@@ -233,11 +249,11 @@
 
     // find something to shoot: nearest thing we can hurt, preferring what
     // is already shooting at us
-    acquire(g, u, radius) {
+    acquire(g, u, radius, noBld) {
       if (!u.w && !u.w2) return null;
       const w = u.w || u.w2;
       const r = radius || Math.max(w.range * 1.05, 200);
-      return g.nearestTarget(u, r);
+      return g.nearestTarget(u, r, undefined, noBld);
     },
 
     /* ==================================================================
@@ -321,10 +337,16 @@
             site.capBy = u.fac;
             site.capFrac = Math.min(1, site.capT / 14);
             if (site.capT >= 14) {
-              R.Territory.capture(g, site, u.fac);
-              u.order = null;
-              u.capT = 0;
-              site.capT = 0;
+              if (R.Territory.capture(g, site, u.fac)) {
+                u.order = null;
+                u.capT = 0;
+                site.capT = 0;
+              } else {
+                // the ground will not turn yet. Hold where you are and
+                // try again shortly — giving up is how raids fail.
+                site.capT = 10;
+                u.capT = 0;
+              }
             }
           }
         }
@@ -372,7 +394,11 @@
           }
         }
         if (ord.type === "amove") {
-          const t = this.acquire(g, u, Math.max(u.w ? u.w.range : 200, 240));
+          // units yes, buildings no: a marching column shoots the enemy it
+          // passes, and shoots a wall only when the wall stands in its way
+          // (blockerAhead below). Stopping to duel every wall on the
+          // skyline is how raids stall inside nobody's guns.
+          const t = this.acquire(g, u, Math.max(u.w ? u.w.range : 200, 240), true);
           if (t) {
             // stop and fight; the move order waits
             shooting = t;
@@ -440,34 +466,55 @@
 
       if (shooting) {
         if (!this.tryShoot(g, u, shooting)) {
-          // out of range after all: walk in
-          goalX = shooting.x;
-          goalY = shooting.y;
+          // why did the shot fail? If the target is IN range, the line of
+          // fire is blocked — and whatever stands between us and it is
+          // the real target. Shooting the wall down is the siege; staring
+          // at it is a freeze.
+          const w = this.gunFor(u, shooting);
+          if (w && R.dist(u.x, u.y, shooting.x, shooting.y) <= w.range) {
+            const block = this.blockerAhead(g, u, shooting.x, shooting.y);
+            if (block) {
+              shooting = block;
+              this.stopMoving(u);
+              u.a = u.va = Math.atan2(block.y - u.y, block.x - u.x);
+              this.tryShoot(g, u, block); // fire this frame, not the next
+            }
+            // blocked by rock, or by nothing we can name: keep the order
+            // goal — walking at a wall we cannot shoot is the other freeze
+          } else {
+            // genuinely out of range: close the distance
+            goalX = shooting.x;
+            goalY = shooting.y;
+          }
         }
       }
 
       /* ---- go ---- */
       if (goalX !== null) {
-        this.step(g, u, dt, goalX, goalY, speed);
-        const moved = Math.hypot(u.vx, u.vy) > 4;
-        if (!moved) u.stuck += dt;
-        else u.stuck = Math.max(0, u.stuck - dt * 2);
-        if (u.stuck > 1.1) {
-          u.path = null;
-          u.repathT = 0;
-          u.stuck = 0;
-          // shove it back toward ground it can actually stand on, rather
-          // than jittering in place and hoping for the best
-          const t = g.nav.randomOpenNear((u.x / TILE) | 0, (u.y / TILE) | 0, 5, u.layer);
-          const dx = (t.tx + 0.5) * TILE - u.x,
-            dy = (t.ty + 0.5) * TILE - u.y;
-          const dd = Math.hypot(dx, dy);
-          if (dd > 1) {
-            u.x += (dx / dd) * 12;
-            u.y += (dy / dd) * 12;
-          } else {
-            u.x += (Math.random() - 0.5) * 8;
-            u.y += (Math.random() - 0.5) * 8;
+        // something of theirs is standing in the doorway. Stop and shoot
+        // it rather than grinding against it forever: this is how an
+        // attack opens a gate it cannot walk through.
+        const wall = this.blockerAhead(g, u, goalX, goalY);
+        if (wall) {
+          shooting = wall;
+          this.stopMoving(u);
+          u.a = u.va = Math.atan2(wall.y - u.y, wall.x - u.x);
+          // face it AND fire: a unit that only turns to look at the gate
+          // it is supposed to be opening will look at it forever
+          this.tryShoot(g, u, wall);
+        } else {
+          this.step(g, u, dt, goalX, goalY, speed);
+          const moved = Math.hypot(u.vx, u.vy) > 4;
+          if (!moved) u.stuck += dt;
+          else u.stuck = Math.max(0, u.stuck - dt * 2);
+          if (u.stuck > 1.1) {
+            u.path = null;
+            u.repathT = 0;
+            u.stuck = 0;
+            // put it back on ground it can stand on. Deliberately not a
+            // nudge — a shove can move a tank into a wall, and a tank in
+            // a wall is the thing we came here to prevent.
+            g.nav.legalize(g, u);
           }
         }
       }
@@ -482,14 +529,15 @@
         u.x = R.clamp(nx, 40, R.W - 40);
         u.y = R.clamp(ny, 40, R.H - 40);
       } else {
-        // slide along whatever stops us instead of sticking to it
-        if (g.nav.openAt(nx, ny, u.layer)) {
+        // slide along whatever stops us instead of sticking to it. Our own
+        // gates count as open ground; everybody else's do not.
+        if (g.nav.openAt(nx, ny, u.layer, u.fac)) {
           u.x = nx;
           u.y = ny;
-        } else if (g.nav.openAt(nx, u.y, u.layer)) {
+        } else if (g.nav.openAt(nx, u.y, u.layer, u.fac)) {
           u.x = nx;
           u.vy *= -0.25;
-        } else if (g.nav.openAt(u.x, ny, u.layer)) {
+        } else if (g.nav.openAt(u.x, ny, u.layer, u.fac)) {
           u.y = ny;
           u.vx *= -0.25;
         } else {
@@ -498,6 +546,9 @@
         }
         u.x = R.clamp(u.x, 20, R.W - 20);
         u.y = R.clamp(u.y, 20, R.H - 20);
+        // the invariant, checked every frame: nothing ends a frame inside
+        // a building. Everything above is a best effort; this is the rule.
+        g.nav.legalize(g, u);
       }
 
       /* ---- animation ---- */
@@ -516,6 +567,25 @@
       }
       if (u.layer === 2 && sp > 40 && Math.random() < dt * 8) R.FX.wake(g, u.x, u.y);
       if (u.layer === 1 && u.alt > 6 && Math.random() < dt * 2) R.FX.dust(g, u.x, u.y + 10, 0.2);
+    },
+
+    /* A wall between us and where we are going. Looks a hull-length down
+       the line of march — far enough to see the doorway coming, near
+       enough that we are already committed to it. Returns the building to
+       shoot, or null. Aircraft and ships never have this problem. */
+    blockerAhead(g, u, gx, gy) {
+      if (u.layer !== 0) return null;
+      const d = R.dist(u.x, u.y, gx, gy);
+      if (d < 1) return null;
+      const look = Math.min(d, (u.def.big ? 30 : 22) + 8);
+      const px = u.x + ((gx - u.x) / d) * look,
+        py = u.y + ((gy - u.y) / d) * look;
+      const b = g.buildingAtWorld(px, py);
+      if (!b || b.dead) return null;
+      if (!R.hostileTo(u.fac, b.fac)) return null;
+      const i = g.t.at(px, py);
+      if (i < 0 || g.nav.passTile(i, u.fac)) return null; // already open
+      return b;
     },
 
     separate(g, u, dt) {
@@ -560,12 +630,14 @@
     unload(g, u) {
       if (!u.carry || !u.carry.length) return;
       for (const c of u.carry) {
-        const spot = g.nav.nearestOpen((u.x / TILE) | 0, (u.y / TILE) | 0, 3, 0);
+        const spot = g.nav.nearestOpen((u.x / TILE) | 0, (u.y / TILE) | 0, 4, 0, u.fac);
         c.x = spot ? (spot.tx + 0.5) * TILE : u.x;
         c.y = spot ? (spot.ty + 0.5) * TILE : u.y;
         c.inside = null;
         c.order = null;
         c.sel = u.sel;
+        // climbing out of a transport must not climb into a wall
+        g.nav.legalize(g, c);
       }
       u.carry.length = 0;
       if (u.sel) g.say(0, u.def.name + " unloaded");
