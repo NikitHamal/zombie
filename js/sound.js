@@ -38,6 +38,20 @@
     v_mama: 0.7,
     v_spit: 0.5,
     v_zedshout: 0.8,
+    // --- the RTS bank: the same synth, pointed at a war instead of a
+    //     village. Short, dry, and rate-limited hard, because a battle
+    //     fires hundreds of these a second.
+    shot: 0.06,
+    cannon: 0.14,
+    rocket: 0.22,
+    bomb: 0.3,
+    hit: 0.09,
+    die: 0.3,
+    claw: 0.12,
+    order: 0.2,
+    move: 0.2,
+    build: 0.25,
+    alarm: 1.5,
   };
   const last = {};
   let crackleT = 0;
@@ -935,6 +949,59 @@
         const hb = Math.max(B, 0.5);
         voice({ f: 330, f2: 520, type: "sawtooth", cut: 1100, q: 1.8, t: 0.9, g: 0.4 * hb });
         voice({ f: 165, f2: 110, t: 0.9, g: 0.3 * hb });
+        break;
+      }
+
+      /* ================= the RTS bank =================
+         Same synthesiser, pointed at armour and aircraft. Each cue is a
+         noise burst plus a body: the noise carries the distance, the body
+         says what kind of gun it was. */
+
+      case "shot": // small arms: a dry crack, no tail
+        voice({ n: 1, cut: 2600, bt: "highpass", t: 0.05, g: 0.34 * B });
+        voice({ f: 190, f2: 70, t: 0.05, g: 0.26 * B });
+        break;
+      case "cannon": // a tank gun: the crack and the chest-thump
+        voice({ n: 1, cut: 900, t: 0.16, g: 0.75 * B });
+        voice({ f: 110, f2: 34, t: 0.26, g: 0.62 * B });
+        voice({ f: 320, f2: 90, t: 0.1, g: 0.24 * B });
+        break;
+      case "rocket": // a launcher: the whoosh is the sound
+        voice({ n: 1, cut: 700, bt: "bandpass", q: 2.2, t: 0.34, g: 0.44 * B });
+        voice({ f: 620, f2: 240, t: 0.3, g: 0.2 * B });
+        break;
+      case "bomb": // falling, then the ground going over
+        vboomOut(B);
+        voice({ f: 78, f2: 26, t: 0.55, g: 0.7 * B });
+        break;
+      case "hit": // a round landing on armour: sparks, no body
+        voice({ n: 1, cut: 4200, bt: "highpass", t: 0.04, g: 0.26 * B });
+        voice({ f: 900, f2: 420, t: 0.05, g: 0.18 * B });
+        break;
+      case "die": // something burning out
+        voice({ n: 1, cut: 1200, t: 0.3, g: 0.4 * B });
+        voice({ f: 150, f2: 48, t: 0.34, g: 0.34 * B });
+        break;
+      case "claw": // the Rot: a wet rasp, nothing mechanical in it
+        voice({ n: 1, cut: 1500, bt: "bandpass", q: 3.4, t: 0.13, g: 0.4 * B });
+        voice({ f: 220, f2: 90, type: "sawtooth", cut: 800, q: 4, t: 0.16, g: 0.24 * B });
+        break;
+      case "order": // an acknowledged order: two short blips
+        voice({ f: 780, f2: 780, t: 0.05, g: 0.2 * B });
+        voice({ f: 1180, f2: 1180, t: 0.07, g: 0.16 * B });
+        break;
+      case "move": // a move order: one lower blip
+        voice({ f: 560, f2: 560, t: 0.07, g: 0.19 * B });
+        break;
+      case "build": // a structure going up: a rising thunk
+        voice({ f: 240, f2: 420, t: 0.16, g: 0.3 * B });
+        voice({ n: 1, cut: 800, t: 0.2, g: 0.24 * B });
+        break;
+      case "alarm": {
+        // the base is under attack: the bugle, twice, and it carries
+        const ab = Math.max(B, 0.55);
+        voice({ f: 440, f2: 300, type: "square", cut: 1400, q: 2, t: 0.5, g: 0.3 * ab });
+        voice({ f: 300, f2: 440, type: "square", cut: 1400, q: 2, t: 0.5, g: 0.3 * ab });
         break;
       }
     }

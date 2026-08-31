@@ -759,3 +759,91 @@ went, and more identifiable building art.
 Scout reports written in the hand of whoever went; more structure art;
 veterancy shown on the figure itself. Whatever ships keeps the exact
 sketch style.
+
+## Branch: `feat/desert-order-rts`
+
+A second game lives on this branch alongside the village. Open
+`rts.html` instead of `index.html` for it.
+
+**Desert Order** is an RTS in the same engine and the same hand-drawn
+ink-on-paper style. Six nations (four enemies, two allies) and a zombie
+horde ("the Rot") fight over a vast procedural desert. The player holds
+one settlement in the middle, builds industry and armies on it, takes
+more ground with a Conquest Truck, and survives the Rot's night waves.
+
+The RTS keeps every Hard constraint from the village (double-clickable
+`file://`, classic `<script>` tags, no bundler, the same sketch
+primitives). It uses the shared core: `js/sketch.js`, `js/grid.js`,
+`js/camera.js`, `js/sound.js`, `js/village/perf.js`. Its own code lives
+under `js/rts/`:
+
+```
+core.js       constants, palette, noise, factions, the game clock
+camera.js     RTS camera: edge scroll, glide-to, shake
+terrain.js    300×300-tile procedural desert: dunes, sea, oil, scrub,
+              rivers, sites, roads, decor, an overview canvas
+nav.js        tile A* with layers (ground / air / sea) and a fire-line
+defs.js       resources, weapons, units, buildings, levels, flak rule
+fx.js         particle / tracer / marker / wreck pools
+combat.js     shots in flight: bullets, shells, rockets, missiles, bombs,
+              torpedoes, with the Desert Order flak damage curve
+entity.js     orders, formations, movement, targeting
+base.js       placement, build progress, upgrades, production queues
+economy.js    four resources, productivity = sqrt(n)/n, storage caps
+territory.js  settlement capture, ring growth
+ai.js         six personalities (rusher, boomer, airpower, navy,
+              turtler, expansionist) with attack waves and expansion
+horde.js      the Rot: infested sites, night waves, the dose
+sprites.js    the art: infantry, vehicles, tanks with rotating turrets,
+              independent tread animation, jets, helis with rotors,
+              ships with wake, walls, factories, defences, oil seeps,
+              palms, bushes, ripples, wrecks, damage smoke, muzzle flash
+render.js     chunked ground cache, painter-order draw, fog of war,
+              selection rings, health bars, build ghosts, night wash
+minimap.js    full-map minimap with territory, fog, units, pings
+ui.js         the paper HUD: resources, clock, build menu, production
+              roster, selection panel, orders, control groups, help
+main.js       bootstrap, input, the loop
+```
+
+`rts.html` loads all of these in the right order. The headless smoke
+test is `node tools/rts-smoke.mjs --shot`; it boots the page in
+Chromium, lets it run, and reports units / buildings / fps / errors.
+
+`village.html` is the preserved copy of the old `index.html` (village
+mode).
+
+The rules that shape the war (straight from Desert Order):
+
+- every plant costs resources, takes time, and has a cap per faction;
+- more settlements = more of every building you may own (`max × (1 +
+  floor(sites/2))`), so expansion is not a luxury — it is the production
+  limit;
+- a gun that cannot point up cannot hit aircraft, and aircraft can hit
+  anything that cannot answer; flak is not optional;
+- flak towers (and HQs) are hard targets: a hundred guns shooting one do
+  three times the damage of ten, not ten times (`hardScale(n) = n^-0.52`);
+- weapons have an armour penetration and armour has a number, and the
+  gap between them scales the hit;
+- you can only build on ground you own; taking a settlement means
+  driving a Conquest Truck onto it and holding it; settlements grow the
+  longer you hold them.
+
+### Hotkeys
+
+- `WASD` / edge of screen — pan
+- `Wheel` — zoom on the cursor
+- `Middle drag` — pan
+- `Left drag` — box select; `Left click` — select one
+- `Double click` — select every one of that kind on screen
+- `Ctrl+1..9` — make a control group; `1..9` — select it; press twice to jump there
+- `Right click` — move / attack
+- `A` attack-move · `M` move · `P` patrol · `H` hold · `S` stop · `R` repair · `U` unload · `C` capture
+- `F` form up · `Tab` cycle armies · `Ctrl+A` select all on screen
+- `Q W E R T Y` — build from the open tab; `B` — back to build menu
+- `Shift+click` — place several buildings in a row; `Ctrl+click` — cancel one queued unit
+- `Space` — pause; `[` / `]` — slower / faster
+- `Home` / `F2` — jump to HQ · `F9` — jump to last alarm
+- `F1` — help · `F3` fog · `F4` territory · `F5` tile grid
+- `Del` / `Backspace` — scuttle selected
+- `Esc` — cancel placement, deselect, close help
