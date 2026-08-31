@@ -224,6 +224,39 @@
       fly: 1,
       desc: "one pass, one stick of bombs, and a gap in the horde you could walk a cart through.",
     },
+    /* ---- the sea: Desert Order fleets (not in the village ORDER, so the
+       village ladder is untouched — the RTS scenario trains these itself) ---- */
+    gunboat: {
+      name: "gunboat",
+      age: "foundry",
+      hp: 150,
+      dmg: 26,
+      rng: 250,
+      rate: 1.4,
+      spd: 108,
+      crew: 2,
+      eat: 2,
+      cost: { w: 20, s: 16, c: 24, a: 22 },
+      shot: "ball",
+      water: 1,
+      desc: "a fast hull with a pump gun. It owns the shallows.",
+    },
+    destroyer: {
+      name: "destroyer",
+      age: "sky",
+      hp: 360,
+      dmg: 46,
+      rng: 300,
+      rate: 2.2,
+      spd: 76,
+      crew: 3,
+      eat: 4,
+      cost: { w: 30, s: 34, c: 44, a: 44 },
+      shot: "shell",
+      splash: 42,
+      water: 1,
+      desc: "a gun on the sea, and the sea is yours if you can keep it.",
+    },
   };
 
   // the order they appear in the panel, and the order they are trained in
@@ -850,6 +883,125 @@
       ZS.wcirc(c, -3, 8, 2.6, s + 226, 0.3);
       c.restore();
     },
+
+    gunboat(c, a, t) {
+      const s = a.seed;
+      const y = a.y + 4; // sits on the waterline
+      // the wake
+      c.strokeStyle = "rgba(150,164,132,0.3)";
+      c.lineWidth = 1.2;
+      ZS.wcirc(c, a.x, y, 20, s + 230, 2.4);
+      ZS.wcirc(c, a.x, y, 10, s + 233, 1.6);
+      c.strokeStyle = "rgba(84,86,74,0.95)";
+      c.lineWidth = 1.6;
+      // hull: a long pointed lozenge, drawn from above
+      ZS.wpoly(
+        c,
+        [
+          { x: a.x - 18, y: y },
+          { x: a.x - 12, y: y - 5 },
+          { x: a.x + 10, y: y - 4 },
+          { x: a.x + 18, y: y },
+          { x: a.x + 10, y: y + 5 },
+          { x: a.x - 12, y: y + 5 },
+        ],
+        s + 231,
+        0.5,
+        true,
+      );
+      c.fillStyle = "rgba(104,110,94,0.3)";
+      c.fill();
+      c.stroke();
+      // the gun, pointing where it looks
+      const ca = Math.cos(a.a),
+        sa = Math.sin(a.a) * 0.5;
+      const kick = a.kick > 0 ? a.kick * 4 : 0;
+      c.lineWidth = 2.2;
+      ZS.wline(c, a.x, y - 2, a.x + ca * (16 - kick), y - 2 + sa * 16, s + 232, 0.2);
+      // the bridge
+      c.lineWidth = 1.4;
+      ZS.wpoly(
+        c,
+        [
+          { x: a.x - 4, y: y - 6 },
+          { x: a.x + 2, y: y - 7 },
+          { x: a.x + 1, y: y - 12 },
+          { x: a.x - 3, y: y - 11 },
+        ],
+        s + 234,
+        0.3,
+        true,
+      );
+      c.stroke();
+    },
+
+    destroyer(c, a, t) {
+      const s = a.seed;
+      const y = a.y + 4;
+      c.strokeStyle = "rgba(150,164,132,0.3)";
+      c.lineWidth = 1.2;
+      ZS.wcirc(c, a.x, y, 27, s + 240, 2.6);
+      ZS.wcirc(c, a.x, y, 15, s + 243, 1.8);
+      c.strokeStyle = "rgba(84,86,74,0.95)";
+      c.lineWidth = 1.8;
+      // a long hull
+      ZS.wpoly(
+        c,
+        [
+          { x: a.x - 26, y },
+          { x: a.x - 18, y: y - 6 },
+          { x: a.x + 14, y: y - 5 },
+          { x: a.x + 26, y },
+          { x: a.x + 14, y: y + 6 },
+          { x: a.x - 18, y: y + 6 },
+        ],
+        s + 241,
+        0.45,
+        true,
+      );
+      c.fillStyle = "rgba(104,110,94,0.3)";
+      c.fill();
+      c.stroke();
+      // the big turret
+      const ca = Math.cos(a.a),
+        sa = Math.sin(a.a) * 0.5;
+      const kick = a.kick > 0 ? a.kick * 5 : 0;
+      c.lineWidth = 2.6;
+      ZS.wline(c, a.x, y - 3, a.x + ca * (24 - kick), y - 3 + sa * 24, s + 242, 0.2);
+      // two funnels
+      c.lineWidth = 1.4;
+      ZS.wpoly(
+        c,
+        [
+          { x: a.x - 10, y: y - 8 },
+          { x: a.x - 6, y: y - 8 },
+          { x: a.x - 7, y: y - 15 },
+          { x: a.x - 11, y: y - 15 },
+        ],
+        s + 244,
+        0.3,
+        true,
+      );
+      c.stroke();
+      ZS.wpoly(
+        c,
+        [
+          { x: a.x + 2, y: y - 8 },
+          { x: a.x + 6, y: y - 8 },
+          { x: a.x + 5, y: y - 13 },
+          { x: a.x + 1, y: y - 13 },
+        ],
+        s + 245,
+        0.3,
+        true,
+      );
+      c.stroke();
+      // a pennant
+      c.strokeStyle = kit(a).cloth;
+      c.lineWidth = 1.2;
+      ZS.wline(c, a.x - 22, y - 8, a.x - 22, y - 20, s + 246, 0.3);
+      ZS.wline(c, a.x - 22, y - 20, a.x - 14, y - 18, s + 247, 0.3);
+    },
   };
 
   /* ---------- one of them, drawn ---------- */
@@ -863,10 +1015,17 @@
       return CAT[id] || CAT.militia;
     },
 
-    list() {
+    list(scen) {
       const out = [];
-      for (const id of ORDER) out.push({ id, def: CAT[id] });
+      for (const id of this.roster(scen)) out.push({ id, def: CAT[id] });
       return out;
+    },
+
+    // the trainable order, as a scenario sees it: the survival ladder plus
+    // whatever a scenario adds (the Desert Order's fleets)
+    roster(scen) {
+      const extra = scen && scen.roster ? scen.roster() : [];
+      return ORDER.concat(extra || []);
     },
 
     // what it costs you, at this moment (the workshop and the smithy take
@@ -907,6 +1066,8 @@
       add("stable", 3);
       add("foundry", 2);
       add("airfield", 2);
+      add("factory", 4); // the RTS armory: armour, gunships and fleets
+      add("refinery", 1);
       return n;
     },
 

@@ -629,7 +629,7 @@
         f += "|" + s.army.queue.map((q) => q.id + Math.floor(q.p * 20)).join(",");
         for (const a of ZS.Army.units(s, false))
           f += ";" + a.uid + Math.ceil(a.hp / 8) + (a.sup > 0 ? 1 : 0);
-        f += "|" + this.afford(ZS.Units.ORDER.map((id) => s.canPay(ZS.Units.cost(s, id))));
+        f += "|" + this.afford(ZS.Units.roster(s).map((id) => s.canPay(ZS.Units.cost(s, id))));
         return f;
       }
       if (s.mode === "nations") {
@@ -1136,7 +1136,7 @@
           "</button>";
       h += "</div>";
       // what is in the field right now
-      const mine = U.ORDER.filter((id) => U.count(s, id));
+      const mine = U.roster(s).filter((id) => U.count(s, id));
       if (mine.length)
         h +=
           '<div class="pfoot">' +
@@ -1182,7 +1182,7 @@
         '<button data-act="dismiss"' + (s.army.rally ? "" : ' class="no"') + ">fall back</button>";
       h += "</div>";
       // the roster: everything the village could train, in order
-      for (const id of U.ORDER) {
+      for (const id of U.roster(s)) {
         const d = U.def(id);
         const open = ZS.Ages.at(s, d.age);
         const cost = U.cost(s, id);

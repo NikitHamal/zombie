@@ -283,6 +283,73 @@
       key: "z",
       desc: "a strip of mown grass · +2 to the army, and wings",
     },
+    /* ---- the RTS: the desert order's own works ---- */
+    refinery: {
+      name: "refinery",
+      w: 96,
+      h: 72,
+      hp: 300,
+      cost: { w: 60, s: 40, c: 20 },
+      time: 46,
+      lvlMax: 3,
+      key: "y",
+      desc: "the desert's dead oil · +steel from scrap, +territory",
+    },
+    factory: {
+      name: "factory",
+      w: 120,
+      h: 86,
+      hp: 420,
+      cost: { w: 90, s: 80, c: 60 },
+      time: 66,
+      lvlMax: 2,
+      key: "f",
+      desc: "armour and gunships off the line · +army cap",
+    },
+    gunTurret: {
+      name: "gun turret",
+      w: 46,
+      h: 46,
+      hp: 380,
+      cost: { w: 40, s: 60, c: 40 },
+      time: 42,
+      lvlMax: 3,
+      key: "h",
+      desc: "a shielded gun · shells the line from behind the wall",
+    },
+    flak: {
+      name: "flak",
+      w: 52,
+      h: 48,
+      hp: 320,
+      cost: { w: 40, s: 50, c: 60 },
+      time: 48,
+      lvlMax: 3,
+      key: "j",
+      desc: "three quick barrels for the sky",
+    },
+    rocket: {
+      name: "rocket",
+      w: 64,
+      h: 50,
+      hp: 340,
+      cost: { w: 44, s: 70, c: 70 },
+      time: 58,
+      lvlMax: 2,
+      key: "k",
+      desc: "a heavy rack of rockets for the walls of the enemy",
+    },
+    capture: {
+      name: "capture post",
+      w: 72,
+      h: 66,
+      hp: 260,
+      cost: { w: 50, s: 44, c: 30 },
+      time: 50,
+      lvlMax: 2,
+      key: "v",
+      desc: "a flag on the waste · build on new ground to hold it",
+    },
   };
   // the build menu's order (the hall is never built, only repaired)
   const ORDER = [
@@ -300,6 +367,12 @@
     "stable",
     "foundry",
     "airfield",
+    "refinery",
+    "factory",
+    "gunTurret",
+    "flak",
+    "rocket",
+    "capture",
     "tower",
     "post",
     "kennel",
@@ -2257,6 +2330,30 @@
       c.stroke();
     }
     // a fuel drum and a crate
+    const drums = (s) => {
+      const x = s.x,
+        yb = s.y + s.h;
+      for (let i = 0; i < 3; i++) {
+        seg(c, x + 8 + i * 12, yb - 18, x + 8 + i * 12, yb - 4, s.seed + 50 + i * 3, 1.2, INK2);
+        seg(c, x + 3 + i * 12, yb - 16, x + 13 + i * 12, yb - 16, s.seed + 54 + i * 3, 1);
+      }
+    };
+    drums(s);
+    ZS.wpoly(
+      c,
+      [
+        { x: x + w - 34, y: yb - 6 },
+        { x: x + w - 34, y: yb - 22 },
+        { x: x + w - 16, y: yb - 22 },
+        { x: x + w - 16, y: yb - 6 },
+      ],
+      s.seed + 70,
+      0.5,
+      true,
+    );
+    c.fillStyle = "rgba(150,116,74,0.3)";
+    c.fill();
+    c.stroke();
     ZS.wcirc(c, x + 26, yb - 4, 6, s.seed + 70, 0.4);
     c.fillStyle = "rgba(150,110,60,0.4)";
     c.fill();
@@ -2321,6 +2418,237 @@
     }
   }
 
+  /* ---------- the RTS works: refinery · factory · turrets ---------- */
+
+  function drawRefinery(c, s, t, _env) {
+    const x = s.x,
+      y = s.y,
+      w = s.w,
+      h = s.h,
+      yb = y + h;
+    floor(c, s, "rgba(150,132,110,0.18)");
+    // the shed
+    cottage(c, s, t, _env, { lift: -4, dw: 20, roof: "rgba(120,104,70,0.3)" });
+    // the still: three tall pipes and a bubbling tank
+    seg(c, x + 12, yb, x + 12, yb - 44, s.seed + 20, 1.8, "rgba(104,84,56,0.95)");
+    seg(c, x + 24, yb - 4, x + 24, yb - 34, s.seed + 21, 1.6, "rgba(104,84,56,0.9)");
+    seg(c, x + 34, yb, x + 34, yb - 40, s.seed + 22, 1.6, "rgba(104,84,56,0.9)");
+    ZS.wpoly(
+      c,
+      [
+        { x: x + 40, y: yb - 26 },
+        { x: x + 62, y: yb - 30 },
+        { x: x + 62, y: yb - 12 },
+        { x: x + 40, y: yb - 8 },
+      ],
+      s.seed + 30,
+      0.5,
+      true,
+    );
+    c.fillStyle = "rgba(114,118,124,0.3)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.4;
+    c.stroke();
+    // the smoke line off the still
+    seg(c, x + 51, yb - 32, x + 49, yb - 48, s.seed + 41, 1.1, INK2);
+    smoke(c, x + 49, yb - 50, t, s.seed + 42, 2);
+  }
+
+  function drawFactory(c, s, t, _env) {
+    const x = s.x,
+      y = s.y,
+      w = s.w,
+      h = s.h,
+      yb = y + h;
+    floor(c, s, "rgba(160,150,134,0.2)");
+    // a long low building with a saw-tooth roof
+    ZS.wpoly(
+      c,
+      [
+        { x: x + 4, y: yb - 4 },
+        { x: x + w - 4, y: yb - 8 },
+        { x: x + w - 8, y: y + 6 },
+        { x: x + 8, y: y + 10 },
+      ],
+      s.seed + 1,
+      1.1,
+      true,
+    );
+    c.fillStyle = "rgba(158,150,136,0.34)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.8;
+    c.stroke();
+    // the saw-tooth: a row of tall windows
+    for (let i = 0; i < 4; i++) {
+      const px = x + 16 + (i * (w - 32)) / 4;
+      seg(c, px, yb - 10, px, y + 18, s.seed + 20 + i * 3, 1.3, INK2);
+      seg(c, px, y + 18, px + 10, y + 12, s.seed + 21 + i * 3, 1.3, INK2);
+    }
+    // the stack
+    seg(c, x + w - 26, yb - 4, x + w - 22, yb - 56, s.seed + 40, 2.2, "rgba(104,84,56,0.95)");
+    smoke(c, x + w - 23, yb - 58, t, s.seed + 41, 3);
+    // a tank, waiting by the yard gate
+    const tk = x + w - 4;
+    seg(c, tk, yb - 8, tk, yb - 22, s.seed + 50, 1.4, "rgba(104,84,56,0.9)");
+    seg(c, tk + 18, yb - 8, tk + 18, yb - 20, s.seed + 51, 1.4, "rgba(104,84,56,0.9)");
+    seg(c, tk + 4, yb - 20, tk + 14, yb - 18, s.seed + 52, 1.4, "rgba(104,84,56,0.9)");
+  }
+
+  function drawGunTurret(c, s, t, _env) {
+    const x = s.x,
+      y = s.y,
+      w = s.w,
+      h = s.h,
+      yb = y + h;
+    floor(c, s, "rgba(150,132,110,0.2)");
+    // a squat concrete drum
+    ZS.wpoly(
+      c,
+      [
+        { x: x + 6, y: yb - 4 },
+        { x: x + 9, y: y + 6 },
+        { x: x + w - 9, y: y + 4 },
+        { x: x + w - 6, y: yb - 6 },
+      ],
+      s.seed + 1,
+      1.1,
+      true,
+    );
+    c.fillStyle = "rgba(136,130,120,0.4)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.6;
+    c.stroke();
+    // the shield plate + the barrel, drawn the way the units' art does
+    seg(c, x + w / 2 - 4, y + 12, x + w / 2 + 4, y + 12, s.seed + 20, 1.6, INK2);
+    ZS.wpoly(
+      c,
+      [
+        { x: x + w / 2 - 7, y: y + 11 },
+        { x: x + w / 2, y: y - 12 },
+        { x: x + w / 2 + 7, y: y + 11 },
+      ],
+      s.seed + 21,
+      0.6,
+      true,
+    );
+    c.fillStyle = "rgba(104,110,96,0.4)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.4;
+    c.stroke();
+    seg(c, x + w / 2, y + 8, x + w / 2 + 20, y + 6, s.seed + 30, 2.2, "rgba(84,86,74,0.95)");
+  }
+
+  function drawFlak(c, s, t, _env) {
+    const x = s.x,
+      y = s.y,
+      w = s.w,
+      h = s.h,
+      yb = y + h;
+    floor(c, s, "rgba(150,132,110,0.2)");
+    // a small angular mount
+    ZS.wpoly(
+      c,
+      [
+        { x: x + 8, y: yb - 4 },
+        { x: x + 4, y: y + 8 },
+        { x: x + w - 4, y: y + 6 },
+        { x: x + w - 8, y: yb - 6 },
+      ],
+      s.seed + 1,
+      1,
+      true,
+    );
+    c.fillStyle = "rgba(128,126,114,0.4)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.6;
+    c.stroke();
+    // three barrels, fanned up
+    for (let i = 0; i < 3; i++) {
+      const off = (i - 1) * 5;
+      seg(
+        c,
+        x + w / 2 + off,
+        y + 6,
+        x + w / 2 + off - 4,
+        y - 22 - Math.abs(off),
+        s.seed + 20 + i,
+        1.8,
+        "rgba(84,86,74,0.95)",
+      );
+    }
+    seg(c, x + w / 2, y + 6, x + w / 2, y - 30, s.seed + 30, 2, "rgba(104,84,56,0.95)");
+  }
+
+  function drawRocket(c, s, t, _env) {
+    const x = s.x,
+      y = s.y,
+      w = s.w,
+      h = s.h,
+      yb = y + h;
+    floor(c, s, "rgba(150,132,110,0.2)");
+    // the base plate
+    seg(c, x + 6, yb - 6, x + w - 6, yb - 6, s.seed + 1, 1.6, "rgba(104,84,56,0.95)");
+    // a rack of rockets, angled up
+    for (let i = 0; i < 4; i++) {
+      const px = x + 16 + i * 12;
+      seg(c, px, yb - 10, px, yb - 34, s.seed + 20 + i * 3, 1.4, "rgba(84,86,74,0.95)");
+      ZS.wpoly(
+        c,
+        [
+          { x: px - 2.5, y: yb - 34 },
+          { x: px + 2.5, y: yb - 34 },
+          { x: px + 2.5, y: yb - 40 },
+          { x: px - 2.5, y: yb - 40 },
+        ],
+        s.seed + 40 + i,
+        0.3,
+        true,
+      );
+      c.fillStyle = "rgba(150,116,74,0.7)";
+      c.fill();
+      c.strokeStyle = INK;
+      c.lineWidth = 1;
+      c.stroke();
+    }
+  }
+
+  function drawCapture(c, s, t, _env) {
+    const x = s.x,
+      y = s.y,
+      w = s.w,
+      h = s.h,
+      yb = y + h;
+    floor(c, s, "rgba(170,150,120,0.18)");
+    // a low earthwork ring with a flag on a tall pole
+    ZS.wcirc(c, x + w / 2, yb - 6, w * 0.42, s.seed + 1, 1.1);
+    c.strokeStyle = "rgba(104,84,56,0.8)";
+    c.lineWidth = 1.6;
+    c.stroke();
+    seg(c, x + w / 2, yb - 8, x + w / 2, y - 30, s.seed + 20, 1.5, INK);
+    const flut = Math.sin(t * 2 + s.seed) * 0.28;
+    ZS.wpoly(
+      c,
+      [
+        { x: x + w / 2, y: y - 30 },
+        { x: x + w / 2 + 24, y: y - 25 + flut * 8 },
+        { x: x + w / 2, y: y - 20 },
+      ],
+      s.seed + 21,
+      0.7,
+      true,
+    );
+    c.fillStyle = "rgba(72,96,120,0.6)";
+    c.fill();
+    c.strokeStyle = INK;
+    c.lineWidth = 1.2;
+    c.stroke();
+  }
+
   const ART = {
     hall: drawHall,
     hut: drawHut,
@@ -2345,6 +2673,12 @@
     stable: drawStable,
     foundry: drawFoundry,
     airfield: drawAirfield,
+    refinery: drawRefinery,
+    factory: drawFactory,
+    gunTurret: drawGunTurret,
+    flak: drawFlak,
+    rocket: drawRocket,
+    capture: drawCapture,
   };
 
   /* ---------- the module ---------- */

@@ -233,9 +233,11 @@ if (RNG) {
     return s / 4294967296;
   };
 }
-win.ZS_WW = 2200;
-win.ZS_WH = 1600;
-win.ZS_SCEN = "ScenarioVillage";
+win.ZS_WW = process.env.ZS_WW ? +process.env.ZS_WW : 2200;
+win.ZS_WH = process.env.ZS_WH ? +process.env.ZS_WH : 1600;
+// a test may point the page at another scenario pack (e.g. the RTS);
+// the default stays the survival village so nothing existing breaks.
+win.ZS_SCEN = process.env.ZS_SCEN || "ScenarioVillage";
 globalThis.ZS_WW = win.ZS_WW;
 globalThis.ZS_WH = win.ZS_WH;
 globalThis.ZS_SCEN = win.ZS_SCEN;

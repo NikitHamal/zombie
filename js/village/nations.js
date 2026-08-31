@@ -197,6 +197,18 @@
       return null;
     },
 
+    // are these two nations at war with each other? An RTS scenario turns
+    // whole factions hostile to one another through this. Unknown or
+    // missing ids default to peaceful.
+    atWar(scen, aId, bId) {
+      if (!aId || !bId || aId === bId) return false;
+      const st = scen && scen.nat;
+      if (!st) return false;
+      const a = this.get(st, aId),
+        b = this.get(st, bId);
+      return !!(a && b && a.war && b.war);
+    },
+
     word(op) {
       return op > 0.78
         ? "allies"

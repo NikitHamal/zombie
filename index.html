@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"
     />
-    <title>The Hollow — rebuild the village</title>
+    <title>The Desert Order — hold the waste</title>
     <!-- a hut, drawn in the same ink, as the tab's mark -->
     <link
       rel="icon"
@@ -440,12 +440,24 @@
         <button id="natb" title="the world beyond — the nations (D)">nations</button>
         <button id="mapb" title="the valley — send parties out (M)">valley</button>
         <button id="bookb" title="the record — what has happened, and saving (L)">record</button>
-        <button id="pilotb" title="the steward — let him play the village for you (P)">steward</button>
-        <button id="watchb" title="watch — the camera follows the trouble, and the quiet runs on (W)">watch</button>
+        <button id="pilotb" title="the steward — let him play the village for you (P)">
+          steward
+        </button>
+        <button
+          id="watchb"
+          title="watch — the camera follows the trouble, and the quiet runs on (W)"
+        >
+          watch
+        </button>
         <span class="sep"></span>
         <button id="home" title="centre on the hall (H)">hall</button>
         <button id="fit" title="fit the whole map (F)">map</button>
-        <button id="bell" title="ring the bell — bring them home (N) · shift+N calls the dark down early">bell</button>
+        <button
+          id="bell"
+          title="ring the bell — bring them home (N) · shift+N calls the dark down early"
+        >
+          bell
+        </button>
         <button id="qualb" title="picture quality (Q)">quality</button>
         <button id="sound" title="mute (K)">sound</button>
         <button id="helpb" title="keys (?)">?</button>
@@ -459,55 +471,50 @@
 
       <div id="helpwrap">
         <div class="card paper">
-          <h2>the hollow</h2>
-          Nothing here is yours to control directly — only to direct. The
-          village works by day and hides by night.
+          <h2>the desert order</h2>
+          You hold a walled outpost on the waste, and you take more of it. Build, research, field
+          tanks and gunships and fleets — and send them out to take the ground.
           <div style="margin-top: 8px">
-            <div><span class="k">V</span>the roster — everybody, and the work you give them</div>
-            <div><span class="k">M</span>the valley — send parties out for what you need</div>
-            <div><span class="k">L</span>the record — everything that has happened, and saving</div>
-            <div><span class="k">Q</span>picture quality · <span class="k">F3</span>the numbers</div>
-            <div><span class="k">click</span>a villager, then pick their work</div>
-            <div><span class="k">L W S F</span>labourer · wood · stone · forage</div>
-            <div><span class="k">M B R G</span>farm · build · repair · guard</div>
-            <div><span class="k">C X</span>heal · idle</div>
-            <div><span class="k">tab</span>next villager</div>
-            <div><span class="k">B</span>build menu — the ghost follows the cursor, click to set it down</div>
+            <div>
+              <span class="k">drag</span>box-select your units · <span class="k">click</span>ground
+              to move
+            </div>
+            <div><span class="k">click</span>an enemy to send the line after it</div>
+            <div>
+              <span class="k">B</span>build — the ghost follows the cursor, click to set it down
+            </div>
             <div><span class="k">T</span>the workshop's research</div>
             <div>
-              <span class="k">A</span>the field — train soldiers, carts, cannon, wings
+              <span class="k">A</span>the field — train soldiers, cannon, tanks, wings, fleets
             </div>
             <div>
-              <span class="k">D</span>the world beyond — the nations, their wagons and
-              their wars
+              <span class="k">D</span>the world beyond — the nations, their wars and their wagons
             </div>
             <div>
-              <span class="k">P</span>the steward — he sets the work, raises and mends,
-              and tells you what he did
+              <span class="k">P</span>the steward — he sets the work, raises and mends, and tells
+              you what he did
             </div>
             <div>
-              <span class="k">W</span>watch — the camera follows the trouble, and the
-              quiet stretches run on
+              <span class="k">W</span>watch — the camera follows the trouble, and the quiet
+              stretches run on
             </div>
             <div><span class="k">A</span>then <i>rally</i>, and click the ground to place it</div>
             <div><span class="k">U R X</span>on a building: upgrade · rebuild · dismantle</div>
             <div><span class="k">space</span>pause · <span class="k">1 2 3</span>speed</div>
             <div><span class="k">H F</span>centre on the hall · fit the map</div>
-            <div><span class="k">N</span>ring the bell — everyone comes home</div>
+            <div><span class="k">N</span>ring the bell — the garrison comes home</div>
             <div><span class="k">J</span>job icons · <span class="k">shift+V</span>names</div>
             <div><span class="k">K</span>mute · <span class="k">esc</span>cancel</div>
           </div>
-          <div class="foot">
-            drag to pan · wheel to zoom · the hall falling ends the run
-          </div>
+          <div class="foot">drag to pan · wheel to zoom · the hall falling ends the run</div>
         </div>
       </div>
     </div>
 
     <script>
-      var ZS_WW = 2200;
-      var ZS_WH = 1600;
-      var ZS_SCEN = "ScenarioVillage";
+      var ZS_WW = 3200;
+      var ZS_WH = 2200;
+      var ZS_SCEN = "ScenarioDesert";
     </script>
     <script src="js/sketch.js"></script>
     <script src="js/village/perf.js"></script>
@@ -537,6 +544,7 @@
     <script src="js/agents.js"></script>
     <script src="js/sim.js"></script>
     <script src="js/scenarios/village.js"></script>
+    <script src="js/scenarios/desert.js"></script>
     <script src="js/village/ui.js"></script>
     <script src="js/draw.js"></script>
     <script src="js/sound.js"></script>

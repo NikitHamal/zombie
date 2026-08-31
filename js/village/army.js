@@ -42,6 +42,13 @@
   // cannot reach — the dead cannot reach them at all.
   function opposed(a, o) {
     if (!o || o.dead || o.gone || o === a) return false;
+    // two units under arms: a scenario may put whole factions at war with
+    // each other (rival nations fight one another, not just the player).
+    // The village scenario never defines hostileBetween, so this is a no-op.
+    if (o.st === 4 && a.st === 4) {
+      const S = typeof ZS !== "undefined" && ZS.scenario && ZS.scenario.hostileBetween;
+      if (S) return S(a, o, ZS.scenario);
+    }
     if (a.foe) return o.st === 0 || (o.st === 4 && !o.foe);
     return o.st === 2 || o.st === 3 || (o.st === 4 && o.foe);
   }
@@ -536,14 +543,19 @@
     spawn(scen, id, foe, at) {
       const U = ZS.Units;
       const d = U.def(id);
-      const p = at || this.muster(scen, foe);
+      // a ship steps into the nearest open water, not the barracks yard
+      const fleet =
+        !at && d.water && scen._spawnPointFleet && typeof scen._spawnPointFleet === "function"
+          ? scen._spawnPointFleet()
+          : null;
+      const p = at || fleet || this.muster(scen, foe);
       if (!p) return null;
       const a = scen.makeAgent(p.x, p.y, 4, {
         unit: id,
         foe: foe ? 1 : 0,
         hp: d.hp,
         maxHp: d.hp,
-        free: !!d.fly, // a flyer goes over walls, water and the dead
+        free: !!d.fly || !!d.water, // a flyer or a ship goes over walls and water
         slot: 0,
         sup: 1,
         kick: 0,
@@ -814,7 +826,7 @@
       const n = U.count(scen);
       if (!n) return "nobody under arms";
       const bits = [];
-      for (const id of U.ORDER) {
+      for (const id of U.roster(scen)) {
         const c = U.count(scen, id);
         if (c) bits.push(c + " " + (c === 1 ? U.def(id).name : U.def(id).name + "s"));
       }

@@ -43,8 +43,15 @@
   // Steer toward a world-space target: replan with A* when stale, follow
   // path waypoints, or go straight when line-of-sight is clear.
   // Returns "arrived" | "path" | "direct" | "fail" | "wait" | "blocked".
+  // A scenario may say who can swim per agent (naval units): `swimmer(a)`
+  // falls back to the whole-scenario `swim` flag when not provided.
+  function swimmerOf(a) {
+    const S = ZS.scenario;
+    if (S && typeof S.swimmer === "function") return !!S.swimmer(a);
+    return !!(S && S.swim);
+  }
   function planAndFollow(a, tg, isZ, sp, dt, t, nav) {
-    const swim = ZS.scenario.swim;
+    const swim = swimmerOf(a);
     const d = Math.hypot(tg.x - a.x, tg.y - a.y);
     if (d < 16) return "arrived";
     const moved =
@@ -127,7 +134,7 @@
   // agent already inside a building (standing on a floor cell) may move
   // through the interior; walls only exclude agents outside it
   function hardClamp(a, nx, ny, isZ, nav) {
-    const swim = ZS.scenario.swim;
+    const swim = swimmerOf(a);
     const inB = isZ && nav.cellAt(a.x, a.y) === 2;
     if (
       nav.isWalkable(nx, ny, isZ) ||
@@ -164,7 +171,7 @@
   // wall: try the full push, then each axis, then drop it
   function corePush(a, dx, dy, nav) {
     const isZ = ZS.scenario.walkBlocked(a);
-    const swim = ZS.scenario.swim;
+    const swim = swimmerOf(a);
     const inB = isZ && nav.cellAt(a.x, a.y) === 2;
     const nx = a.x + dx,
       ny = a.y + dy;
@@ -289,7 +296,7 @@
       if (
         !nav.isWalkable(a.x, a.y, blk) &&
         !(blk && nav.cellAt(a.x, a.y) === 2) &&
-        !(S.swim && nav.isWater(a.x, a.y))
+        !(swimmerOf(a) && nav.isWater(a.x, a.y))
       ) {
         if (nav.isWalkable(a.px, a.py, blk)) {
           a.x = a.px;
@@ -327,7 +334,7 @@
       if (a.y > world.h - m) a.vy -= (a.y - (world.h - m)) * dt * 8;
       const v = Math.hypot(a.vx, a.vy);
       let maxv = S.maxSpeed(a);
-      if (S.swim && nav.isWater(a.x, a.y)) maxv *= SWIM_FRAC; // swimmers
+      if (swimmerOf(a) && nav.isWater(a.x, a.y)) maxv *= SWIM_FRAC; // swimmers
       if (v > maxv) {
         a.vx *= maxv / v;
         a.vy *= maxv / v;
@@ -343,7 +350,7 @@
         else buildings[a.bld].survCount++;
       }
       const sp = Math.hypot(a.vx, a.vy);
-      if (a.wantMove && sp < 22 && !(S.swim && nav.isWater(a.x, a.y))) a.stuckT += dt;
+      if (a.wantMove && sp < 22 && !(swimmerOf(a) && nav.isWater(a.x, a.y))) a.stuckT += dt;
       else a.stuckT = Math.max(0, a.stuckT - dt * 2);
     }
     // the fallen are lifted from the field (the scenario hears about it:
