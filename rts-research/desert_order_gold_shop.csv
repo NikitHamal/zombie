@@ -1,0 +1,17 @@
+item,type,gold_cost,effect,recoverable,recovery_cost,max_installs,notes
+Power Plant,Maximum building,19,"+100 Energy Points",yes,1,"15 on home base","285 gold to max a home base"
+Military Central,Maximum building,29,"+100 Military Points",yes,1,"15 on home base","435 gold to max"
+Military Office,Maximum building,"19 / 29 / 59 / 109","+500 Military Points",no,-,"4 total","4th (109g) must be on a resident base; price rises with count on map"
+Command Base,Maximum building,69,+1 base cap,yes,1,"3 on home base; 500 per map","(Base Command) also recoverable"
+Base Extension,Base upgrade,49,"Unlocks max refinery levels (16/16/16/15)",yes,9,"1 per base","Manual maxing costs ~1300 gold equivalent"
+Flak armor upgrade,Base defense upgrade,29,"Armored flak (L2) ~10x tougher",yes,9,"per flak","L1 default flaks are weak"
+Flak weapon upgrade,Base defense upgrade,99,"Long-range flak (L3); ~13-20 range",yes,9,"per flak","Needs L2 first; can only upgrade when no enemy near"
+Group Extension,Bonus building,"39 / 69 / 159",+1 group limit,no,-,"3 total","Price rises with count on map; cheaper on home map"
+Sight Tower,Bonus building,"9 / 29 / 99",Reveals activity around base (3 levels),no,-,"per base",-
+Jammer Tower,Bonus building,"19 / 49 / 99",Hides base/units from sight towers,no,-,"per base",-
+Detector Tower,Bonus building,29,Detects stealth units; base auto-fires,no,-,"per base","Detects Ju87 Nachtrevi / Ho229 / XR-1 / M-class sub"
+Repair Crane,Bonus building,"79 / 159 / 349",Repairs units to 100% HP; L3 repairs air at 2%/min,no,-,"per base","Non-recoverable - protect it"
+Immediate Resources,Speed-up,49,"+30M concrete/steel/alu (x3 = 90M with 2-week loyalty bonus)",n/a,n/a,n/a,"Only purchasable if all resources < 10M"
+Resource Acceleration,Speed-up,gold (1-15h),3x production on a base,refund prorated,n/a,n/a,"No storage limit while active; free 1h steel/day on home base (<1M steel), free 1h alu/day with 2nd base (<1M alu)"
+Allied Conquest Vehicle,Utility,250,"Build a conquest vehicle from an allied airbase",n/a,n/a,n/a,"Works on maps where you have no presence"
+Gold,-,cash purchase,premium currency,n/a,n/a,n/a,"10 Polutorka in one CET day = 1 gold; not transferable"

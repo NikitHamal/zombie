@@ -1,0 +1,75 @@
+category,unit,special_abilities,steel,aluminum,damage,armor,range,fuel,notes
+Ground,Conquest Truck,APC,45000,5000,,3,,20,Non-attacking; capture bases
+Ground,M16 MGMC,Good vs Air Units / 2x range,45000,25000,200,7,5,10,Cheap group AA; escort
+Ground,SDKFZ123 Luchs (PzKpfw II),,35000,5000,100,15,8,15,P2; tutorial unit; home base only; group 47
+Ground,Willys MB Calliope,2x range engage / Fast,65000,25000,500,7,8,5,Scout/raid jeep; home base only
+Ground,BM-13 Katyusha,3x range engage,850000,750000,5000,10,10,25,MLRS; no AA
+Ground,M4 Sherman Heavy tank,,450000,200000,1500,150,10,50,All-rounder
+Ground,SP6 Sturmtiger Howitzer,Good against Bases,1970000,900000,20000,1875,12,75,No-turret: cannot fire while moving; special ammo
+Ground,SDKFZ4 Maultier,2x range engage,375000,250000,950,15,10,30,MLRS; no AA
+Ground,Breda 501,Good against Bases,95000,35000,250,30,10,15,Starter base-killer; group 47
+Ground,90/53 su Lancia 3Ro,Good against Bases,390000,65000,1000,30,10,25,50/day at 10x price from home base; MP15/grp19/spd1/sight11/9s
+Ground,Tetrarch LT Mk VII,Good against Trains,500000,15000,750,75,8,35,
+Ground,VK1602 Leopard LT,Good vs Boats / 3x range engage,310000,120000,150,75,6,45,Long sight scout
+Ground,M3 Stuart,,95000,55000,250,75,8,35,MP15/grp7/spd1.5/sight9/45s
+Ground,T-26,Good against weak Vehicles,590000,90000,250,150,10,50,
+Ground,KW2 Klimet Woroszylowa,Good vs big Vehicles / 2x range,1300000,600000,6000,1500,9,80,
+Ground,SDKFZ173 Jagdpanther,Good vs Base Attack Units / 2x,1300000,500000,800,300,9,50,Base-defense sniper
+Ground,T-34-85,Good vs Vehicles + Boats / 3x,2500000,750000,400,600,8,50,3x range vs boats
+Ground,sIG33 Sturmpanzer I Bison,Good against Bases,135000,105000,2500,30,6,40,
+Ground,sIG33 Sturmpanzer II Bison,Good against Bases,390000,290000,1750,50,10,45,
+Ground,Wespe Howitzer,Good against Bases,150000,35000,1200,75,10,40,
+Ground,SDKFZ166 Sturmpanzer IV,Good against Bases,2900000,1900000,2250,300,10,65,
+Ground,FP6 Flakpanzer IV Wirbelwind,Good vs Air Units / 2x range,950000,300000,1000,375,8,50,2x range vs air units
+Ground,P6 Tiger I (PzKpfw VI) Heavy tank,,1900000,650000,2500,1500,10,75,
+Ground,T34 Calliope Heavy tank,2x range engage,950000,250000,1500,150,10,60,MLRS; no AA
+Ground,GPF SaintChamond,Good vs Bases / 3x range engage,975000,150000,14000,37,7,50,Siege gun
+Ground,A27M Cruiser MkIV Cromwell Heavy tank,Fast,650000,650000,2000,250,9,75,
+Ground,IS-3M Stalin Tankograd Heavy tank,,8900000,3900000,5000,3000,10,110,
+Ground,P6 Tiger II (PzKpfw VI B) King Heavy,,9500000,5500000,2500,4166,10,100,
+Ground,M4A1 Skink,Good vs Aircraft / 2x range,750000,175000,700,150,8,50,Long-range plane shooter
+Ground,M19 MGMC,Good vs big Aircraft / 2x range,875000,225000,3000,50,9,40,Heavy bomber killer
+Ground,SDKFZ164 Nashorn,Good vs Vehicles / 2x range,900000,300000,650,93,10,40,The base guard tank
+Ground,SDKFZ184 Elefant,Good vs Vehicles / 2x range,13900000,12900000,675,4491,10,90,
+Ground,SU-122 (T-34),Good against Trains,950000,390000,2250,500,10,75,
+Ground,203mm Howitzer M1931 (B-4),Good vs Bases / 3x range engage,1390000,590000,12500,50,10,55,
+Ground,T28 Super Heavy tank,Good vs Vehicles / 2x range,9500000,4500000,1000,7500,10,100,Copter base build; no turret; 2x vs moving vehicles
+Ground,SDKFZ205 (PzKpfw VIII) Maus Super Heavy,Good vs Vehicles + Trains / 2x,11000000,3000000,1500,5000,9,125,Copter base build
+Ground,Karl-Geraet 041 Howitzer,Good vs Bases / 3x range engage,9000000,8000000,100000,750,12,150,Copter base build; special ammo
+Ground,MP4 Karl Ammunition Support Vehicle,,1500000,500000,,75,,50,Supply only; Karl ammo
+Ground,MP1 Heavy Ammunition Support Vehicle,,750000,250000,,18,,30,Supply only
+Helicopter,Sikorsky-R4 copter,,25000,225000,500,30,8,125,Cheap scout copter
+Helicopter,Focke-Wulf FW-61 copter,Good against Vehicles,100000,1250000,2000,150,8,175,
+Helicopter,Sikorsky-H5 copter,Good against Bases,200000,1750000,5500,375,4,225,
+Helicopter,Flettner FL-265 copter,Good against Air Units,95000,750000,900,75,10,125,
+Helicopter,Platt-LePage XR-1 RAM copter,Stealth abilities,390000,2950000,2500,150,10,275,Stealth scout
+Aircraft,IL2 Iljuschin Schturmowik,Good against Vehicles,100000,750000,600,250,5,150,
+Aircraft,Kawasaki KI-48 Sokei Bomber,Good against Bases,450000,4500000,7500,1000,5,750,
+Aircraft,Polikarpov I15,Good against Copters,55000,125000,100,50,12,150,Cheap long-sight scout
+Aircraft,Supermarine Spitfire,Good against Aircraft,250000,800000,500,375,12,200,
+Aircraft,Lockheed P38 Lightning,,2500000,8500000,3000,3750,10,550,Heavy fighter
+Aircraft,ME262 Messerschmitt Jet,,750000,2900000,2500,750,12,400,
+Aircraft,B25 Mitchell Bomber,Good against Boats,750000,4500000,5000,3000,6,700,
+Aircraft,Junkers JU87 Stuka Nachtrevi,Stealth abilities,900000,1900000,3000,375,8,400,Stealth; heavy fuel
+Aircraft,BF110 Messerschmitt,Detector,490000,4900000,900,2500,12,800,Detects stealth
+Aircraft,Handley Page Halifax Bomber,Good against Bases,1990000,13900000,70000,3750,6,900,Terrible fuel (900/s)
+Aircraft,Horten Ho 229 v7 Bomber,Good against Bases + Stealth,1900000,19000000,90000,2000,6,2500,Stealth siege bomber
+Aircraft,Mitsubishi Ki-30,Good against Trains,220000,2200000,20000,500,6,300,
+Aircraft,Junkers JU88,Good against Vehicles,500000,3500000,12500,3000,5,300,
+Aircraft,Heinkel HE51,,50000,300000,1000,250,10,175,Cheap armored biplane (600 vs ground)
+Naval,Conquest boat,APC,35000,1000,,15,,5,Non-attacking; capture naval bases
+Naval,MBK186 Project Patrol boat,Good against Vehicles,4500000,2500000,1500,7500,18,45,
+Naval,BK1125 Project AA boat,Good against Air Units,1500000,350000,300,3000,10,35,
+Naval,Flower class Howitzer boat,Good against Bases,19000000,2500000,12000,15000,18,55,
+Naval,Fast Attack boat,,45000,15000,100,10,12,5,Cheap swarm boat
+Naval,PT596 Torpedo boat,Good against Boats,750000,150000,1600,750,12,15,
+Naval,M-class Submarine,attacks Boats only / Stealth / 2x,3500000,1500000,2000,2500,8,90,Stealth
+Naval,Allen M. Sumner class Destroyer boat,2x range engage,35000000,9000000,7500,25000,16,75,Top-tier boat
+Naval,Ammunition Transport boat,,1250000,250000,0,75,0,35,Supply only
+Train,Train Locomotive,,390000,90000,0,750,0,5,Engine; pulls flatcars
+Train,Field Artillery Flatcar,Good against Vehicles,850000,150000,750,500,18,10,
+Train,Howitzer Flatcar,Good vs Bases / 3x range engage,4500000,900000,12000,750,18,25,
+Train,Anti-Air Flatcar,Good against Air Units / 2x,1950000,25000,1500,3750,12,20,
+Train,Panzerjaegerwagen,2x range engage,2200000,500000,6000,750,15,20,
+Train,Panzerjaeger Triebwagen 51,Good vs Boats + Trains / 3x,3900000,1900000,2500,3750,12,15,
+Special,Polutorka (Gold Export Truck),Gold export,75000,25000,,,,4500,"10/day (CET) => +1 gold; home base only; not queueable; ~750k steel/250k alu/45k fuel per 10 trucks"

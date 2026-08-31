@@ -1,0 +1,216 @@
+{
+  "_readme": "Example data-driven schema for your Desert-Order-style RTS. All balance lives in data, not code. Values below are the researched Desert Order reference values (2022 snapshot) - replace names/art with your own original creations.",
+  "meta": {
+    "game": "Your game name",
+    "resources": ["concrete", "steel", "aluminum", "oil", "gold"],
+    "tick_rate_seconds": 1,
+    "free_energy_at_start": 1000,
+    "free_military_at_start": 1000,
+    "free_bases": 10,
+    "cap_tolerance": 99,
+    "timezone_for_daily_reset": "CET"
+  },
+  "formulas": {
+    "productivity": "(bases_on_map ** 0.5) / bases_on_map",
+    "storage": {
+      "concrete": "ROUND(ROOT(concrete_factories_on_map * 1000)) * 1000",
+      "steel": "ROUND(ROOT(steel_mills_on_map * 1000)) * 300",
+      "aluminum": "ROUND(ROOT(alu_factories_on_map * 1000)) * 100",
+      "oil": "ROUND(ROOT(oil_refineries_on_map * 1000)) * 30"
+    },
+    "home_map_storage_bonus": { "concrete": 1000000, "steel": 500000, "aluminum": 250000, "oil": 50000 },
+    "home_map_second_base_bonus": { "concrete": 750000, "steel": 1000000, "aluminum": 500000, "oil": 0 },
+    "group_limit": "((bases_on_map / 10) ** 0.5) * 10 + (2 if is_home_map else 0)",
+    "energy_cost_per_level": { "concrete_factory": 5, "steel_plant": 7, "aluminum_factory": 9, "oil_refinery": 11, "flak": 9 },
+    "specialization_damage": { "vs_specialty": 5.0, "vs_other": 0.2 },
+    "flak_range_bonus_vs_boats_trains": 6,
+    "highway_fuel_cost": "1000 * unit.fuel_per_second",
+    "highway_fuel_arriving": "0.2 * highway_fuel_cost",
+    "big_vehicle_armor_threshold": 1500,
+    "big_aircraft_armor_threshold": 2500
+  },
+  "unit_classes": [
+    { "id": "base", "label": "Bases (base guns/flaks)" },
+    { "id": "vehicle", "label": "Vehicles (armor < 1500)" },
+    { "id": "big_vehicle", "label": "Big vehicles (armor >= 1500)" },
+    { "id": "weak_vehicle", "label": "Weak vehicles" },
+    { "id": "boat", "label": "Boats" },
+    { "id": "train", "label": "Trains" },
+    { "id": "aircraft", "label": "Aircraft (armor >= 2500)" },
+    { "id": "air_unit", "label": "Air units (any plane/copter)" },
+    { "id": "copter", "label": "Copters" },
+    { "id": "submarine", "label": "Submarines" }
+  ],
+  "units": [
+    {
+      "id": "breda_501",
+      "name": "Breda 501 (rename in your game)",
+      "category": "ground_tank",
+      "buildable_at": ["tank_base", "home_base"],
+      "cost": { "steel": 95000, "aluminum": 35000 },
+      "build_time_s": 12,
+      "firepower": { "base": 250, "default": 50 },
+      "armor": 30,
+      "weapon_range": 10,
+      "sight": 10,
+      "speed": 1,
+      "fuel_per_second": 15,
+      "military_points": 15,
+      "group_size": 47,
+      "specialty": ["base"],
+      "special": { "range_multiplier_vs": {} },
+      "can_shoot_air": false,
+      "can_fire_while_moving": true,
+      "ammo_capacity": 0,
+      "stealth": false,
+      "detector": false
+    },
+    {
+      "id": "lancia_3ro",
+      "name": "90/53 su Lancia 3Ro",
+      "category": "ground_tank",
+      "buildable_at": ["home_base"],
+      "cost": { "steel": 390000, "aluminum": 65000 },
+      "build_time_s": 9,
+      "firepower": { "base": 5000, "default": 20 },
+      "armor": 30,
+      "weapon_range": 10,
+      "sight": 11,
+      "speed": 1,
+      "fuel_per_second": 25,
+      "military_points": 15,
+      "group_size": 19,
+      "specials": { "daily_quota": { "amount": 50, "price_multiplier": 0.1, "only_at": "home_base" } },
+      "specialty": ["base"]
+    },
+    {
+      "id": "nashorn",
+      "name": "SDKFZ164 Nashorn",
+      "category": "tank_destroyer",
+      "buildable_at": ["tank_base"],
+      "cost": { "steel": 900000, "aluminum": 300000 },
+      "build_time_s": 60,
+      "firepower": { "vehicle": 650, "big_vehicle": 650, "default": 130 },
+      "armor": 93,
+      "weapon_range": 10,
+      "sight": 9,
+      "speed": 1,
+      "fuel_per_second": 40,
+      "military_points": 25,
+      "group_size": 5,
+      "specialty": ["vehicle", "big_vehicle"],
+      "special": { "range_multiplier_vs": { "vehicle": 2, "big_vehicle": 2 } }
+    },
+    {
+      "id": "halifax",
+      "name": "Handley Page Halifax Bomber",
+      "category": "aircraft_bomber",
+      "buildable_at": ["air_base"],
+      "cost": { "steel": 1990000, "aluminum": 13900000 },
+      "build_time_s": 240,
+      "firepower": { "base": 70000, "default": 14000 },
+      "armor": 3750,
+      "weapon_range": 6,
+      "sight": 12,
+      "speed": 3,
+      "fuel_per_second": 900,
+      "military_points": 60,
+      "group_size": 3,
+      "specialty": ["base"],
+      "can_shoot_air": true,
+      "note": "Fuel hog - needs good oil economy; retreat at 15-20% HP"
+    },
+    {
+      "id": "polutorka",
+      "name": "Polutorka (Gold Export Truck)",
+      "category": "economic",
+      "buildable_at": ["home_base"],
+      "cost": { "steel": 75000, "aluminum": 25000, "oil": 4500 },
+      "build_time_s": 30,
+      "firepower": { "default": 0 },
+      "armor": 10,
+      "speed": 1,
+      "fuel_per_second": 15,
+      "military_points": 2,
+      "group_size": 30,
+      "queueable": false,
+      "gold_quest": { "10_per_day_gives": 1 }
+    }
+  ],
+  "buildings": [
+    {
+      "id": "steel_plant",
+      "category": "factory",
+      "max_level": 16,
+      "base_max_level": 12,
+      "energy_per_level": 7,
+      "produces": { "resource": "steel" },
+      "production_per_level": "design your own curve (~174 steel/s at maxed single base is the lore anchor)",
+      "storage_formula_key": "steel"
+    },
+    {
+      "id": "flak",
+      "category": "base_defense",
+      "energy_cost": 9,
+      "armor_tiers": [
+        { "tier": "L1", "gold": 0, "armor_mult": 1, "range": 9.5, "dmg": 35, "recoverable": false },
+        { "tier": "L2", "gold": 29, "armor_mult": 10, "range": 9.5, "recoverable": true, "recovery_gold": 9 },
+        { "tier": "L3", "gold": 99, "armor_mult": 10, "range": 16, "recoverable": true, "recovery_gold": 9 }
+      ],
+      "behaviour": { "fires_at": ["ground", "air"], "range_bonus_vs": { "boat": 6, "train": 6 }, "progressive_armor": true },
+      "only_upgradable_when": "no enemy (incl. stealth) nearby, base uncontested"
+    },
+    {
+      "id": "power_plant", "category": "maximum_building", "gold": 19, "effect": { "energy": 100 }, "recoverable": 1, "max_on_home_base": 15
+    },
+    {
+      "id": "military_central", "category": "maximum_building", "gold": 29, "effect": { "military_points": 100 }, "recoverable": 1, "max_on_home_base": 15
+    },
+    {
+      "id": "military_office", "category": "maximum_building", "gold": [19, 29, 59, 109], "effect": { "military_points": 500 }, "recoverable": false
+    },
+    {
+      "id": "command_base", "category": "maximum_building", "gold": 69, "effect": { "base_cap": 1 }, "recoverable": 1, "max_on_home_base": 3
+    },
+    {
+      "id": "base_extension", "category": "base_upgrade", "gold": 49, "effect": { "factory_level_cap": [16, 16, 16, 15] }, "recoverable": 9
+    },
+    {
+      "id": "group_extension", "category": "bonus_building", "gold": [39, 69, 159], "effect": { "group_limit": 1 }, "recoverable": false
+    },
+    {
+      "id": "sight_tower", "category": "bonus_building", "gold": [9, 29, 99], "effect": { "reveal_radius": [10, 14, 18] }, "recoverable": false
+    },
+    {
+      "id": "jammer_tower", "category": "bonus_building", "gold": [19, 49, 99], "effect": { "hide_radius": [10, 14, 18] }, "recoverable": false
+    },
+    {
+      "id": "detector_tower", "category": "bonus_building", "gold": 29, "effect": { "detects_stealth": true }, "recoverable": false
+    },
+    {
+      "id": "repair_crane", "category": "bonus_building", "gold": [79, 159, 349], "effect": { "repair_speed_mult": [1, 1.5, 2], "repairs_air": [false, false, true], "air_repair_percent_per_min": 2 }, "recoverable": false
+    }
+  ],
+  "base_types": [
+    { "id": "home", "marker": "H", "produces": ["willys", "p2_luchs", "polutorka", "discount_lancia_50d"], "uncapturable": true },
+    { "id": "tank", "marker": "plain", "produces": "ground vehicles" },
+    { "id": "air", "marker": "/", "produces": "airplanes" },
+    { "id": "helicopter", "marker": "|", "produces": "helicopters + T28/Maus/Karl" },
+    { "id": "naval", "marker": "near river", "produces": "boats" },
+    { "id": "train", "marker": "near tracks", "produces": "armored trains" }
+  ],
+  "conquest_rules": {
+    "destroy_all_flaks_to_own": true,
+    "production_buildings_decay_pct": 50,
+    "captured_base_default_flaks": 2,
+    "newbie_base_rules": { "max_player_bases": 5, "max_captures_this_week": 10, "ages_over_time": true },
+    "free_apc_if_no_base_on_map": true,
+    "allied_conquest_vehicle_gold": 250
+  },
+  "map_system": {
+    "maps": "numbered, open over time, each with resource multiplier & stock size",
+    "highways": { "per_map": 12, "edges": ["N","W","S","E"], "per_edge": 3, "sealed_maps_low_end": 10, "newest_maps_sealed": 2, "age_seal_days": 7 },
+    "home_map_leave_after_idle_minutes": 15,
+    "home_map_change": "only 1 base total, OR only home base on home map + >10 bases on another map"
+  }
+}
