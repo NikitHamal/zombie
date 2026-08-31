@@ -1,4 +1,4 @@
-/* Desert Order — the minimap.
+/* SANDSTORM — the minimap.
 
    The whole 300x300-tile map in a square in the corner, at roughly one
    pixel per tile. Three layers, only one of which is redrawn often:
@@ -154,19 +154,18 @@
           py = s.ty * k;
         const owned = s.owner >= 0;
         c.fillStyle = owned ? R.factionTint[s.owner] : "rgba(120,108,88,0.85)";
-        if (s.nest) {
-          // a Rot nest reads as a hollow ring, not a settlement
-          c.strokeStyle = R.factionTint[6];
-          c.lineWidth = 1.6;
+        c.beginPath();
+        c.arc(px, py, s.home ? 4.2 : s.open ? 3.6 : 3, 0, R.TAU);
+        c.fill();
+        c.strokeStyle = "rgba(52,45,37,0.7)";
+        c.lineWidth = 0.9;
+        c.stroke();
+        if (s.open) {
+          // an open yard reads as a bright ring — come and take it
+          c.strokeStyle = "rgba(240,234,218,0.9)";
+          c.lineWidth = 1;
           c.beginPath();
-          c.arc(px, py, 3.4, 0, R.TAU);
-          c.stroke();
-        } else {
-          c.beginPath();
-          c.arc(px, py, s.home ? 4.2 : 3, 0, R.TAU);
-          c.fill();
-          c.strokeStyle = "rgba(52,45,37,0.7)";
-          c.lineWidth = 0.9;
+          c.arc(px, py, 5.4, 0, R.TAU);
           c.stroke();
         }
       }

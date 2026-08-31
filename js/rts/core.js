@@ -1,4 +1,4 @@
-/* Desert Order — RTS core: the constants, the paper palette, the seeded
+/* SANDSTORM — RTS core: the constants, the paper palette, the seeded
    noise, and the small maths everything else leans on.
 
    The whole world is a tile grid. Ground units walk tiles, ships hold the
@@ -32,6 +32,7 @@
   const T_SCRUB = 4; // dry brush: walkable, breaks sight a little
   const T_OIL = 5; // an oil seep: a refinery here pays double
   const T_ROAD = 6; // highway: fast, and it leaves the map at the edges
+  const T_RAIL = 7; // the rail line: walkable, and the only ground trains know
 
   R.T = {
     SAND: T_SAND,
@@ -41,12 +42,13 @@
     SCRUB: T_SCRUB,
     OIL: T_OIL,
     ROAD: T_ROAD,
+    RAIL: T_RAIL,
   };
 
   // ground speed multiplier per tile kind (road is a highway, sand drags)
-  const SPEED_BY_T = [0.86, 1, 0, 0, 0.78, 0.92, 1.28];
+  const SPEED_BY_T = [0.86, 1, 0, 0, 0.78, 0.92, 1.28, 1];
   // can a ground unit stand here at all
-  const OPEN_BY_T = [1, 1, 0, 0, 1, 1, 1];
+  const OPEN_BY_T = [1, 1, 0, 0, 1, 1, 1, 1];
 
   R.SPEED_BY_T = SPEED_BY_T;
   R.OPEN_BY_T = OPEN_BY_T;
@@ -55,8 +57,9 @@
 
   const L_GROUND = 0,
     L_AIR = 1,
-    L_SEA = 2;
-  R.L = { GROUND: L_GROUND, AIR: L_AIR, SEA: L_SEA };
+    L_SEA = 2,
+    L_TRAIN = 3;
+  R.L = { GROUND: L_GROUND, AIR: L_AIR, SEA: L_SEA, TRAIN: L_TRAIN };
 
   /* ---------- the paper palette ----------
      Everything is drawn in ink on a warm page. The desert is a pale wash,
@@ -80,6 +83,7 @@
     scrub: [150, 158, 104],
     oil: [72, 64, 54],
     road: [201, 184, 150],
+    rail: [128, 112, 90],
 
     build: [196, 172, 132],
     buildDark: [148, 126, 94],
@@ -183,6 +187,7 @@
   R.hostileTo = function (a, b) {
     if (a === b) return false;
     if (a === 6 || b === 6) return true; // the Rot eats everyone
+    if (a === -1 || b === -1) return true; // neutral ground defends itself against all
     const A = R.diplo[a],
       B = R.diplo[b];
     return !(A.ally[b] || B.ally[a]);
@@ -192,6 +197,7 @@
   R.sameTeam = function (a, b) {
     if (a === b) return true;
     if (a === 6 || b === 6) return false; // nobody shares a door with the Rot
+    if (a === -1 || b === -1) return false; // and nobody shares a door with the sand
     const A = R.diplo[a],
       B = R.diplo[b];
     return !!(A.ally[b] || B.ally[a]);

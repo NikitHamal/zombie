@@ -1,4 +1,4 @@
-/* Desert Order — the drawing of things.
+/* SANDSTORM — the drawing of things.
 
    Same ink as the village: every line is a boiling stroke from
    js/sketch.js, the same wobble, the same paper palette. What changes is
@@ -1049,38 +1049,6 @@
     }
   }
 
-  function barracks(c, b, _t) {
-    const s = b.size * TILE;
-    const w = s * 0.84,
-      h = s * 0.62,
-      ht = 14;
-    slab(c, b.x, b.y, w, h, ht, b.seed, facetTint(b.fac, 0.14), "rgba(206,186,150,0.95)");
-    // a pitched roof
-    const x = b.x,
-      y = b.y - ht;
-    shape(
-      c,
-      [
-        { x: x - w / 2, y: y + h / 2 },
-        { x, y: y - h * 0.42 },
-        { x: x + w / 2, y: y + h / 2 },
-      ],
-      b.seed + 5,
-      "rgba(164,142,110,0.95)",
-      "rgba(52,45,37,0.95)",
-      1.6,
-      0.8,
-    );
-    // a parade of doorways
-    ink(c, "rgba(52,45,37,0.8)", 1.2);
-    for (let i = 0; i < 3; i++) {
-      const px = x - w / 3 + i * (w / 3);
-      ZS.wline(c, px - 4, y + h / 2, px - 4, y + h / 2 - 11, b.seed + 11 + i, 0.3);
-      ZS.wline(c, px + 4, y + h / 2, px + 4, y + h / 2 - 11, b.seed + 15 + i, 0.3);
-      ZS.wline(c, px - 4, y + h / 2 - 11, px + 4, y + h / 2 - 11, b.seed + 19 + i, 0.3);
-    }
-  }
-
   function airfield(c, b, t) {
     const s = b.size * TILE;
     // a runway, drawn on the ground, with the tower beside it
@@ -1197,43 +1165,6 @@
         1.6,
         0.5,
       );
-    }
-  }
-
-  function depot(c, b, _t) {
-    const s = b.size * TILE;
-    slab(
-      c,
-      b.x,
-      b.y,
-      s * 0.8,
-      s * 0.66,
-      10,
-      b.seed,
-      facetTint(b.fac, 0.14),
-      "rgba(202,190,164,0.95)",
-    );
-    // a row of crates and a fuel drum
-    const y = b.y - 10;
-    for (let i = 0; i < 3; i++) {
-      const px = b.x - s * 0.26 + i * s * 0.26;
-      shape(
-        c,
-        boxPts(px, y + s * 0.16, s * 0.18, s * 0.18, 0.2, 0, 0),
-        b.seed + 5 + i * 4,
-        "rgba(186,158,118,0.9)",
-        "rgba(52,45,37,0.9)",
-        1.3,
-        0.5,
-      );
-    }
-    ink(c, "rgba(52,45,37,0.9)", 1.4);
-    ZS.wcirc(c, b.x + s * 0.3, y + s * 0.18, s * 0.08, b.seed + 21, 0.6);
-    if (b.def.heal && LOD >= 1) {
-      // a red cross band, because it mends
-      ink(c, "rgba(150,64,48,0.85)", 2.4);
-      ZS.wline(c, b.x - 7, y - s * 0.18, b.x + 7, y - s * 0.18, b.seed + 25, 0.3);
-      ZS.wline(c, b.x, y - s * 0.18 - 7, b.x, y - s * 0.18 + 7, b.seed + 27, 0.3);
     }
   }
 
@@ -1385,70 +1316,6 @@
     }
   }
 
-  /* A baby flak: a sandbag ring, a slab, and a short pair of barrels
-     tipped up at the sky. Deliberately small — eight of them stand across
-     the mouth of the yard, and they must not hide the base behind them. */
-  function flaknest(c, b, _t) {
-    const x = b.x,
-      y = b.y,
-      a = b.turretA;
-    const s = TILE;
-    // the pit: a low ring of earth, thrown up in a hurry
-    shape(
-      c,
-      [
-        { x: x - s * 0.4, y: y - s * 0.3 },
-        { x: x + s * 0.38, y: y - s * 0.32 },
-        { x: x + s * 0.4, y: y + s * 0.3 },
-        { x: x - s * 0.36, y: y + s * 0.32 },
-      ],
-      b.seed,
-      "rgba(198,182,150,0.85)",
-      "rgba(52,45,37,0.85)",
-      1.4,
-      0.8,
-    );
-    // sandbags, three courses of them, counted in one at a time
-    ink(c, "rgba(52,45,37,0.45)", 1);
-    for (let i = 0; i < 3; i++) ZS.wcirc(c, x, y + 2, s * (0.18 + i * 0.07), b.seed + 21 + i, 0.3);
-    // the mount the turret sits on
-    shape(
-      c,
-      boxPts(x, y, s * 0.22, s * 0.19, 0, 0, 0),
-      b.seed + 5,
-      facetTint(b.fac, 0.34),
-      "rgba(52,45,37,0.95)",
-      1.5,
-      0.5,
-    );
-    const mx = x,
-      my = y - 3;
-    ink(c, "rgba(52,45,37,0.95)", 1.2);
-    ZS.wcirc(c, mx, my, 5, b.seed + 13, 0.4);
-    // twin barrels, short, and pointed up at whatever is coming
-    for (const off of [-2.2, 2.2]) {
-      const ox = -Math.sin(a) * off,
-        oy = Math.cos(a) * off;
-      ink(c, "rgba(52,45,37,0.95)", 2.6);
-      ZS.wline(
-        c,
-        mx + ox - Math.cos(a) * 4,
-        my + oy - Math.sin(a) * 4,
-        mx + ox + Math.cos(a) * 16,
-        my + oy + Math.sin(a) * 16,
-        b.seed + 17 + off,
-        0.3,
-      );
-    }
-    if (b.flash > 0) {
-      const f = b.flash / 0.08;
-      c.fillStyle = "rgba(252,220,140," + (0.85 * f).toFixed(2) + ")";
-      c.beginPath();
-      c.arc(mx + Math.cos(a) * 18, my + Math.sin(a) * 18, 4.5 * f, 0, R.TAU);
-      c.fill();
-    }
-  }
-
   /* ---- defences: a pit, a shield, and a gun on a bearing ---- */
 
   function defence(c, b, _t) {
@@ -1486,7 +1353,7 @@
     const ca = Math.cos(a),
       sa = Math.sin(a);
 
-    if (key === "mgnest") {
+    if (key === "mg") {
       // a shield with a slit, and a barrel poking out of it
       shape(
         c,
@@ -1629,6 +1496,793 @@
   }
 
   /* =====================================================================
+     the new silhouettes: the self-propelled gun, the tank destroyer,
+     the fixed-wing plane, the warship, the submarine and the train.
+     Same ink, same wobble — but each one must read at a glance.
+     ===================================================================== */
+
+  // a low hull with a big fixed gun set into the front: no turret to
+  // turn, the whole gun crew sits behind the shield
+  function spg(c, u, _t) {
+    const big = u.def.big;
+    const L = big ? 44 : 36;
+    shadow(c, u.x + 1.5, u.y + 3, L * 0.5, 9, 0.2);
+    tracks(c, u.x, u.y, u.va, L * 0.94, 7.5, 7, u.tread, u.seed + 3);
+    const cos = Math.cos(u.va),
+      sin = Math.sin(u.va);
+    const hull = [
+      { x: -L / 2, y: -W2(u) },
+      { x: L * 0.34, y: -W2(u) },
+      { x: L / 2, y: -W2(u) * 0.5 },
+      { x: L / 2, y: W2(u) * 0.5 },
+      { x: L * 0.34, y: W2(u) },
+      { x: -L / 2, y: W2(u) },
+    ].map((p) => ({ x: u.x + p.x * cos - p.y * sin, y: u.y + p.x * sin + p.y * cos }));
+    shape(c, hull, u.seed + 7, facetTint(u.fac, 0.42), "rgba(40,35,29,0.95)", 1.8, 0.7);
+    // the gun: thick, short-ish, and it kicks harder than the barrel looks
+    const ta = u.turretA !== undefined ? u.turretA : u.va;
+    const gx = u.x + L * 0.18 * cos,
+      gy = u.y + L * 0.18 * sin;
+    gun(c, gx, gy, ta, big ? 24 : 19, big ? 5 : 4.2, u.recoil, u.flash, u.seed + 13);
+    // the blast shield, hunched over the breech
+    shape(
+      c,
+      boxPts(gx - Math.cos(ta) * 6, gy - Math.sin(ta) * 6, 9, W2(u) * 1.24, ta, 0, 0),
+      u.seed + 17,
+      "rgba(122,112,94,0.4)",
+      "rgba(40,35,29,0.85)",
+      1.3,
+      0.3,
+    );
+  }
+
+  function W2(u) {
+    return u.def.big ? 11 : 9.5;
+  }
+
+  // the tank destroyer: a casemate welded to the hull. The gun does not
+  // turn — the whole front end is the gun
+  function td(c, u, _t) {
+    const big = u.def.big;
+    const L = big ? 46 : 38;
+    const Wd = big ? 20 : 17;
+    shadow(c, u.x + 1.5, u.y + 3, L * 0.5, Wd * 0.4, 0.2);
+    tracks(c, u.x, u.y, u.va, L * 0.92, Wd / 2 - 3.4, 6.8, u.tread, u.seed + 3);
+    const cos = Math.cos(u.va),
+      sin = Math.sin(u.va);
+    const hull = [
+      { x: -L / 2, y: -Wd / 2 },
+      { x: L * 0.3, y: -Wd / 2 },
+      { x: L / 2, y: -Wd * 0.28 },
+      { x: L / 2, y: Wd * 0.28 },
+      { x: L * 0.3, y: Wd / 2 },
+      { x: -L / 2, y: Wd / 2 },
+    ].map((p) => ({ x: u.x + p.x * cos - p.y * sin, y: u.y + p.x * sin + p.y * cos }));
+    shape(c, hull, u.seed + 7, facetTint(u.fac, 0.42), "rgba(40,35,29,0.95)", 1.8, 0.7);
+    // the casemate: an angled slab, nose up like a wedge
+    const ta = u.turretA !== undefined ? u.turretA : u.va;
+    const tx = u.x + L * 0.1 * cos,
+      ty = u.y + L * 0.1 * sin;
+    const casePts = [
+      { x: -L * 0.3, y: -Wd * 0.42 },
+      { x: L * 0.16, y: -Wd * 0.3 },
+      { x: L * 0.3, y: -Wd * 0.1 },
+      { x: L * 0.3, y: Wd * 0.1 },
+      { x: L * 0.16, y: Wd * 0.3 },
+      { x: -L * 0.3, y: Wd * 0.42 },
+    ].map((p) => ({ x: tx + p.x * cos - p.y * sin, y: ty + p.x * sin + p.y * cos }));
+    shape(c, casePts, u.seed + 11, facetTint(u.fac, 0.6), "rgba(40,35,29,0.95)", 1.7, 0.5);
+    gun(
+      c,
+      tx + Math.cos(ta) * L * 0.3,
+      ty + Math.sin(ta) * L * 0.3,
+      ta,
+      big ? 24 : 20,
+      big ? 4 : 3.4,
+      u.recoil,
+      u.flash,
+      u.seed + 15,
+    );
+    if (LOD >= 2) {
+      ink(c, "rgba(40,35,29,0.5)", 1);
+      ZS.wline(
+        c,
+        tx - Math.cos(ta) * L * 0.28,
+        ty - Math.sin(ta) * L * 0.28,
+        tx + Math.cos(ta) * L * 0.14,
+        ty + Math.sin(ta) * L * 0.14,
+        u.seed + 19,
+        0.3,
+      );
+    }
+  }
+
+  // the fixed wing: a jet without the burn — slower, quieter, longer
+  // legs. The transport carries the bomb and the gun crew
+  function plane(c, u, _t) {
+    const alt = u.alt;
+    const y = u.y - alt * 0.55;
+    shadow(c, u.x, u.y + 4, 16, 5, R.clamp(0.16 - alt * 0.0012, 0.05, 0.16));
+    c.save();
+    c.translate(u.x, y);
+    c.rotate(u.va);
+    const L = u.def.big ? 44 : 30;
+    const span = u.def.big ? 38 : 24;
+    // straight wings
+    shape(
+      c,
+      [
+        { x: -L * 0.06, y: -2 },
+        { x: -L * 0.36, y: -span / 2 },
+        { x: -L * 0.18, y: -span / 2 },
+        { x: L * 0.1, y: -2 },
+        { x: L * 0.1, y: 2 },
+        { x: -L * 0.18, y: span / 2 },
+        { x: -L * 0.36, y: span / 2 },
+        { x: -L * 0.06, y: 2 },
+      ],
+      u.seed + 3,
+      facetTint(u.fac, 0.4),
+      "rgba(42,36,30,0.95)",
+      1.6,
+      0.6,
+    );
+    // fuselage
+    shape(
+      c,
+      [
+        { x: -L * 0.5, y: -4 },
+        { x: L * 0.28, y: -3 },
+        { x: L * 0.5, y: 0 },
+        { x: L * 0.28, y: 3 },
+        { x: -L * 0.5, y: 4 },
+      ],
+      u.seed + 7,
+      facetTint(u.fac, 0.62),
+      "rgba(42,36,30,0.95)",
+      1.7,
+      0.4,
+    );
+    // twin tail
+    shape(
+      c,
+      [
+        { x: -L * 0.5, y: -1.6 },
+        { x: -L * 0.4, y: -9 },
+        { x: -L * 0.33, y: -9 },
+        { x: -L * 0.36, y: -1.6 },
+      ],
+      u.seed + 11,
+      facetTint(u.fac, 0.4),
+      "rgba(42,36,30,0.9)",
+      1.2,
+      0.3,
+    );
+    shape(
+      c,
+      [
+        { x: -L * 0.5, y: 1.6 },
+        { x: -L * 0.4, y: 9 },
+        { x: -L * 0.33, y: 9 },
+        { x: -L * 0.36, y: 1.6 },
+      ],
+      u.seed + 13,
+      facetTint(u.fac, 0.4),
+      "rgba(42,36,30,0.9)",
+      1.2,
+      0.3,
+    );
+    if (LOD >= 1) {
+      // the intakes, forward of the wing root
+      ink(c, "rgba(42,36,30,0.8)", 1.1);
+      ZS.wline(c, L * 0.3, -2.4, L * 0.42, -1.8, u.seed + 19, 0.2);
+      ZS.wline(c, L * 0.3, 2.4, L * 0.42, 1.8, u.seed + 23, 0.2);
+    }
+    c.restore();
+    if (u.flash > 0) {
+      const f = u.flash / 0.08;
+      c.fillStyle = "rgba(252,220,140," + (0.8 * f).toFixed(2) + ")";
+      c.beginPath();
+      c.arc(u.x + Math.cos(u.va) * 14, y + Math.sin(u.va) * 14, 4 * f, 0, R.TAU);
+      c.fill();
+    }
+  }
+
+  // the warship: a long hull with two gun mounts, bow pointed the way
+  // it is going
+  function ship(c, u, _t) {
+    const big = u.def.big;
+    const L = big ? 96 : 58;
+    const Ws = big ? 22 : 14;
+    c.save();
+    c.translate(u.x, u.y);
+    c.rotate(u.va);
+    // the bow wave
+    if (Math.hypot(u.vx || 0, u.vy || 0) > 2) {
+      ink(c, "rgba(222,234,240,0.5)", 1.4);
+      ZS.wline(c, L * 0.5, -3, L * 0.5 + 10, -7, u.seed + 2, 0.8);
+      ZS.wline(c, L * 0.5, 3, L * 0.5 + 10, 7, u.seed + 4, 0.8);
+    }
+    // hull
+    shape(
+      c,
+      [
+        { x: -L * 0.5, y: -Ws * 0.42 },
+        { x: L * 0.34, y: -Ws * 0.42 },
+        { x: L * 0.5, y: 0 },
+        { x: L * 0.34, y: Ws * 0.42 },
+        { x: -L * 0.5, y: Ws * 0.42 },
+      ],
+      u.seed,
+      facetTint(u.fac, 0.55),
+      "rgba(38,34,28,0.95)",
+      1.9,
+      0.7,
+    );
+    if (LOD >= 1) {
+      ink(c, "rgba(38,34,28,0.35)", 1);
+      ZS.wline(c, -L * 0.44, 0, L * 0.34, 0, u.seed + 3, 0.5);
+    }
+    // the gun mounts, forward and aft
+    const ta = u.turretA !== undefined ? u.turretA : u.va;
+    for (let m = 0; m < 2; m++) {
+      const off = m === 0 ? L * 0.26 : -L * 0.3;
+      shape(
+        c,
+        boxPts(off, 0, big ? 10 : 8, big ? 10 : 8, 0, 0, 0),
+        u.seed + 7 + m,
+        "rgba(122,112,94,0.5)",
+        "rgba(38,34,28,0.9)",
+        1.3,
+        0.3,
+      );
+      gun(
+        c,
+        off,
+        0,
+        ta,
+        big ? 18 : 14,
+        big ? 3.6 : 3,
+        u.recoil,
+        m === 0 ? u.flash : 0,
+        u.seed + 11 + m,
+      );
+    }
+    c.restore();
+  }
+
+  // the submarine: the deck barely clears the water, a long cigar and a
+  // fin, the wake reading as two pale lines
+  function sub(c, u, _t) {
+    c.save();
+    c.translate(u.x, u.y);
+    c.rotate(u.va);
+    shape(
+      c,
+      [
+        { x: -24, y: -5 },
+        { x: 14, y: -4 },
+        { x: 24, y: 0 },
+        { x: 14, y: 4 },
+        { x: -24, y: 5 },
+      ],
+      u.seed,
+      "rgba(96,108,114,0.88)",
+      "rgba(38,34,28,0.95)",
+      1.6,
+      0.4,
+    );
+    // the conning tower
+    shape(
+      c,
+      boxPts(-2, 0, 9, 7, 0, 0, 0),
+      u.seed + 3,
+      "rgba(116,126,130,0.9)",
+      "rgba(38,34,28,0.9)",
+      1.3,
+      0.3,
+    );
+    if (LOD >= 1) {
+      ink(c, "rgba(38,34,28,0.5)", 1);
+      ZS.wline(c, -18, 0, 12, 0, u.seed + 7, 0.3);
+    }
+    // the wake
+    ink(c, "rgba(222,234,240,0.5)", 1.3);
+    ZS.wline(c, -26, -6, -38, -9, u.seed + 11, 0.7);
+    ZS.wline(c, -26, 6, -38, 9, u.seed + 13, 0.7);
+    c.restore();
+    if (u.flash > 0) {
+      const f = u.flash / 0.08;
+      c.fillStyle = "rgba(252,220,140," + (0.8 * f).toFixed(2) + ")";
+      c.beginPath();
+      c.arc(u.x + Math.cos(u.va) * 22, u.y + Math.sin(u.va) * 22, 4 * f, 0, R.TAU);
+      c.fill();
+    }
+  }
+
+  // the train: a long slab on two bogies, a cab forward, riding the rail
+  function train(c, u, _t) {
+    const big = u.def.big;
+    const L = big ? 72 : 40;
+    const Wt = big ? 17 : 12;
+    c.save();
+    c.translate(u.x, u.y);
+    c.rotate(u.va);
+    // the bogies
+    ink(c, "rgba(38,34,28,0.9)", 1.6);
+    for (const off of [-L * 0.32, L * 0.32]) {
+      ZS.wcirc(c, off, -Wt / 2 - 1.5, 2.8, u.seed + 1 + (off > 0 ? 0 : 10), 0.3);
+      ZS.wcirc(c, off, Wt / 2 + 1.5, 2.8, u.seed + 5 + (off > 0 ? 0 : 10), 0.3);
+    }
+    // the body
+    shape(
+      c,
+      boxPts(0, 0, L, Wt, 0, 0, 0),
+      u.seed,
+      facetTint(u.fac, 0.55),
+      "rgba(38,34,28,0.95)",
+      1.8,
+      0.5,
+    );
+    if (LOD >= 1) {
+      // the cab, forward
+      shape(
+        c,
+        boxPts(L * 0.36, 0, L * 0.24, Wt * 0.84, 0, 0, 0),
+        u.seed + 9,
+        "rgba(122,112,94,0.5)",
+        "rgba(38,34,28,0.85)",
+        1.2,
+        0.3,
+      );
+      // the rivet line
+      ink(c, "rgba(38,34,28,0.4)", 1);
+      ZS.wline(c, -L * 0.42, 0, L * 0.22, 0, u.seed + 13, 0.4);
+    }
+    c.restore();
+    if (u.flash > 0) {
+      const f = u.flash / 0.08;
+      c.fillStyle = "rgba(252,220,140," + (0.8 * f).toFixed(2) + ")";
+      c.beginPath();
+      c.arc(u.x + Math.cos(u.va) * L * 0.4, u.y + Math.sin(u.va) * L * 0.4, 5 * f, 0, R.TAU);
+      c.fill();
+    }
+  }
+
+  /* =====================================================================
+     the new ground for the buildings
+     ===================================================================== */
+
+  // the industry: four plants, one character. Concrete pours, steel
+  // glows, alu hums, oil steams.
+  function plant(c, b, t) {
+    const s = b.size * TILE;
+    slab(
+      c,
+      b.x,
+      b.y,
+      s * 0.92,
+      s * 0.8,
+      26,
+      b.seed,
+      "rgba(206,188,154,0.85)",
+      "rgba(226,208,172,0.9)",
+      "rgba(52,45,37,0.9)",
+    );
+    const x = b.x,
+      y = b.y;
+    const key = b.key;
+    if (key === "concrete") {
+      // a hopper on legs and a silo
+      shape(
+        c,
+        [
+          { x: x - s * 0.34, y: y - s * 0.18 },
+          { x: x - s * 0.1, y: y - s * 0.18 },
+          { x: x - s * 0.16, y: y + s * 0.08 },
+          { x: x - s * 0.28, y: y + s * 0.08 },
+        ],
+        b.seed + 5,
+        "rgba(168,152,120,0.9)",
+        "rgba(52,45,37,0.9)",
+        1.5,
+        0.5,
+      );
+      ZS.wcirc(c, x + s * 0.2, y - s * 0.04, s * 0.16, b.seed + 9, 0.6);
+      ink(c, "rgba(52,45,37,0.7)", 1.2);
+      ZS.wline(c, x + s * 0.2, y - s * 0.2, x + s * 0.2, y + s * 0.12, b.seed + 13, 0.4);
+      // the mixer's turn
+      const an = t * 1.2;
+      ink(c, "rgba(52,45,37,0.6)", 1.2);
+      ZS.wline(
+        c,
+        x + s * 0.2,
+        y - s * 0.04,
+        x + s * 0.2 + Math.cos(an) * s * 0.1,
+        y - s * 0.04 + Math.sin(an) * s * 0.1,
+        b.seed + 17,
+        0.2,
+      );
+    } else if (key === "steel") {
+      // the furnace mouth glows, and the chimney breathes
+      const glow = 0.55 + 0.45 * Math.sin(t * 2.1 + b.seed);
+      c.fillStyle = "rgba(232,140,58," + (0.5 + glow * 0.4).toFixed(2) + ")";
+      c.beginPath();
+      c.arc(x - s * 0.16, y + s * 0.02, s * 0.07, 0, R.TAU);
+      c.fill();
+      ink(c, "rgba(52,45,37,0.9)", 1.6);
+      ZS.wline(c, x - s * 0.16, y - s * 0.04, x - s * 0.16, y - s * 0.3, b.seed + 5, 0.5);
+      ZS.wcirc(c, x - s * 0.16, y - s * 0.3, s * 0.07, b.seed + 9, 0.5);
+      ink(c, "rgba(52,45,37,0.8)", 1.4);
+      ZS.wline(c, x + s * 0.06, y + s * 0.1, x + s * 0.3, y + s * 0.1, b.seed + 13, 0.4);
+      ZS.wline(c, x + s * 0.06, y - s * 0.12, x + s * 0.3, y - s * 0.12, b.seed + 15, 0.4);
+    } else if (key === "alu") {
+      // the baths: two long cells with a faint hum-line between them
+      for (let m = 0; m < 2; m++) {
+        const oy = (m - 0.5) * s * 0.24;
+        shape(
+          c,
+          boxPts(x, y + oy, s * 0.52, s * 0.14, 0, 0, 0),
+          b.seed + 5 + m * 4,
+          "rgba(150,158,148,0.85)",
+          "rgba(52,45,37,0.9)",
+          1.4,
+          0.4,
+        );
+      }
+      ink(c, "rgba(96,120,140,0.55)", 1.2);
+      const hx = x - s * 0.26 + (Math.sin(t * 3 + b.seed) * 0.5 + 0.5) * s * 0.52;
+      ZS.wline(c, hx, y - s * 0.11, hx, y + s * 0.11, b.seed + 11, 0.3);
+    } else if (key === "oil") {
+      // the stills: two drums and a pipe run, always a little steam
+      ZS.wcirc(c, x - s * 0.16, y, s * 0.13, b.seed + 5, 0.5);
+      ZS.wcirc(c, x + s * 0.1, y - s * 0.06, s * 0.11, b.seed + 9, 0.5);
+      ink(c, "rgba(52,45,37,0.8)", 1.4);
+      ZS.wline(c, x - s * 0.03, y - s * 0.06, x + s * 0.3, y - s * 0.06, b.seed + 13, 0.4);
+      ZS.wline(c, x + s * 0.3, y - s * 0.06, x + s * 0.3, y + s * 0.16, b.seed + 15, 0.4);
+      const p = (t * 0.4 + b.seed) % 1;
+      if (p < 0.6) {
+        c.fillStyle = "rgba(180,176,168," + (0.3 * (1 - p)).toFixed(2) + ")";
+        c.beginPath();
+        c.arc(x - s * 0.16, y - s * 0.16 - p * 14, 4 + p * 6, 0, R.TAU);
+        c.fill();
+      }
+    }
+  }
+
+  // the helipad: a round slab and an H, the windsock streaming
+  function heliPad(c, b, t) {
+    const s = b.size * TILE;
+    slab(
+      c,
+      b.x,
+      b.y,
+      s * 0.9,
+      s * 0.72,
+      10,
+      b.seed,
+      "rgba(188,174,146,0.85)",
+      "rgba(214,198,164,0.9)",
+      "rgba(52,45,37,0.9)",
+    );
+    ink(c, "rgba(52,45,37,0.85)", 1.8);
+    ZS.wcirc(c, b.x, b.y, s * 0.26, b.seed + 3, 0.8);
+    // the H
+    ZS.wline(c, b.x - s * 0.1, b.y - s * 0.12, b.x - s * 0.1, b.y + s * 0.12, b.seed + 7, 0.3);
+    ZS.wline(c, b.x + s * 0.1, b.y - s * 0.12, b.x + s * 0.1, b.y + s * 0.12, b.seed + 9, 0.3);
+    ZS.wline(c, b.x - s * 0.1, b.y, b.x + s * 0.1, b.y, b.seed + 11, 0.3);
+    // the windsock
+    const wx = b.x + s * 0.36,
+      wy = b.y - s * 0.2;
+    ink(c, "rgba(52,45,37,0.8)", 1.2);
+    ZS.wline(c, wx, wy, wx, wy - 12, b.seed + 13, 0.3);
+    const sw = Math.sin(t * 2.4 + b.seed) * 2;
+    c.fillStyle = "rgba(190,96,58,0.85)";
+    c.beginPath();
+    c.moveTo(wx, wy - 12);
+    c.lineTo(wx + 9, wy - 11 + sw * 0.4);
+    c.lineTo(wx + 9, wy - 8 + sw * 0.4);
+    c.lineTo(wx, wy - 9);
+    c.closePath();
+    c.fill();
+  }
+
+  // the trainyard: a long shed with the rails running in front of it
+  function trainYard(c, b, t) {
+    const s = b.size * TILE;
+    // the shed
+    shape(
+      c,
+      [
+        { x: b.x - s * 0.42, y: b.y - s * 0.3 },
+        { x: b.x + s * 0.42, y: b.y - s * 0.3 },
+        { x: b.x + s * 0.42, y: b.y + s * 0.1 },
+        { x: b.x - s * 0.42, y: b.y + s * 0.1 },
+      ],
+      b.seed,
+      "rgba(196,178,146,0.9)",
+      "rgba(52,45,37,0.9)",
+      1.7,
+      0.7,
+    );
+    // the gable line
+    ink(c, "rgba(52,45,37,0.8)", 1.5);
+    ZS.wline(c, b.x - s * 0.42, b.y - s * 0.3, b.x, b.y - s * 0.46, b.seed + 3, 0.5);
+    ZS.wline(c, b.x, b.y - s * 0.46, b.x + s * 0.42, b.y - s * 0.3, b.seed + 5, 0.5);
+    // the open doors
+    for (let m = 0; m < 2; m++) {
+      const dx = b.x + (m - 0.5) * s * 0.34;
+      c.fillStyle = "rgba(96,86,70,0.55)";
+      c.fillRect(dx - s * 0.11, b.y - s * 0.2, s * 0.22, s * 0.3);
+      ink(c, "rgba(52,45,37,0.8)", 1.3);
+      ZS.wline(c, dx, b.y - s * 0.2, dx, b.y + s * 0.1, b.seed + 9 + m, 0.3);
+    }
+    // the rail running in front
+    ink(c, "rgba(96,84,64,0.8)", 1.6);
+    ZS.wline(c, b.x - s * 0.46, b.y + s * 0.3, b.x + s * 0.46, b.y + s * 0.3, b.seed + 13, 0.6);
+    ZS.wline(c, b.x - s * 0.46, b.y + s * 0.34, b.x + s * 0.46, b.y + s * 0.34, b.seed + 15, 0.6);
+    // the crane hook that swings when something leaves
+    const an = Math.sin(t * 0.7 + b.seed) * 0.5;
+    ink(c, "rgba(52,45,37,0.85)", 1.4);
+    ZS.wline(
+      c,
+      b.x + s * 0.3,
+      b.y - s * 0.3,
+      b.x + s * 0.3 + Math.sin(an) * s * 0.2,
+      b.y - s * 0.3 + Math.cos(an) * s * 0.2,
+      b.seed + 17,
+      0.4,
+    );
+  }
+
+  // the flak tower: the base's back against the sky. Three grades —
+  // the plain mast, the plated tower, the long gun — and the barrels
+  // sweep the air and kick when they fire
+  function flakTower(c, b, t, g) {
+    const s = b.size * TILE;
+    const f = b.fac >= 0 && g ? g.factions[b.fac] : null;
+    const l2 = f && f.flakL2,
+      l3 = f && f.flakL3;
+    const hgt = (l3 ? 46 : l2 ? 38 : 30) + b.lvl * 2;
+    // the plinth
+    shape(
+      c,
+      [
+        { x: b.x - s * 0.34, y: b.y - s * 0.26 },
+        { x: b.x + s * 0.34, y: b.y - s * 0.28 },
+        { x: b.x + s * 0.32, y: b.y + s * 0.3 },
+        { x: b.x - s * 0.32, y: b.y + s * 0.28 },
+      ],
+      b.seed,
+      "rgba(196,180,150,0.9)",
+      "rgba(52,45,37,0.9)",
+      1.7,
+      0.7,
+    );
+    // the tower itself: taller as it is plated
+    shape(
+      c,
+      [
+        { x: b.x - 10, y: b.y - hgt },
+        { x: b.x + 10, y: b.y - hgt },
+        { x: b.x + 13, y: b.y + s * 0.1 },
+        { x: b.x - 13, y: b.y + s * 0.1 },
+      ],
+      b.seed + 5,
+      l2 ? "rgba(150,146,132,0.92)" : "rgba(198,184,154,0.9)",
+      "rgba(52,45,37,0.95)",
+      1.7,
+      0.5,
+    );
+    // the plated version gets visible bolts
+    if (l2 && LOD >= 1) {
+      ink(c, "rgba(52,45,37,0.6)", 1.2);
+      for (let m = 0; m < 3; m++) {
+        const by = b.y - hgt * (0.25 + m * 0.24);
+        ZS.wline(c, b.x - 12, by, b.x + 12, by, b.seed + 9 + m, 0.2);
+      }
+    }
+    // the barrels, sweeping on their own bearing
+    const mx = b.x,
+      my = b.y - hgt - 4;
+    const ta = b.turretA !== undefined ? b.turretA : Math.sin(t * 0.5 + b.seed) * 0.6 - Math.PI / 2;
+    ink(c, "rgba(52,45,37,0.95)", 1.5);
+    ZS.wcirc(c, mx, my, 8, b.seed + 13, 0.5);
+    if (l3) {
+      // the long double gun
+      ink(c, "rgba(52,45,37,0.95)", 3.2);
+      for (const off of [-3, 3]) {
+        const ox = -Math.sin(ta) * off,
+          oy = Math.cos(ta) * off;
+        ZS.wline(
+          c,
+          mx + ox,
+          my + oy,
+          mx + ox + Math.cos(ta) * 30,
+          my + oy + Math.sin(ta) * 30,
+          b.seed + 17 + off,
+          0.3,
+        );
+      }
+    } else {
+      // the quad mount
+      ink(c, "rgba(52,45,37,0.95)", 2.4);
+      for (const off of [-5.5, 5.5]) {
+        const ox = -Math.sin(ta) * off,
+          oy = Math.cos(ta) * off;
+        for (const dd of [-1, 1]) {
+          const da = ta + dd * 0.16;
+          ZS.wline(
+            c,
+            mx + ox,
+            my + oy,
+            mx + ox + Math.cos(da) * 20,
+            my + oy + Math.sin(da) * 20,
+            b.seed + 17 + off + dd,
+            0.3,
+          );
+        }
+      }
+    }
+    if (b.flash > 0) {
+      const f = b.flash / 0.08;
+      c.fillStyle = "rgba(252,220,140," + (0.85 * f).toFixed(2) + ")";
+      c.beginPath();
+      c.arc(mx + Math.cos(ta) * 26, my + Math.sin(ta) * 26, 6 * f, 0, R.TAU);
+      c.fill();
+    }
+  }
+
+  // the crane: a tall arm that reaches over the yard and mends what sits
+  // under it
+  function crane(c, b, t) {
+    const s = b.size * TILE;
+    shape(
+      c,
+      [
+        { x: b.x - 12, y: b.y + s * 0.3 },
+        { x: b.x + 12, y: b.y + s * 0.3 },
+        { x: b.x + 8, y: b.y - s * 0.34 },
+        { x: b.x - 8, y: b.y - s * 0.34 },
+      ],
+      b.seed,
+      "rgba(158,146,120,0.9)",
+      "rgba(52,45,37,0.95)",
+      1.7,
+      0.5,
+    );
+    const an = b.craneA !== undefined ? b.craneA : t * 0.4;
+    ink(c, "rgba(52,45,37,0.95)", 2.2);
+    ZS.wline(
+      c,
+      b.x,
+      b.y - s * 0.3,
+      b.x + Math.cos(an) * s * 0.62,
+      b.y - s * 0.3 + Math.sin(an) * s * 0.42,
+      b.seed + 5,
+      0.4,
+    );
+    // the hook on a cable
+    const hx = b.x + Math.cos(an) * s * 0.5,
+      hy = b.y - s * 0.3 + Math.sin(an) * s * 0.34;
+    ink(c, "rgba(52,45,37,0.8)", 1.2);
+    ZS.wline(c, hx, hy, hx, hy + 10 + Math.sin(t * 2 + b.seed) * 3, b.seed + 9, 0.3);
+    ZS.wcirc(c, hx, hy + 13 + Math.sin(t * 2 + b.seed) * 3, 3, b.seed + 11, 0.2);
+    ink(c, "rgba(52,45,37,0.8)", 1.4);
+    ZS.wcirc(c, b.x, b.y - s * 0.3, 5, b.seed + 13, 0.3);
+  }
+
+  // the jammer tower: a lattice mast and the pulse that eats the map
+  function jammerTower(c, b, t) {
+    const s = b.size * TILE;
+    const hgt = 34 + b.lvl * 3;
+    ink(c, "rgba(52,45,37,0.9)", 1.6);
+    ZS.wline(c, b.x - 9, b.y + s * 0.28, b.x - 3, b.y - hgt, b.seed, 0.5);
+    ZS.wline(c, b.x + 9, b.y + s * 0.28, b.x + 3, b.y - hgt, b.seed + 3, 0.5);
+    for (let m = 1; m < 5; m++) {
+      const yy = b.y + s * 0.28 - (hgt + s * 0.28) * (m / 5);
+      const ww = 9 - m * 1.4;
+      ZS.wline(c, b.x - ww, yy, b.x + ww, yy, b.seed + 5 + m, 0.3);
+    }
+    // the pulse, expanding and eating
+    const p = (t * 0.5 + b.seed) % 1;
+    c.strokeStyle = "rgba(122,140,168," + (0.5 * (1 - p)).toFixed(2) + ")";
+    c.lineWidth = 1.6;
+    c.beginPath();
+    c.arc(b.x, b.y - hgt, 6 + p * 40, 0, R.TAU);
+    c.stroke();
+    c.fillStyle = "rgba(122,140,168,0.9)";
+    c.beginPath();
+    c.arc(b.x, b.y - hgt, 3.4, 0, R.TAU);
+    c.fill();
+  }
+
+  // the detector: a dish on a mount, tipped at the sky, with a light
+  // that turns when it sees something it should not
+  function detectorTower(c, b, t) {
+    const s = b.size * TILE;
+    shape(
+      c,
+      boxPts(b.x, b.y + s * 0.16, 22, 12, 0, 0, 0),
+      b.seed,
+      "rgba(176,164,138,0.9)",
+      "rgba(52,45,37,0.9)",
+      1.6,
+      0.5,
+    );
+    ink(c, "rgba(52,45,37,0.9)", 1.6);
+    ZS.wline(c, b.x, b.y + s * 0.1, b.x, b.y - 26, b.seed + 3, 0.4);
+    // the dish, sweeping
+    const an = Math.sin(t * 0.6 + b.seed) * 0.8;
+    c.save();
+    c.translate(b.x, b.y - 26);
+    c.rotate(an);
+    ink(c, "rgba(52,45,37,0.95)", 1.6);
+    c.beginPath();
+    c.arc(0, 0, 11, Math.PI * 0.15, Math.PI * 0.85);
+    c.stroke();
+    ZS.wline(c, 0, 0, 0, -11, b.seed + 7, 0.3);
+    c.restore();
+    const seen = b.detFlash > 0.5;
+    c.fillStyle = seen ? "rgba(190,96,58,0.95)" : "rgba(122,140,168,0.7)";
+    c.beginPath();
+    c.arc(b.x, b.y - 40, 2.6, 0, R.TAU);
+    c.fill();
+  }
+
+  // the command towers: the gold section of the company. One silhouette
+  // for all six, the badge on the front telling which is which
+  function commandTower(c, b, _t) {
+    const s = b.size * TILE;
+    const hgt = 30 + b.lvl * 2;
+    shape(
+      c,
+      [
+        { x: b.x - s * 0.3, y: b.y - hgt },
+        { x: b.x + s * 0.3, y: b.y - hgt },
+        { x: b.x + s * 0.36, y: b.y + s * 0.3 },
+        { x: b.x - s * 0.36, y: b.y + s * 0.3 },
+      ],
+      b.seed,
+      "rgba(206,190,156,0.92)",
+      "rgba(52,45,37,0.95)",
+      1.7,
+      0.5,
+    );
+    // the gold band
+    ink(c, "rgba(160,120,44,0.85)", 2.2);
+    ZS.wline(c, b.x - s * 0.31, b.y - hgt + 6, b.x + s * 0.31, b.y - hgt + 6, b.seed + 3, 0.3);
+    // the badge
+    const k = b.key;
+    ink(c, "rgba(96,72,28,0.9)", 1.6);
+    if (k === "maxpower") {
+      ZS.wline(c, b.x + 4, b.y - hgt + 12, b.x - 4, b.y - hgt + 22, b.seed + 5, 0.2);
+      ZS.wline(c, b.x - 4, b.y - hgt + 22, b.x + 4, b.y - hgt + 32, b.seed + 7, 0.2);
+    } else if (k === "maxmil") {
+      ZS.wline(c, b.x - 6, b.y - hgt + 14, b.x + 6, b.y - hgt + 30, b.seed + 5, 0.2);
+      ZS.wline(c, b.x + 6, b.y - hgt + 14, b.x - 6, b.y - hgt + 30, b.seed + 7, 0.2);
+    } else if (k === "maxoffice") {
+      ZS.wline(c, b.x - 6, b.y - hgt + 16, b.x + 6, b.y - hgt + 16, b.seed + 5, 0.2);
+      ZS.wline(c, b.x - 6, b.y - hgt + 24, b.x + 6, b.y - hgt + 24, b.seed + 7, 0.2);
+    } else if (k === "maxcommand") {
+      ZS.wline(c, b.x - 4, b.y - hgt + 14, b.x - 4, b.y - hgt + 30, b.seed + 5, 0.2);
+      ZS.wline(c, b.x - 4, b.y - hgt + 16, b.x + 7, b.y - hgt + 20, b.seed + 7, 0.2);
+      ZS.wline(c, b.x - 4, b.y - hgt + 20, b.x + 7, b.y - hgt + 24, b.seed + 9, 0.2);
+    } else if (k === "maxextend") {
+      ZS.wline(c, b.x - 6, b.y - hgt + 18, b.x + 6, b.y - hgt + 18, b.seed + 5, 0.2);
+      ZS.wline(c, b.x, b.y - hgt + 12, b.x, b.y - hgt + 24, b.seed + 7, 0.2);
+    } else {
+      // maxgroup: three pips
+      for (let m = 0; m < 3; m++) {
+        c.beginPath();
+        c.arc(b.x - 5 + m * 5, b.y - hgt + 22, 1.6, 0, R.TAU);
+        c.fillStyle = "rgba(96,72,28,0.9)";
+        c.fill();
+      }
+    }
+  }
+
+  /* =====================================================================
      the dispatcher
      ===================================================================== */
 
@@ -1638,36 +2292,47 @@
     truck,
     half: halftrack,
     tank,
+    spg,
+    td,
     artillery,
     flak,
     heli,
     jet,
+    plane,
     boat,
+    ship,
+    sub,
+    train,
     zed,
   };
 
   const BLD_DRAW = {
     hq,
-    concrete: factory,
-    steelmill: factory,
-    aluworks: factory,
-    refinery: factory,
-    power: factory,
-    depot,
-    barracks,
+    concrete: plant,
+    steel: plant,
+    alu: plant,
+    oil: plant,
     works: factory,
     airfield,
+    heli: heliPad,
     shipyard,
-    repair: depot,
-    radar,
+    trainyard: trainYard,
+    flak: flakTower,
     wall,
     gate: wall,
-    flaknest,
-    mgnest: defence,
+    mg: defence,
     atgun: defence,
-    flaktower: defence,
     howitzer: defence,
-    sam: defence,
+    crane,
+    sight: radar,
+    jammer: jammerTower,
+    detector: detectorTower,
+    maxpower: commandTower,
+    maxmil: commandTower,
+    maxoffice: commandTower,
+    maxcommand: commandTower,
+    maxextend: commandTower,
+    maxgroup: commandTower,
   };
 
   const Sprites = {

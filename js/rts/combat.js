@@ -1,4 +1,4 @@
-/* Desert Order — shooting.
+/* SANDSTORM — shooting.
 
    Every shot is a record that travels: bullets and shells fly straight,
    howitzers lob, missiles chase, bombs fall out of a bomber. Nothing hits
@@ -7,12 +7,15 @@
 
    Damage is decided at the moment of impact:
 
-     dmg x armour gap x what-it-is multiplier x the hard-target rule
+     dmg x the specialisation x the armour gap x the hard-target rule
 
-   The last one is the Desert Order one and it is worth repeating, because
-   it changes how you attack a flak tower: a hundred guns shooting it do
-   three times the damage of ten, not ten times. Swarming a hard target
-   with cheap units is a way to waste cheap units. */
+   The specialisation follows the design spec, and it is worth repeating,
+   because it decides what a base-killer truck is for: against what it is
+   built to kill it deals five times the sheet damage, and against
+   everything else a fifth of a fifth. The gun that loves the factory
+   does not love the tank. The hard-target rule says a hundred guns
+   shooting a flak deal three times the damage of ten, not ten times —
+   swarming a hard target with cheap units is a way to waste cheap units. */
 (() => {
   "use strict";
   const ZS = (window.ZS = window.ZS || {});
@@ -22,6 +25,31 @@
   const MISSILE_TURN = 3.4;
 
   const Combat = {
+    /* ---------- range: what the gun can reach, at this target ---------- */
+
+    // the range the gun offers against this particular target. The
+    // specialisation stretches it (rm), and only while the target moves
+    // or fires when the sheet says rmMove. A flak tower sees boats and
+    // trains from further out, because they are long.
+    rangeTo(g, e, tgt) {
+      const w = e.w;
+      if (!w) return 0;
+      let r = w.range;
+      const spec = e.def ? e.def.spec : null;
+      if (spec && R.specMatch(spec, tgt)) {
+        const moved =
+          tgt.kind === "b" ||
+          tgt.vx * tgt.vx + tgt.vy * tgt.vy > 36 ||
+          (tgt.lastFire || -99) > g.time - 1.5;
+        if (!e.def.rmMove || moved) r *= e.def.rm || 1;
+      }
+      if (e.def && e.def.flak) {
+        const c = R.classOf(tgt);
+        if (c === "boat" || c === "train") r += R.FLAK_SEA_RANGE_BONUS;
+      }
+      return r;
+    },
+
     /* ---------- firing ---------- */
 
     fire(g, src, tgt, w) {
@@ -39,7 +67,7 @@
       if (d < 34 && w.kind === "bullet") {
         R.FX.tracer(g, src.x, src.y - (src.alt || 0) * 0.4, tgt.x, tgt.y, src.fac, w);
         this.hit(g, src, tgt, w, tgt.x, tgt.y);
-        if (ZS.sound) ZS.sound.event(w.kind === "bullet" ? "shot" : "boom", src.x, src.y);
+        if (ZS.sound) ZS.sound.event("shot", src.x, src.y);
         return;
       }
 
@@ -245,17 +273,25 @@
       const arm = tgt.kind === "b" ? tgt.arm || tgt.def.arm : tgt.def.arm + (tgt.vet || 0);
       const am = R.armorMul(w.pen || 0, arm || 0);
 
+      // the specialisation: the gun loves what it is built to kill
+      let sm = 1;
+      const spec = src && src.def ? src.def.spec : null;
+      if (spec) sm = R.specMatch(spec, tgt) ? R.SPEC_MUL : R.SPEC_OFF;
+
       // the hard-target rule: a flak tower soaks up a swarm
       let hard = 1;
       if (tgt.kind === "b" && tgt.def.hard) {
         const n = Math.max(1, tgt.atkN || 1);
         hard = R.hardScale(n);
       }
-      const dmg = w.dmg * am * vs * hard * (fall === undefined ? 1 : fall);
+      const dmg = w.dmg * sm * am * vs * hard * (fall === undefined ? 1 : fall);
 
       tgt.hp -= dmg;
       tgt.dmgFlash = 0.22;
       tgt.lastHit = g.time;
+
+      // who touched this flak: the capture rule remembers
+      if (tgt.kind === "b" && tgt.def.flak && src && src.fac !== undefined) tgt.lastBy = src.fac;
 
       if (src && src.kind) {
         // being shot wakes you up: you turn on whoever shot you
@@ -271,7 +307,7 @@
         if (tgt.kind === "b") g.removeBuilding(tgt);
         else {
           g.killUnit(tgt);
-          if (src && src.fac !== undefined) {
+          if (src && src.fac !== undefined && g.factions[src.fac]) {
             g.factions[src.fac].kills++;
             if (src.fac === 0) g.stats.killed++;
           }

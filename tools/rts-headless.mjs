@@ -260,9 +260,51 @@ function main() {
   const cautious = apcSpot ? g.nav.astar(apcSpot.x, apcSpot.y, home.x, home.y, 0) : null;
   check("a neutral query cannot just walk in", !cautious, cautious ? "the door opened for a stranger" : "door shut");
 
-  /* ---- 4. the eight starter flaks ---- */
+  /* ---- 4. the starter flak arc ---- */
   const flaks = g.buildings.filter((b) => !b.dead && b.fac === 0 && b.def.startFlak);
-  check("the base opens with 8 starter flaks", flaks.length === 8, flaks.length + " found");
+  check("the base opens with its starter flak arc", flaks.length >= 10, flaks.length + " found");
+
+  /* ---- 4b. every base type got its ground ---- */
+  const kinds = { home: 0, tank: 0, air: 0, copter: 0, naval: 0, train: 0 };
+  for (const s of g.t.sites) kinds[s.kind] = (kinds[s.kind] || 0) + 1;
+  check(
+    "every base type has ground on the map",
+    kinds.naval >= 1 && kinds.train >= 3 && kinds.air >= 4 && kinds.copter >= 3,
+    JSON.stringify(kinds),
+  );
+  const navalSites = g.t.sites.filter((s) => s.kind === "naval");
+  check(
+    "naval ground reaches the water",
+    navalSites.length > 0 && navalSites.every((s) => g.t.waterNear(s.tx, s.ty, 16)),
+    navalSites.map((s) => s.name).join(", ") || "none",
+  );
+  const trainSite = g.t.sites.find((s) => s.kind === "train");
+  check(
+    "train ground sits on the rail",
+    !!trainSite && g.t.railNear(trainSite.tx, trainSite.ty, 6),
+    trainSite ? trainSite.name : "none",
+  );
+
+  /* ---- 4c. the books balance at the opening ---- */
+  const p0 = g.factions[0];
+  check("the energy book starts in the black", p0.ep > 0 && p0.ep <= p0.epMax + R.EP_TOLERANCE, p0.ep + "/" + p0.epMax);
+  check("the military book starts in the black", p0.mp >= 0 && p0.mp <= p0.mpMax + R.MP_TOLERANCE, p0.mp + "/" + p0.mpMax);
+  check("the store beats the opening purse", p0.store.fuel > p0.res.fuel, "fuel " + Math.round(p0.res.fuel) + " in a " + Math.round(p0.store.fuel) + " store");
+
+  /* ---- 4d. the capture rule: down the flaks, the ground opens ---- */
+  const site = g.t.sites.find((s) => s.owner === -1 && s.kind !== "home");
+  if (site) {
+    const before = site.open;
+    const theirFlaks = g.buildings.filter((b) => !b.dead && b.fac === -1 && b.def.flak && b.site === site);
+    for (const b of theirFlaks) g.removeBuilding(b, true);
+    check(
+      "a flakless settlement stands open",
+      !before && site.open === true,
+      site.name + " open=" + site.open,
+    );
+  } else {
+    check("a flakless settlement stands open", false, "no neutral site found");
+  }
 
   /* ---- 5. run it, then look again ---- */
   if (secs > 0) {
@@ -275,6 +317,11 @@ function main() {
     }
     check("no unit ends up inside a building", stuck === 0, stuck + " embedded");
     const p = g.factions[0];
+    check(
+      "the industry pours out something",
+      p.res.concrete > 350000 && p.res.steel > 250000,
+      "concrete " + Math.round(p.res.concrete) + " · steel " + Math.round(p.res.steel),
+    );
     console.log(
       "  player: " +
         g.units.filter((u) => !u.dead && u.fac === 0).length +
@@ -282,11 +329,23 @@ function main() {
         g.buildings.filter((b) => !b.dead && b.fac === 0).length +
         " buildings, sites " +
         p.sites +
+        ", EP " +
+        p.ep +
+        "/" +
+        p.epMax +
+        ", MP " +
+        p.mp +
+        "/" +
+        p.mpMax +
+        ", gold " +
+        Math.round(p.gold) +
         ", res " +
         Object.entries(p.res)
           .map(([k, v]) => k + " " + Math.round(v))
           .join(" · "),
     );
+    const alive = [1, 2, 3, 4, 5].filter((i) => g.factions[i].alive);
+    console.log("  nations alive: " + (alive.length ? alive.join(",") : "none"));
   }
 
   console.log("");

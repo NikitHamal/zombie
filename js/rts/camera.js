@@ -1,4 +1,4 @@
-/* Desert Order — the camera.
+/* SANDSTORM — the camera.
 
    A real RTS camera: it scrolls when the cursor reaches the screen edge,
    it pans on a middle-drag, it answers WASD and the arrow keys, the wheel

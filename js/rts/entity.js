@@ -1,17 +1,26 @@
-/* Desert Order — units.
+/* SANDSTORM — units.
 
    A unit is an order, a path and a gun. The order says where it is going
    and what it will do when it gets there; the path is how it avoids the
    rocks and the walls on the way; the gun is why anybody cares.
 
    Orders are the RTS vocabulary: move, attack-move, attack that, hold,
-   patrol, capture, repair. A group told to move gets a formation — slots
-   laid out across the line of march and handed to the unit that can reach
-   each one fastest, so twenty tanks arrive as a line instead of a crowd.
+   patrol, capture. A group told to move gets a formation — slots laid out
+   across the line of march and handed to the unit that can reach each one
+   fastest, so twenty tanks arrive as a line instead of a crowd.
 
-   Aircraft ignore the ground entirely, and burn fuel doing it: a fighter
-   that forgets to come home falls out of the sky. That is the trade for
-   being able to go anywhere. */
+   Three rules from the design spec live here and nowhere else:
+
+     THE ROAD DRINKS. Every moving second, the pool pays. The pool runs
+     dry and the army stands still — guns still up, engines cold.
+     FIXED GUNS PAY FOR THE AMMO. A siege gun that has fired its last
+     shell is a very expensive statue until a wagon feeds it.
+     A VEHICLE THAT CANNOT TURN ITS GUN DOES NOT FIRE IT. The base-killer
+     stops to shoot. Move it while it aims and the shot is gone.
+
+   Aircraft keep their own tanks and come home to the pad to refill,
+   because a fighter that forgets to come home falls out of the sky.
+   That is the trade for being able to go anywhere. */
 (() => {
   "use strict";
   const ZS = (window.ZS = window.ZS || {});
@@ -30,8 +39,6 @@
     // and the unit carries on with what it was doing.
     setOrder(g, u, ord, append) {
       if (append && u.order) {
-        // a chain of waypoints, capped so a stray shift-click cannot send
-        // a unit on a grand tour of the map
         if (!u.q) u.q = [];
         u.q.push(Object.assign({}, ord));
         if (u.q.length > 12) u.q.shift();
@@ -55,13 +62,10 @@
     // a group order: lay out slots and hand each unit the one it can take
     assignFormation(g, list, ord) {
       const n = list.length;
-      // measure the group: bigger hulls need more room
       let rad = 0;
       for (const u of list) rad = Math.max(rad, u.def.big ? 26 : u.def.cls === "arm" ? 22 : 14);
       const spacing = rad * 2.1 + 8;
       const cols = Math.max(3, Math.ceil(Math.sqrt(n) * 1.5));
-      // face the formation along the line of march, or north if it is a
-      // very short hop
       const cx = list.reduce((s, u) => s + u.x, 0) / n;
       const cy = list.reduce((s, u) => s + u.y, 0) / n;
       let ang = Math.atan2(ord.y - cy, ord.x - cx);
@@ -81,8 +85,6 @@
           taken: false,
         });
       }
-      // greedy assignment: each unit takes its nearest free slot, closest
-      // units first so nobody ends up crossing the whole formation
       const order = list
         .slice()
         .sort((a, b) => R.dist2(a.x, a.y, ord.x, ord.y) - R.dist2(b.x, b.y, ord.x, ord.y));
@@ -117,14 +119,15 @@
        ================================================================== */
 
     // ask for a path, but only when we can afford it and only when we
-    // need one — most of the desert is a straight line
+    // need one — most of the desert is a straight line. Trains never get
+    // the straight line: the rail decides.
     wantPath(g, u, gx, gy) {
       if (u.layer === 1) {
         u.path = [{ x: gx, y: gy }];
         u.pi = 0;
         return;
       }
-      if (g.nav.los(u.x, u.y, gx, gy, u.layer, u.fac)) {
+      if (u.layer !== 3 && g.nav.los(u.x, u.y, gx, gy, u.layer, u.fac)) {
         u.path = [{ x: gx, y: gy }];
         u.pi = 0;
         return;
@@ -132,17 +135,12 @@
       if (u.repathT > 0) return;
       if (g.nav.budget <= 0) return;
       g.nav.budget--;
-      // breach is on: if there is no way round their wall, the search is
-      // allowed to route straight through it, and the unit will shoot
-      // whatever stands in the doorway when it gets there
-      const p = g.nav.astar(u.x, u.y, gx, gy, u.layer, u.fac, true);
+      const p = g.nav.astar(u.x, u.y, gx, gy, u.layer, u.fac, u.layer !== 3);
       u.repathT = REPATH_MIN;
       if (p) {
         u.path = p;
         u.pi = 0;
       } else {
-        u.path = null;
-        // no route at all: edge toward it anyway, and try again shortly
         u.path = [{ x: gx, y: gy }];
         u.pi = 0;
       }
@@ -164,8 +162,6 @@
           wy = u.path[u.pi].y;
         }
       }
-      // the goal itself moved (a formation slot, a chase): repath now and
-      // then, not every frame
       if (u.gx !== undefined && R.dist2(u.gx, u.gy, gx, gy) > 2600) {
         u.path = null;
         u.gx = gx;
@@ -184,14 +180,14 @@
         want,
         dt * (u.def.cls === "arm" ? 3.2 : u.def.cls === "air" ? 4.5 : 6),
       );
-      const terr = u.layer === 0 ? g.t.speedAt(u.x, u.y) : 1;
+      const terr = u.layer === 1 ? 1 : g.t.speedAt(u.x, u.y);
       const sp = speed * terr;
-      // a tracked vehicle cannot turn on the spot: it slows into corners
       const facing = Math.max(0, Math.cos(R.angDiff(u.va, want)));
       const mul =
         u.def.cls === "arm" ? 0.35 + 0.65 * facing : u.def.cls === "sea" ? 0.5 + 0.5 * facing : 1;
       u.vx = Math.cos(u.va) * sp * mul;
       u.vy = Math.sin(u.va) * sp * mul;
+      if (u.vx || u.vy) u.lastMove = g.time;
       u.moveT = (u.moveT || 0) + dt;
     },
 
@@ -200,6 +196,10 @@
       u.vy *= 0.82;
       if (Math.abs(u.vx) < 1) u.vx = 0;
       if (Math.abs(u.vy) < 1) u.vy = 0;
+    },
+
+    moving(u) {
+      return Math.hypot(u.vx, u.vy) > 6;
     },
 
     /* ==================================================================
@@ -216,18 +216,17 @@
       return u.w;
     },
 
-    rangeOf(u) {
-      const w = u.w;
-      return w ? w.range : 0;
+    // can this unit fire at all, right now?
+    ready(g, u, _tgt) {
+      if (u.def.noTurret && this.moving(u)) return false; // fixed gun, moving feet
+      if (u.ammoMax > 0 && u.ammo <= 0) return false; // the last shell is gone
+      return true;
     },
 
     tryShoot(g, u, tgt) {
       const w = this.gunFor(u, tgt);
       if (!w) return false;
-      // a building is shot at its near face, not its centre. A big
-      // footprint sits on the tiles between here and its own middle, and
-      // a target that blocks its own line of fire can never be hit —
-      // which is how sieges used to freeze.
+      if (!this.ready(g, u, tgt)) return false;
       let tx = tgt.x,
         ty = tgt.y;
       if (tgt.kind === "b" && tgt.size > 1) {
@@ -237,18 +236,19 @@
         ty = (ny + 0.5) * TILE;
       }
       const d = R.dist(u.x, u.y, tx, ty);
-      if (d > w.range) return false;
+      if (d > R.Combat.rangeTo(g, u, tgt)) return false;
       if (u.layer === 0 && !g.nav.fireLine(u.x, u.y, tx, ty)) return false;
       if (u.cd > 0) return true; // in range, waiting on the reload
       u.cd = 1 / w.rof;
       u.flash = 0.07;
       u.recoil = 1;
+      u.lastFire = g.time;
+      if (u.ammoMax > 0) u.ammo--;
       R.Combat.fire(g, u, tgt, w);
       return true;
     },
 
-    // find something to shoot: nearest thing we can hurt, preferring what
-    // is already shooting at us
+    // find something to shoot: nearest thing we can hurt
     acquire(g, u, radius, noBld) {
       if (!u.w && !u.w2) return null;
       const w = u.w || u.w2;
@@ -276,7 +276,7 @@
 
       if (u.inside) return; // riding in something: nothing to do
 
-      /* ---- aircraft: fuel, altitude, take-off and landing ---- */
+      /* ---- aircraft: own tank, own altitude, own return home ---- */
       if (u.layer === 1) {
         u.rotor += dt * (u.alt > 2 ? 26 : 6);
         if (u.landing) {
@@ -293,7 +293,6 @@
           u.altW = def.alt;
           u.fuel -= dt * 2.1;
           if (u.fuel <= 0) {
-            // out of fuel: it comes down, and it does not survive it
             R.FX.explode(g, u.x, u.y, 40, 1);
             g.killUnit(u);
             if (u.fac === 0) g.say(0, def.name + " out of fuel — lost", "warn");
@@ -306,24 +305,42 @@
         u.alt += (u.altW - u.alt) * Math.min(1, dt * 1.6);
       }
 
-      // an order that has been satisfied pops the next one off the
-      // shift-queue. The branches below clear `u.order` when they are
-      // done, so the next frame picks the chain up here.
       if (!u.order && u.q && u.q.length) u.order = u.q.shift();
 
       const ord = u.order;
 
       /* ---- the order ---- */
       let goalX = null,
-        goalY = null,
-        speed = u.speed;
+        goalY = null;
+      // the pool: a dry well and a standing army. Guns still work.
+      const fac = g.factions[u.fac];
+      let speed = u.speed;
+      if (fac && fac.fuelOut && u.layer !== 1) speed = 0;
       let shooting = null;
 
       if (def.capture && ord && ord.type === "capture") {
-        // a conquest truck on a settlement: stand on it and hold it
+        // a conquest vehicle on a settlement: the ground has to be open —
+        // the flaks down — before the flag can move
         const site = ord.site;
-        if (!site || site.owner === u.fac || site.dead) {
+        if (!site || site.owner === u.fac) {
           u.order = null;
+        } else if (!site.open) {
+          // standing ground that will not turn yet. Drive up to the mouth
+          // of the yard and wait there — the flaks have to go first.
+          const dNow = R.dist(u.x, u.y, site.x, site.y);
+          const reach = (site.r + 2) * TILE;
+          if (dNow > reach) {
+            goalX = site.x;
+            goalY = site.y;
+          } else {
+            this.stopMoving(u);
+            if (u.sayT <= 0) {
+              u.sayT = 9;
+              u.say = "flaks in the way";
+              if (u.fac === 0 && u.sel)
+                g.say(0, "Kill the flaks first — the base is still held", "warn");
+            }
+          }
         } else {
           const d = R.dist(u.x, u.y, site.x, site.y);
           if (d > 120) {
@@ -337,13 +354,11 @@
             site.capBy = u.fac;
             site.capFrac = Math.min(1, site.capT / 14);
             if (site.capT >= 14) {
-              if (R.Territory.capture(g, site, u.fac)) {
+              if (g.capture(g, site, u.fac)) {
                 u.order = null;
                 u.capT = 0;
                 site.capT = 0;
               } else {
-                // the ground will not turn yet. Hold where you are and
-                // try again shortly — giving up is how raids fail.
                 site.capT = 10;
                 u.capT = 0;
               }
@@ -353,16 +368,11 @@
       } else if (ord && ord.type === "attack" && ord.tgt && !ord.tgt.dead) {
         const tgt = ord.tgt;
         const w = this.gunFor(u, tgt);
-        const rng = w ? w.range : 60;
+        const rng = w ? R.Combat.rangeTo(g, u, tgt) : 60;
         const d = R.dist(u.x, u.y, tgt.x, tgt.y);
         if (d > rng * 0.9) {
           goalX = tgt.x;
           goalY = tgt.y;
-          // chase, but do not walk into their guns if we cannot shoot back
-          if (def.indirect && d < rng * 0.45) {
-            goalX = null;
-            this.stopMoving(u);
-          }
         } else {
           this.stopMoving(u);
           u.a = u.va = Math.atan2(tgt.y - u.y, tgt.x - u.x);
@@ -394,13 +404,8 @@
           }
         }
         if (ord.type === "amove") {
-          // units yes, buildings no: a marching column shoots the enemy it
-          // passes, and shoots a wall only when the wall stands in its way
-          // (blockerAhead below). Stopping to duel every wall on the
-          // skyline is how raids stall inside nobody's guns.
           const t = this.acquire(g, u, Math.max(u.w ? u.w.range : 200, 240), true);
           if (t) {
-            // stop and fight; the move order waits
             shooting = t;
             this.stopMoving(u);
             u.a = u.va = Math.atan2(t.y - u.y, t.x - u.x);
@@ -413,38 +418,8 @@
           shooting = t;
           u.a = u.va = Math.atan2(t.y - u.y, t.x - u.x);
         }
-      } else if (ord && ord.type === "repair" && ord.tgt && !ord.tgt.dead) {
-        const tgt = ord.tgt;
-        const d = R.dist(u.x, u.y, tgt.x, tgt.y);
-        if (d > 46) {
-          goalX = tgt.x;
-          goalY = tgt.y;
-        } else {
-          this.stopMoving(u);
-          u.repairing = tgt;
-          if (tgt.hp < tgt.maxHp) {
-            tgt.hp = Math.min(tgt.maxHp, tgt.hp + def.repair * dt);
-            if (Math.random() < dt * 3) R.FX.spark(g, tgt.x, tgt.y);
-          } else u.order = null;
-        }
-      } else if (ord && ord.type === "garrison" && ord.tgt && !ord.tgt.dead) {
-        const b = ord.tgt;
-        const d = R.dist(u.x, u.y, b.x, b.y);
-        if (d > b.size * TILE * 0.6 + 30) {
-          goalX = b.x;
-          goalY = b.y;
-        } else {
-          if (b.cap && u.cap) {
-            b.cap--;
-            u.inside = b;
-            b.carry = b.carry || [];
-            b.carry.push(u);
-            u.order = null;
-          } else u.order = null;
-        }
       } else {
-        // idle: hold the ground and shoot whatever walks into range. A
-        // unit that never fires on its own is a unit you have to babysit.
+        // idle: hold the ground and shoot whatever walks into range
         const t = this.acquire(g, u, u.w ? Math.max(u.w.range, 230) : 0);
         if (t) {
           shooting = t;
@@ -452,7 +427,6 @@
           u.a = u.va = Math.atan2(t.y - u.y, t.x - u.x);
         } else {
           this.stopMoving(u);
-          // aircraft with nothing to do orbit their field
           if (u.layer === 1 && !u.landed) {
             const h = u.home && !u.home.dead ? u.home : null;
             if (h) {
@@ -464,25 +438,21 @@
         }
       }
 
+      /* ---- the wagons: shells for the guns they follow ---- */
+      if (def.givesAmmo) this.resupply(g, u, dt);
+
       if (shooting) {
         if (!this.tryShoot(g, u, shooting)) {
-          // why did the shot fail? If the target is IN range, the line of
-          // fire is blocked — and whatever stands between us and it is
-          // the real target. Shooting the wall down is the siege; staring
-          // at it is a freeze.
           const w = this.gunFor(u, shooting);
-          if (w && R.dist(u.x, u.y, shooting.x, shooting.y) <= w.range) {
+          if (w && R.dist(u.x, u.y, shooting.x, shooting.y) <= R.Combat.rangeTo(g, u, shooting)) {
             const block = this.blockerAhead(g, u, shooting.x, shooting.y);
             if (block) {
               shooting = block;
               this.stopMoving(u);
               u.a = u.va = Math.atan2(block.y - u.y, block.x - u.x);
-              this.tryShoot(g, u, block); // fire this frame, not the next
+              this.tryShoot(g, u, block);
             }
-            // blocked by rock, or by nothing we can name: keep the order
-            // goal — walking at a wall we cannot shoot is the other freeze
           } else {
-            // genuinely out of range: close the distance
             goalX = shooting.x;
             goalY = shooting.y;
           }
@@ -490,30 +460,22 @@
       }
 
       /* ---- go ---- */
-      if (goalX !== null) {
-        // something of theirs is standing in the doorway. Stop and shoot
-        // it rather than grinding against it forever: this is how an
-        // attack opens a gate it cannot walk through.
+      if (goalX !== null && (u.vx || u.vy || speed > 0)) {
         const wall = this.blockerAhead(g, u, goalX, goalY);
-        if (wall) {
+        if (wall && u.layer === 0) {
           shooting = wall;
           this.stopMoving(u);
           u.a = u.va = Math.atan2(wall.y - u.y, wall.x - u.x);
-          // face it AND fire: a unit that only turns to look at the gate
-          // it is supposed to be opening will look at it forever
           this.tryShoot(g, u, wall);
         } else {
           this.step(g, u, dt, goalX, goalY, speed);
           const moved = Math.hypot(u.vx, u.vy) > 4;
-          if (!moved) u.stuck += dt;
+          if (!moved && speed > 0) u.stuck += dt;
           else u.stuck = Math.max(0, u.stuck - dt * 2);
           if (u.stuck > 1.1) {
             u.path = null;
             u.repathT = 0;
             u.stuck = 0;
-            // put it back on ground it can stand on. Deliberately not a
-            // nudge — a shove can move a tank into a wall, and a tank in
-            // a wall is the thing we came here to prevent.
             g.nav.legalize(g, u);
           }
         }
@@ -529,8 +491,6 @@
         u.x = R.clamp(nx, 40, R.W - 40);
         u.y = R.clamp(ny, 40, R.H - 40);
       } else {
-        // slide along whatever stops us instead of sticking to it. Our own
-        // gates count as open ground; everybody else's do not.
         if (g.nav.openAt(nx, ny, u.layer, u.fac)) {
           u.x = nx;
           u.y = ny;
@@ -546,8 +506,6 @@
         }
         u.x = R.clamp(u.x, 20, R.W - 20);
         u.y = R.clamp(u.y, 20, R.H - 20);
-        // the invariant, checked every frame: nothing ends a frame inside
-        // a building. Everything above is a best effort; this is the rule.
         g.nav.legalize(g, u);
       }
 
@@ -556,7 +514,6 @@
       u.gait += dt * (u.def.cls === "inf" ? 2 + sp * 0.16 : 3 + sp * 0.1);
       if (u.def.shape === "tank" || u.def.shape === "half" || u.def.shape === "artillery")
         u.tread += dt * sp * 0.055;
-      // dust: heavy things moving fast over sand
       if (u.layer === 0 && sp > 40 && Math.random() < dt * (u.def.cls === "arm" ? 14 : 6)) {
         R.FX.dust(
           g,
@@ -569,10 +526,31 @@
       if (u.layer === 1 && u.alt > 6 && Math.random() < dt * 2) R.FX.dust(g, u.x, u.y + 10, 0.2);
     },
 
-    /* A wall between us and where we are going. Looks a hull-length down
-       the line of march — far enough to see the doorway coming, near
-       enough that we are already committed to it. Returns the building to
-       shoot, or null. Aircraft and ships never have this problem. */
+    // a wagon on the line: one shell to the nearest thirsty gun of the
+    // kind it feeds, a few seconds a time. The siege king drinks only
+    // from the siege wagon.
+    resupply(g, u, dt) {
+      u.ammoT = (u.ammoT || 0) + dt;
+      if (u.ammoT < 2) return;
+      u.ammoT = 0;
+      let best = null,
+        bd = 90 * 90;
+      g.grid.query(u.x, u.y, 90, (o) => {
+        if (o === u || o.kind !== "u" || o.dead || o.fac !== u.fac) return;
+        if (!o.def || o.ammoMax <= 0 || o.ammo >= o.ammoMax) return;
+        if (o.ammoNeeds && o.ammoNeeds !== u.key) return;
+        const d2 = R.dist2(u.x, u.y, o.x, o.y);
+        if (d2 < bd) {
+          bd = d2;
+          best = o;
+        }
+      });
+      if (best) {
+        best.ammo = Math.min(best.ammoMax, best.ammo + 1);
+        if (Math.random() < 0.4) R.FX.spark(g, (u.x + best.x) / 2, (u.y + best.y) / 2);
+      }
+    },
+
     blockerAhead(g, u, gx, gy) {
       if (u.layer !== 0) return null;
       const d = R.dist(u.x, u.y, gx, gy);
@@ -584,7 +562,7 @@
       if (!b || b.dead) return null;
       if (!R.hostileTo(u.fac, b.fac)) return null;
       const i = g.t.at(px, py);
-      if (i < 0 || g.nav.passTile(i, u.fac)) return null; // already open
+      if (i < 0 || g.nav.passTile(i, u.fac)) return null;
       return b;
     },
 
@@ -615,8 +593,6 @@
         n++;
       });
       if (!n) return;
-      // only half of it goes into velocity; the rest is a nudge, so a
-      // column on the march does not spray itself across the desert
       const push = u.def.cls === "inf" ? 42 : 74;
       u.vx += (px / n) * push * dt * 3;
       u.vy += (py / n) * push * dt * 3;
@@ -624,23 +600,6 @@
         u.vx *= 0.2;
         u.vy *= 0.2;
       }
-    },
-
-    /* ---- transports ---- */
-    unload(g, u) {
-      if (!u.carry || !u.carry.length) return;
-      for (const c of u.carry) {
-        const spot = g.nav.nearestOpen((u.x / TILE) | 0, (u.y / TILE) | 0, 4, 0, u.fac);
-        c.x = spot ? (spot.tx + 0.5) * TILE : u.x;
-        c.y = spot ? (spot.ty + 0.5) * TILE : u.y;
-        c.inside = null;
-        c.order = null;
-        c.sel = u.sel;
-        // climbing out of a transport must not climb into a wall
-        g.nav.legalize(g, c);
-      }
-      u.carry.length = 0;
-      if (u.sel) g.say(0, u.def.name + " unloaded");
     },
   };
 

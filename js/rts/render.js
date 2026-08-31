@@ -1,4 +1,4 @@
-/* Desert Order — the renderer.
+/* SANDSTORM — the renderer.
 
    Draws the world in painter order, back to front:
 
@@ -548,15 +548,20 @@
           if (owned) {
             c.fillStyle = col;
             c.fillText(
-              s.nest
-                ? "ROT NEST"
-                : R.FACTIONS[s.owner].short + " · " + (s.garrison ? s.garrison + " G" : "OPEN"),
+              R.FACTIONS[s.owner].short +
+                " · " +
+                (R.BASE_TYPES[s.kind] ? R.BASE_TYPES[s.kind].name : "ground") +
+                (s.open ? " — OPEN" : ""),
               s.x,
               s.y - r + fs * 2.9,
             );
           } else {
             c.fillStyle = "rgba(96,86,70,0.7)";
-            c.fillText("UNCLAIMED", s.x, s.y - r + fs * 2.9);
+            c.fillText(
+              "UNCLAIMED" + (R.BASE_TYPES[s.kind] ? " · " + R.BASE_TYPES[s.kind].name : ""),
+              s.x,
+              s.y - r + fs * 2.9,
+            );
           }
           c.restore();
         }

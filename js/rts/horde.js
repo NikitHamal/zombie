@@ -1,4 +1,4 @@
-/* Desert Order — the Rot.
+/* SANDSTORM — the Rot.
 
    The nations want your ground. The Rot wants all of it.
 

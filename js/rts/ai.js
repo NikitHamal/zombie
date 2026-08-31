@@ -1,20 +1,20 @@
-/* Desert Order — the other nations.
+/* SANDSTORM — the other nations.
 
    Five nations on the same map, and none of them are waiting politely for
    you. Each has a personality that decides what it builds, what it
    attacks with, and how early it comes: the Iron Pact rushes, the Azure
-   League booms and then grinds you down, the Crimson Front lives in the
-   air, the Jade Accord owns the water, the Sand Union spreads.
+   League booms and then grinds you down, the Sand Union spreads, the
+   Crimson Front lives in the air, the Jade Accord owns the water.
 
-   They are not only fighting you. A nation picks the nearest settlement it
-   cannot call its own — yours, or another nation's — and goes for it. Two
-   of them start as your allies and will not raise a hand to you, which
-   means the map has sides as well as enemies.
+   They are not only fighting you. A nation picks the nearest settlement
+   it cannot call its own — yours, or another nation's, or a yellow base
+   held by nobody — and goes for it. Two of them start as your allies and
+   will not raise a hand to you, which means the map has sides as well as
+   enemies.
 
-   The AI thinks four times a second, one nation per tick, and never does
-   anything a player could not do: it pays for buildings out of the same
-   stores, it queues units in the same factories, and it issues the same
-   orders. */
+   They play by the same rules as you: the same books, the same caps, the
+   same flaks. They earn a little gold a minute the way the original's
+   other players do, and spend it where it wins — power, points, plate. */
 (() => {
   "use strict";
   const ZS = (window.ZS = window.ZS || {});
@@ -22,7 +22,7 @@
   const TILE = R.TILE;
 
   function value(u) {
-    return (u.def.pop || 1) * 12 + u.maxHp * 0.02;
+    return (u.def.mp || 1) * 12 + u.maxHp * 0.02;
   }
 
   const AI = {
@@ -47,7 +47,7 @@
         };
         g.factions[i].ai = ai;
         g.ai.push(ai);
-        this.buildStarter(g, ai, g.factions[i].hq);
+        this.buildStarter(g, ai, g.factions[i].hqSite);
       }
     },
 
@@ -58,54 +58,100 @@
       const f = ai.fac;
       const cx = site.tx,
         cy = site.ty;
+      const p = ai.p;
       const put = (key, dx, dy, lvl) => g.addBuilding(key, f, cx + dx, cy + dy, lvl || 1, true);
-      put("hq", -2, -2, 1);
-      put("concrete", 3, -3, 1);
-      put("steelmill", 3, 0, 1);
-      put("refinery", -5, 3, 1);
+      put("hq", -2, -3, 1);
+      put("concrete", 3, -3, 2);
+      put("steel", 3, 1, 2);
+      put("oil", -5, 3, 1);
+      if (p.eco > 1.1) put("alu", -5, -1, 1);
       put("works", -5, -5, 1);
-      if (ai.p.air > 1) put("airfield", -5, 2, 1);
-      if (ai.p.sea > 1) {
-        // find water and put the slipway on it
-        const w = this.findWater(g, site, 14);
+      if (p.air > 1 && (site.kind === "air" || site.home)) put("airfield", 2, -6, 1);
+      if (p.air > 1 && p.sea <= 1 && site.kind === "copter") put("heli", 2, -6, 1);
+      if (p.sea > 1) {
+        const w = this.findWater(g, site, 16);
         if (w) put("shipyard", w.tx - cx, w.ty - cy, 1);
       }
-      // a ring of wall, with a gate facing the map centre
+      // the gate faces the map centre, and the flaks arc over the mouth
       const R0 = 7;
-      const ring = [];
-      for (let a = -R0; a <= R0; a++) ring.push([a, -R0], [a, R0], [-R0, a], [R0, a]);
-      for (const [dx, dy] of ring) {
-        if (dx === 0 && dy === -R0) {
-          put("gate", dx, dy, 1);
-          continue;
+      let best = null,
+        bd = 1e18;
+      for (const s of g.t.sites) {
+        if (s === site) continue;
+        const d = (s.tx - cx) ** 2 + (s.ty - cy) ** 2;
+        if (d < bd) {
+          bd = d;
+          best = s;
         }
-        put("wall", dx, dy, 1);
       }
-      put("mgnest", -R0 + 1, -R0 + 1, 1);
-      put("atgun", R0 - 2, R0 - 2, 1);
-      put("flaktower", R0 - 2, -R0 + 1, 1);
-      if (ai.p.turret) {
-        put("mgnest", R0 - 2, 1, 1);
-        put("flaktower", -R0 + 1, 1, 1);
-        put("atgun", 1, R0 - 2, 1);
+      // a unit axis toward the nearest other settlement — the gate
+      // opens there, and the flaks arc across the mouth
+      let ux = best ? best.tx - cx : 1,
+        uy = best ? best.ty - cy : 0;
+      if (Math.abs(ux) >= Math.abs(uy)) {
+        ux = ux < 0 ? -1 : 1;
+        uy = 0;
+      } else {
+        ux = 0;
+        uy = uy < 0 ? -1 : 1;
       }
+      if (!ux && !uy) ux = 1;
+      const vx = -uy,
+        vy = ux;
+      const gw = 3;
+      for (let k = -(gw >> 1); k <= gw >> 1; k++)
+        put("gate", Math.round(ux * R0 + vx * k), Math.round(uy * R0 + vy * k), 1);
+      for (let a = -R0; a <= R0; a++) {
+        for (const [dx, dy] of [
+          [a, -R0],
+          [a, R0],
+          [-R0, a],
+          [R0, a],
+        ]) {
+          let doorway = false;
+          for (let k = -(gw >> 1); k <= gw >> 1; k++)
+            if (dx === Math.round(ux * R0 + vx * k) && dy === Math.round(uy * R0 + vy * k))
+              doorway = true;
+          if (doorway) continue;
+          put("wall", dx, dy, 1);
+        }
+      }
+      site.ux = ux;
+      site.uy = uy;
+      site.gateX = (cx + ux * R0 + 0.5) * TILE;
+      site.gateY = (cy + uy * R0 + 0.5) * TILE;
+      // the flak arc and a little point defence
+      const flaks = 6 + Math.round((p.turret || 1) * 3);
+      for (let i = 0; i < flaks; i++) {
+        const th = -2.6 + (5.2 * i) / (flaks - 1);
+        put(
+          "flak",
+          Math.round((ux * Math.cos(th) - uy * Math.sin(th)) * 5),
+          Math.round((ux * Math.sin(th) + uy * Math.cos(th)) * 5),
+          1,
+        );
+      }
+      put("mg", Math.round(ux * 4 - vx * 2), Math.round(uy * 4 - vy * 2), 1);
+      put("atgun", Math.round(ux * 4 + vx * 2), Math.round(uy * 4 + vy * 2), 1);
       // a garrison
       const spots = [];
       for (let dy = -4; dy <= 4; dy++)
         for (let dx = -4; dx <= 4; dx++) {
           const x = (cx + dx + 0.5) * TILE,
             y = (cy + dy + 0.5) * TILE;
-          if (g.nav.openAt(x, y, 0)) spots.push({ x, y });
+          if (g.nav.openAt(x, y, 0, f)) spots.push({ x, y });
         }
       if (spots.length) {
         const give = (key, n) => {
           for (let i = 0; i < n; i++) {
-            const p = spots[(i * 3 + 1) % spots.length];
-            g.addUnit(key, f, p.x, p.y);
+            const pt = spots[(i * 3 + 1) % spots.length];
+            const u = g.addUnit(key, f, pt.x, pt.y);
+            if (u) R.Entity.setOrder(g, u, { type: "hold", x: pt.x, y: pt.y });
           }
         };
-        give("ltank", 3);
-        give("scout", 2);
+        give("gnasher", 3);
+        give("lynx", 2);
+        give("mgmc", 1);
       }
     },
 
@@ -129,8 +175,6 @@
       for (const ai of g.ai) {
         ai.t -= dt;
         if (ai.t > 0) continue;
-        // one think per tick, and the tick length is handed down so the
-        // expansion and attack clocks run on real time, not on a guess
         const step = 0.7 + Math.random() * 0.4;
         ai.t = step;
         this.think(g, ai, step);
@@ -140,7 +184,10 @@
     think(g, ai, dt) {
       const f = g.factions[ai.fac];
       if (!f.alive) return;
+      // the other players' purses: a little gold, always
+      f.gold += dt / 60;
       this.industry(g, ai, f);
+      this.goldShop(g, ai, f);
       this.defend(g, ai);
       this.produce(g, ai);
       this.reinforce(g, ai);
@@ -150,37 +197,40 @@
 
     /* ---------- buildings ---------- */
 
-    // where can this nation put a building? inside its own ground, near a
-    // settlement it holds, on flat open tiles
-    spotFor(g, fac, key, size, near) {
+    // where can this nation put a building? inside its own ground, on the
+    // kind of ground the building wants
+    spotFor(g, fac, key, near) {
       const def = R.BDEF[key];
-      size = size || def.size;
-      const sites = g.t.sites.filter((s) => s.owner === fac);
+      const size = def.size;
+      let sites = g.t.sites.filter((s) => s.owner === fac);
+      if (def.site) {
+        const right = sites.filter(
+          (s) => def.site.indexOf(s.kind) >= 0 || (key === "works" && s.home),
+        );
+        if (right.length) sites = right;
+      }
       sites.sort((a, b) => {
         if (!near) return 0;
         return R.dist2(a.x, a.y, near.x, near.y) - R.dist2(b.x, b.y, near.x, near.y);
       });
+      const opts = { water: def.water, rail: def.rail };
       for (const s of sites) {
         const r = s.r + 2;
-        for (let k = 0; k < 26; k++) {
+        for (let k = 0; k < 30; k++) {
           const an = Math.random() * R.TAU;
           const rr = Math.random() * r;
           const tx = Math.round(s.tx + Math.cos(an) * rr - size / 2);
           const ty = Math.round(s.ty + Math.sin(an) * rr - size / 2);
-          if (!g.t.canBuild(tx, ty, size, { water: def.water })) continue;
-          // and it has to be ours
+          if (!g.t.canBuild(tx, ty, size, opts)) continue;
           let mine = true;
           for (let dy = 0; dy < size && mine; dy++)
             for (let dx = 0; dx < size; dx++) {
               if (g.t.ownerAt((tx + dx + 0.5) * TILE, (ty + dy + 0.5) * TILE) !== fac) {
-                if (
-                  !(R.BDEF[key].wall && g.t.ownerAt((tx + 0.5) * TILE, (ty + 0.5) * TILE) === fac)
-                )
+                if (!(def.wall && g.t.ownerAt((tx + 0.5) * TILE, (ty + 0.5) * TILE) === fac))
                   mine = false;
               }
             }
           if (!mine) continue;
-          // keep a little space between buildings so the base reads as a base
           let clear = true;
           for (const b of g.buildings) {
             if (b.dead || b.fac !== fac) continue;
@@ -195,20 +245,19 @@
 
     industry(g, ai, f) {
       const p = ai.p;
-      // what we would like to own, roughly in order
       const wants = [
         ["concrete", Math.max(2, Math.round(4 * p.eco))],
-        ["steelmill", Math.max(2, Math.round(4 * p.eco))],
-        ["refinery", Math.max(1, Math.round(3 * p.eco))],
-        ["aluworks", Math.max(1, Math.round(2.5 * p.eco))],
-        ["power", Math.round(2 * p.eco)],
-        ["depot", 1],
+        ["steel", Math.max(2, Math.round(4 * p.eco))],
+        ["oil", Math.max(1, Math.round(3 * p.eco))],
+        ["alu", Math.max(1, Math.round(2.5 * p.eco))],
         ["works", Math.max(1, Math.round(2 * p.army))],
-        ["radar", 1],
-        ["repair", 1],
       ];
       if (p.air > 1) wants.push(["airfield", Math.round(2 * p.air * 0.6)]);
+      if (p.air > 1.3) wants.push(["heli", 1]);
       if (p.sea > 1) wants.push(["shipyard", Math.round(1.5 * p.sea * 0.6)]);
+      // a railyard, when the doctrine carries trains and the ground allows
+      const wantsTrains = (p.mix || []).some((m) => R.UDEF[m[0]] && R.UDEF[m[0]].train);
+      if (wantsTrains) wants.push(["trainyard", 1]);
 
       for (const [key, want] of wants) {
         const have = f.counts[key] || 0;
@@ -223,16 +272,15 @@
       }
 
       // defences at the settlements we hold
-      const gunWant = Math.max(3, Math.round((p.turret || 1) * 4 * f.sites));
-      const guns = ["flaktower", "atgun", "mgnest", "howitzer", "sam"];
+      const gunWant = Math.max(3, Math.round((p.turret || 1) * 4 * Math.max(1, f.sites)));
+      const guns = ["flak", "atgun", "mg", "howitzer"];
       for (const key of guns) {
         const have = f.counts[key] || 0;
         if (have >= gunWant) continue;
         const def = R.BDEF[key];
         if (!g.canPay(ai.fac, def.cost)) continue;
-        // guns go on the frontier: the settlement nearest an enemy
         const front = this.frontierSite(g, ai.fac);
-        const spot = this.spotFor(g, ai.fac, key, def.size, front);
+        const spot = this.spotFor(g, ai.fac, key, front);
         if (!spot) continue;
         g.pay(ai.fac, def.cost);
         g.addBuilding(key, ai.fac, spot.tx, spot.ty, 1, false);
@@ -247,23 +295,69 @@
           (b) => !b.dead && b.fac === ai.fac && b.built && !b.upgrading && R.Base.upCostFor(g, b),
         );
         if (cands.length) {
-          const b = cands[(Math.random() * cands.length) | 0];
+          cands.sort((a, b) => (b.def.makes ? b.lvl : 0) - (a.def.makes ? a.lvl : 0));
+          const b = cands[(Math.random() * Math.min(4, cands.length)) | 0];
           R.Base.startUpgrade(g, b);
         }
       }
     },
 
+    /* ---------- the gold purse ---------- */
+
+    goldShop(g, ai, f) {
+      const buy = (key) => {
+        const shop = R.GOLD_SHOP.find((x) => x.key === key);
+        if (!shop) return false;
+        if ((f.counts[key] || 0) >= shop.max) return false;
+        const def = R.BDEF[key];
+        const price = R.Economy.goldPrice(f, def);
+        if (f.gold < price + 15) return false; // keep a margin
+        const spot = this.spotFor(g, ai.fac, key, this.frontierSite(g, ai.fac));
+        if (!spot) return false;
+        const b = R.Base.place(g, key, ai.fac, spot.tx, spot.ty, {});
+        return !!b;
+      };
+      if (f.ep > f.epMax * 0.55 && (f.counts.maxpower || 0) < 8) buy("maxpower");
+      else if ((f.counts.maxmil || 0) < 6) buy("maxmil");
+      else if ((f.counts.crane || 0) < 2) buy("crane");
+      else if ((f.counts.sight || 0) < 2) buy("sight");
+      // the flak upgrades, when the purse is thick and the guns are quiet
+      if (!f.flakL2 && f.gold >= 70 && R.Economy.flakClear(g, f))
+        R.Economy.buyLedger(
+          g,
+          f,
+          R.GOLD_LEDGER.find((l) => l.key === "flakArmor"),
+        );
+      else if (f.flakL2 && !f.flakL3 && f.gold >= 150 && R.Economy.flakClear(g, f))
+        R.Economy.buyLedger(
+          g,
+          f,
+          R.GOLD_LEDGER.find((l) => l.key === "flakWeapon"),
+        );
+    },
+
     /* ---------- production ---------- */
 
     produce(g, ai) {
+      const f = g.factions[ai.fac];
       const mix = ai.p.mix;
       for (const b of g.buildings) {
         if (b.dead || b.fac !== ai.fac || !b.built || b.upgrading) continue;
         const list = R.PRODUCES[b.key];
         if (!list) continue;
         if (b.queue.length >= 3) continue;
-        // pick a unit from this factory's list that the persona likes
-        const opts = mix.filter((m) => list.indexOf(m[0]) >= 0);
+        // never spend the purse dry: the walls and the plants come next,
+        // so a unit only leaves the queue if the books survive it
+        const canBuy = (k) => {
+          const c = R.Economy.unitCost(g, f, k);
+          for (const r in c) if (f.res[r] < c[r] * 1.05 + 5000) return false;
+          return true;
+        };
+        // the doctrine's list, narrowed to what the books can carry; a
+        // young purse works the cheap end of the menu until the heavy
+        // things arrive
+        let opts = mix.filter((m) => list.indexOf(m[0]) >= 0 && canBuy(m[0]));
+        if (!opts.length) opts = list.map((k) => [k, 1]).filter(([k]) => canBuy(k));
         if (!opts.length) continue;
         let tw = 0;
         for (const o of opts) tw += o[1];
@@ -276,7 +370,6 @@
             break;
           }
         }
-        // do not drown in one thing: if we have plenty of it, try again
         if (g.countUnits(ai.fac, key) > 4 + ai.wave * 0.6 && Math.random() < 0.6) continue;
         R.Base.queueItem(g, b, key);
       }
@@ -291,8 +384,8 @@
         if (s.owner !== fac) continue;
         let near = 1e18;
         for (const o of g.t.sites) {
-          if (o === s || o.owner < 0 || o.owner === fac) continue;
-          if (!R.hostileTo(fac, o.owner)) continue;
+          if (o === s || o.owner === fac) continue;
+          if (o.owner >= 0 && !R.hostileTo(fac, o.owner)) continue;
           near = Math.min(near, R.dist2(s.x, s.y, o.x, o.y));
         }
         if (near < bd) {
@@ -304,7 +397,6 @@
     },
 
     defend(g, ai) {
-      // if one of our settlements has company, everything nearby goes home
       for (const s of g.t.sites) {
         if (s.owner !== ai.fac) continue;
         let threat = null,
@@ -319,34 +411,32 @@
           }
         });
         if (!threat) continue;
-        // gather the defenders: anything of ours within a long march
         let gathered = 0;
         for (const u of g.units) {
           if (u.dead || u.fac !== ai.fac || u.inside) continue;
-          if (u.def.pop === 0) continue;
+          if (!u.def.mp) continue;
           if (u.order && u.order.type === "attack" && u.order.tgt && !u.order.tgt.dead) continue;
           const d = R.dist2(u.x, u.y, s.x, s.y);
           if (d > Math.pow(s.r * TILE + 900, 2)) continue;
-          if (d < Math.pow(s.r * TILE * 1.4, 2) && (!u.order || u.order.type === "hold")) continue; // already home
+          if (d < Math.pow(s.r * TILE * 1.4, 2) && (!u.order || u.order.type === "hold")) continue;
           R.Entity.setOrder(g, u, { type: "amove", x: threat.x, y: threat.y });
           gathered++;
           if (gathered > 24) break;
         }
-        if (gathered > 3 && s === g.factions[ai.fac].hq) {
+        if (gathered > 3 && s === g.factions[ai.fac].hqSite) {
           ai.alarmed = g.time;
         }
       }
     },
 
     reinforce(g, ai) {
-      // park a few things at the frontier when there is nothing to do
       if (Math.random() > 0.25) return;
       const front = this.frontierSite(g, ai.fac);
       if (!front) return;
       let idle = 0;
       for (const u of g.units) {
         if (u.dead || u.fac !== ai.fac || u.inside) continue;
-        if (u.def.pop === 0) continue;
+        if (!u.def.mp) continue;
         if (u.order) continue;
         idle++;
       }
@@ -354,7 +444,7 @@
       let sent = 0;
       for (const u of g.units) {
         if (u.dead || u.fac !== ai.fac || u.inside) continue;
-        if (u.def.pop === 0 || u.order) continue;
+        if (!u.def.mp || u.order) continue;
         const an = Math.random() * R.TAU,
           rr = Math.random() * front.r * TILE * 0.7;
         R.Entity.setOrder(g, u, {
@@ -372,23 +462,24 @@
       ai.expansionT -= dt;
       if (ai.expansionT > 0) return;
       ai.expansionT = (70 + Math.random() * 80) / (ai.p.expand || 1);
-      // a conquest truck, then send it at the nearest free settlement
       const trucks = g.units.filter(
-        (u) => !u.dead && u.fac === ai.fac && u.def.capture && !u.order,
+        (u) => !u.dead && u.fac === ai.fac && u.def.capture && u.layer === 0 && !u.order,
       );
       let truck = trucks[0];
       if (!truck) {
         for (const b of g.buildings) {
           if (b.dead || b.fac !== ai.fac || b.key !== "works" || !b.built) continue;
-          if (R.Base.queueItem(g, b, "truck")) break;
+          if (b.queue.some((q) => q.key === "apc")) continue;
+          if (R.Base.queueItem(g, b, "apc")) break;
         }
         return;
       }
-      // nearest settlement that is not ours
+      // the truck mops up ground the flaks have already left. Defended
+      // ground is the army's problem — the raid sends the trucks along.
       let best = null,
         bd = 1e18;
       for (const s of g.t.sites) {
-        if (s.owner === ai.fac) continue;
+        if (s.owner === ai.fac || !s.open) continue;
         if (s.owner >= 0 && !R.hostileTo(ai.fac, s.owner)) continue;
         const d = R.dist2(s.x, s.y, truck.x, truck.y);
         if (d < bd) {
@@ -406,21 +497,20 @@
       if (ai.nextWave > 0) return;
       const f = g.factions[ai.fac];
 
-      // gather everything that is armed and not busy defending
       const army = [];
       let val = 0;
       for (const u of g.units) {
         if (u.dead || u.fac !== ai.fac || u.inside) continue;
-        if (u.def.pop === 0) continue;
-        if (u.def.capture || u.def.repair) continue;
+        if (!u.def.mp) continue;
+        if (u.def.capture || u.def.givesAmmo) continue;
         if (u.order && u.order.type === "attack") continue;
-        if (u.order && u.order.defend) continue;
         army.push(u);
         val += value(u);
       }
-      // the bar rises as the game goes on, and with how much we own
-      const bar = 90 * ai.p.army + ai.wave * 22 + f.sites * 10;
-      if (val < bar) {
+      // a raid is a column, not a scout: it needs to be big enough to
+      // trade with the flaks and still have wheels left at the door
+      const bar = 1600 * ai.p.army + ai.wave * 400 + f.sites * 200;
+      if (val < bar || army.length < 5) {
         ai.nextWave = 18;
         return;
       }
@@ -434,45 +524,45 @@
       ai.nextWave = ai.p.wave * (0.85 + Math.random() * 0.4);
       ai.target = target;
 
-      // send the army: attack-move on the objective, in one formation.
-      // A walled yard is attacked at its door — the mouth of the gate is
-      // where the defenders' guns are, and it is the only way in worth
-      // the walk. Wall-less yards are simply overrun.
-      let ax = target.x,
-        ay = target.y;
-      if (target.gateX !== undefined) {
-        ax = target.gateX - (target.ux || 0) * 140;
-        ay = target.gateY - (target.uy || 0) * 140;
-      } else if (target.owner >= 0) {
-        // somebody's home: their HQ is the objective — the ground does
-        // not turn until it falls, so that is where the army goes
-        const hq = g.buildings.find((b) => !b.dead && b.fac === target.owner && b.key === "hq");
-        if (hq) {
-          ax = hq.x;
-          ay = hq.y;
-        }
-      }
+      // send the army in THROUGH the gate. Parked at the mouth of it,
+      // a column is outside every gun on both sides and the raid is
+      // over before it started. So each gun in the yard gets a share of
+      // the column, and the rest walks for the centre.
+      const guns = g.buildings.filter(
+        (b) =>
+          !b.dead &&
+          b.site === target &&
+          b.fac !== ai.fac &&
+          (b.def.turret || b.key === "hq") &&
+          R.hostileTo(ai.fac, b.fac),
+      );
       const list = army.slice(0, 60);
-      R.Entity.assignFormation(g, list, { type: "amove", x: ax, y: ay });
-      // and the trucks go with them. The tanks are there to open the
-      // gate; the truck is the thing that actually takes the ground.
+      if (guns.length) {
+        for (let i = 0; i < list.length; i++) {
+          const tgt = guns[i % guns.length];
+          R.Entity.setOrder(g, list[i], { type: "attack", tgt, x: tgt.x, y: tgt.y });
+        }
+      } else {
+        R.Entity.assignFormation(g, list, { type: "amove", x: target.x, y: target.y });
+      }
       this.sendTrucks(g, ai, target);
-      // and tell the world, if it concerns the player
-      if (target.owner === 0 || (target.kind === "b" && target.fac === 0)) {
+      if (target.owner === 0) {
         g.say(ai.fac, ai.name + " is moving on " + (target.name || "your ground"), "warn");
         R.FX.ping(g, target.x, target.y, "bad");
         if (R.Cam) R.Cam.shake(3);
       }
     },
 
-    // The trucks are the point of a raid, not the baggage. A truck on its
-    // own will only ever park outside somebody's wall, so they follow the
-    // army to the objective and plant the flag once the yard is open.
+    // The trucks are the point of a raid, not the baggage. They follow
+    // the army to the objective and turn the flag once the yard is open —
+    // flaks down, ground ownerless.
     sendTrucks(g, ai, target) {
       let sent = 0;
+      const coastal = g.t.waterNear(target.tx, target.ty, 16);
       for (const u of g.units) {
         if (u.dead || u.fac !== ai.fac || u.inside) continue;
         if (!u.def.capture) continue;
+        if (u.def.cls === "sea" && !coastal) continue;
         if (u.order && u.order.type === "capture" && u.order.site === target) continue;
         R.Entity.setOrder(g, u, { type: "capture", site: target, x: target.x, y: target.y });
         if (++sent >= 3) break;
@@ -480,8 +570,6 @@
     },
 
     pickTarget(g, ai, army) {
-      // the army marches from wherever it is, so "nearest" is measured
-      // from the army, not from the capital
       let ax = 0,
         ay = 0,
         n = 0;
@@ -500,17 +588,29 @@
       for (const s of g.t.sites) {
         if (s.owner === ai.fac) continue;
         if (s.owner >= 0 && !R.hostileTo(ai.fac, s.owner)) continue;
-        // the first raid of the war is always at the player's gate: the
-        // eight flaks exist to be tested, and the player exists to watch
-        // them work. Everything after that is ordinary strategy.
-        if (ai.wave === 0 && s.home && s.owner === 0) return s;
+        // the first raid of the war: the aggressive ones test the
+        // player's flaks at the gate — the rest take the yellow ground
+        // in between first, and grow strong enough to be a problem
+        if (ai.wave === 0) {
+          if (s.home) {
+            if (s.owner === 0 && ai.p.aggro >= 1) return s;
+            continue;
+          }
+        }
         const d = R.dist(ax, ay, s.x, s.y);
         let score = -d * 0.0016;
-        // the player is the protagonist of this war: the pull toward
-        // their gate grows with every wave, until late in the game
-        // everyone is at their walls
         if (s.owner === 0) score += 1.2 + ai.wave * 0.4 + ai.p.aggro * 0.6;
         if (s.home) score += 0.3;
+        // ownerless ground is free — take it without a fight
+        if (s.owner < 0 && s.open) score += 1.5;
+        // the other nations already marching here get first blood —
+        // three armies on one yard is a funeral for all of them
+        let wanters = 0;
+        for (const o of g.ai) {
+          if (o === ai || !R.hostileTo(ai.fac, o.fac)) continue;
+          if (o.target === s) wanters++;
+        }
+        score -= wanters * 1.1;
         // and a soft target is a tempting one
         let guard = 0;
         g.grid.query(s.x, s.y, s.r * TILE, (o) => {

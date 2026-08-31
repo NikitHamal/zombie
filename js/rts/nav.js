@@ -1,4 +1,4 @@
-/* Desert Order — navigation.
+/* SANDSTORM — navigation.
 
    One grid, three layers: the ground walks tiles, ships hold the water,
    aircraft ignore the grid altogether.
@@ -67,6 +67,7 @@
       this.t = terrain;
       this.blockG = new Uint8Array(N); // 1 = ground units cannot enter
       this.blockS = new Uint8Array(N); // 1 = ships cannot enter
+      this.blockR = new Uint8Array(N); // 1 = trains cannot enter (not rail)
       this.blockA = new Uint8Array(N); // 1 = ground fire cannot pass (rock, buildings)
       this.gateOf = new Int8Array(N); // whose gate stands on this tile, -1 = none
       this.bFac = new Int8Array(N); // who owns the building on this tile, -1 = none
@@ -100,6 +101,7 @@
         occ = t.occ;
       const bG = this.blockG,
         bS = this.blockS,
+        bR = this.blockR,
         bA = this.blockA;
       const gO = this.gateOf,
         bF = this.bFac;
@@ -110,6 +112,7 @@
         const built = occ[i] !== 0;
         bG[i] = rock || water || built ? 1 : 0;
         bS[i] = water && !built ? 0 : 1;
+        bR[i] = v === T.RAIL ? 0 : 1; // trains walk the rail and nothing else
         bA[i] = rock || built ? 1 : 0;
         gO[i] = -1;
         bF[i] = -1;
@@ -150,6 +153,7 @@
           this.blockG[i] = v;
           this.blockA[i] = v && !isGate ? 1 : 0;
           this.blockS[i] = 1;
+          this.blockR[i] = solid ? 1 : t.type[i] === T.RAIL ? 0 : 1;
           this.bFac[i] = owner;
           this.gateOf[i] = solid && isGate ? owner : -1;
         }
@@ -193,7 +197,8 @@
       const i = ty * MAPW + tx;
       if (!layer) return this.passTile(i, fac === undefined ? -1 : fac);
       if (layer === 2) return this.blockS[i] === 0;
-      return true;
+      if (layer === 3) return this.blockR[i] === 0;
+      return true; // layer 1: the sky is open
     }
     openAt(x, y, layer, fac) {
       return this.open((x / TILE) | 0, (y / TILE) | 0, layer, fac);
@@ -207,7 +212,14 @@
     legalize(g, u) {
       if (u.layer === 1) return false;
       const i = g.t.at(u.x, u.y);
-      if (i >= 0 && this.passTile(i, u.fac)) return false;
+      const ok =
+        i >= 0 &&
+        (u.layer === 3
+          ? this.blockR[i] === 0
+          : u.layer === 2
+            ? this.blockS[i] === 0
+            : this.passTile(i, u.fac));
+      if (ok) return false;
       const near = this.nearestOpen((u.x / TILE) | 0, (u.y / TILE) | 0, 10, u.layer, u.fac);
       if (!near) return false;
       u.x = (near.tx + 0.5) * TILE;
@@ -226,6 +238,7 @@
     // on buildings but not on brush.
     los(x1, y1, x2, y2, layer, fac) {
       if (layer === 1) return true;
+      if (layer === 3) return false; // a train never sees a straight line
       const sea = layer === 2;
       const who = fac === undefined ? -1 : fac;
       const ok = (i) => (sea ? this.blockS[i] === 0 : this.passTile(i, who));
@@ -346,14 +359,15 @@
       let gtx = R.clamp((gx / TILE) | 0, 0, MAPW - 1),
         gty = R.clamp((gy / TILE) | 0, 0, MAPH - 1);
 
-      const grid = layer === 2 ? this.blockS : this.blockG;
+      const grid = layer === 2 ? this.blockS : layer === 3 ? this.blockR : this.blockG;
       // the goal itself may be occupied (you clicked a tank): take the
       // nearest open tile to it instead
       if (!this.open(gtx, gty, layer, who)) {
         // with breach allowed we are happy to aim at the wall itself —
-        // that is the point of a siege
-        if (!(breach && layer !== 2 && this.bFac[gty * MAPW + gtx] >= 0)) {
-          const alt = this.nearestOpen(gtx, gty, 6, layer, who);
+        // that is the point of a siege. Trains do not breach; they simply
+        // cannot be where you clicked.
+        if (!(breach && layer !== 2 && layer !== 3 && this.bFac[gty * MAPW + gtx] >= 0)) {
+          const alt = this.nearestOpen(gtx, gty, 8, layer, who);
           if (!alt) return null;
           gtx = alt.tx;
           gty = alt.ty;
@@ -420,6 +434,7 @@
           let step = DIRS[d][2];
           if (grid[ni] !== 0) {
             if (d >= 4) continue; // no squeezing diagonally through a wall
+            if (layer === 3) continue; // the rail does not negotiate
             if (!this.passTile(ni, who)) {
               // not our door. Chew through it, or go round.
               const bc = breach ? this.breachCost(ni, who) : -1;

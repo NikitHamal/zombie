@@ -1,4 +1,4 @@
-/* Desert Order — the noise of a battle.
+/* SANDSTORM — the noise of a battle.
 
    Dust behind a column, the flash and the shove of a gun firing, a tracer
    you can follow with your eye, the smoke that hangs over a burning base,

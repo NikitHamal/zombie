@@ -760,16 +760,25 @@ Scout reports written in the hand of whoever went; more structure art;
 veterancy shown on the figure itself. Whatever ships keeps the exact
 sketch style.
 
-## Branch: `feat/desert-order-rts`
+## The RTS: `rts.html` (SANDSTORM)
 
-A second game lives on this branch alongside the village. Open
-`rts.html` instead of `index.html` for it.
+A second game lives in this repo alongside the village. Open
+`rts.html` instead of `index.html` for it. `village.html` is the
+preserved copy of the old `index.html` (village mode).
 
-**Desert Order** is an RTS in the same engine and the same hand-drawn
-ink-on-paper style. Six nations (four enemies, two allies) and a zombie
-horde ("the Rot") fight over a vast procedural desert. The player holds
-one settlement in the middle, builds industry and armies on it, takes
-more ground with a Conquest Truck, and survives the Rot's night waves.
+**SANDSTORM** is an RTS in the same hand-drawn ink-on-paper style. It
+reimplements, in our own names, the mechanics of the game it is a
+replica of — the research and every number's provenance live in
+`rts-research/` (`Desert_Order_Design_Spec.md` is the master reference,
+the two CSVs are the unit and gold-shop rosters). The branding, unit
+names and faction names are all original; the mechanics, costs, rates,
+ranges and scaling follow the spec.
+
+The war: the **Free Company** (the player) holds one settlement. Five
+nations — Iron Pact (rusher), Azure League (boomer), Sand Union
+(spread), Crimson Front (airpower), Jade Accord (navy) — hold the other
+homes and fight each other, expand, and come for you. The Rot horde
+(`horde.js`) is wired in but dormant for now.
 
 The RTS keeps every Hard constraint from the village (double-clickable
 `file://`, classic `<script>` tags, no bundler, the same sketch
@@ -778,72 +787,113 @@ primitives). It uses the shared core: `js/sketch.js`, `js/grid.js`,
 under `js/rts/`:
 
 ```
-core.js       constants, palette, noise, factions, the game clock
+core.js       constants, palette, noise, the six inks, the game clock,
+              day/night, the movement layers (ground / air / sea / rail)
 camera.js     RTS camera: edge scroll, glide-to, shake
 terrain.js    300×300-tile procedural desert: dunes, sea, oil, scrub,
-              rivers, sites, roads, decor, an overview canvas
-nav.js        tile A* with layers (ground / air / sea) and a fire-line
-defs.js       resources, weapons, units, buildings, levels, flak rule
+              34 settlement sites with kinds, two rail lines, roads,
+              decor, fog + territory arrays, an overview canvas
+nav.js        tile A* with layers; rail is its own layer (trains never
+              breach); walls are breachable by non-rail units
+defs.js       the single source of truth: 4 resources at spec scale,
+              ~79 units (cost/mp/grp/speed/sight/fuel/time/shape/spec/
+              quota/ammo/capture/train/water), 27 buildings, the gold
+              shop + gold ledger, flak L1/L2/L3, factory levels,
+              EP/MP/squad caps, productivity, storage, 5 AI personas,
+              the 4 starter quests
 fx.js         particle / tracer / marker / wreck pools
-combat.js     shots in flight: bullets, shells, rockets, missiles, bombs,
-              torpedoes, with the Desert Order flak damage curve
-entity.js     orders, formations, movement, targeting
-base.js       placement, build progress, upgrades, production queues
-economy.js    four resources, productivity = sqrt(n)/n, storage caps
-territory.js  settlement capture, ring growth
-ai.js         six personalities (rusher, boomer, airpower, navy,
-              turtler, expansionist) with attack waves and expansion
-horde.js      the Rot: infested sites, night waves, the dose
-sprites.js    the art: infantry, vehicles, tanks with rotating turrets,
-              independent tread animation, jets, helis with rotors,
-              ships with wake, walls, factories, defences, oil seeps,
-              palms, bushes, ripples, wrecks, damage smoke, muzzle flash
+combat.js     shots in flight (bullet/shell/rocket/missile/bomb/torp),
+              the spec damage curve: spec ×5/×0.2, armour gap,
+              hardScale(n) = n^-0.52 on hard targets
+entity.js     orders (move/amove/patrol/hold/attack/capture/stop),
+              formations, fuel, rail riding, air altitude, the capture
+              walk-up
+base.js       placement, build progress, factory levels, production
+              queues (EP/MP/squad gates, `b.lastFail` names the gate)
+economy.js    four resources, productivity √n/n, storage caps, gold:
+              gold shop prices, the ledger (flak plate/long gun,
+              instant resources, acceleration), the daily free faucets
+territory.js  the contested flag (settlement logic lives in game.js)
+ai.js         five personalities: industry, gold purchases, an army
+              mix (falls back to what the books can carry), defence,
+              expansion (Conquest Trucks mop up open yards) and raids
+              (columns big enough to trade with the flaks)
+horde.js      dormant: the Rot's sites and night waves, stubbed
+sprites.js    the art: every unit silhouette (tanks with rotating
+              turrets and running tread, spg/td, planes/jets, helis
+              with rotors, ships with wake, subs, trains on bogies),
+              the four plants, works, airfield, heli pad, shipyard,
+              trainyard, the flak tower in its three grades, defences,
+              walls that join, the gold command towers with badges,
+              wrecks, damage smoke, muzzle flash
 render.js     chunked ground cache, painter-order draw, fog of war,
-              selection rings, health bars, build ghosts, night wash
-minimap.js    full-map minimap with territory, fog, units, pings
-ui.js         the paper HUD: resources, clock, build menu, production
-              roster, selection panel, orders, control groups, help
-main.js       bootstrap, input, the loop
+              settlement rings with kind + owner, selection rings,
+              health bars, build ghosts, night wash
+minimap.js    full-map minimap with territory, fog, units, open-yard
+              rings, pings
+ui.js         the paper HUD: the four stores, the gold purse, EP/MP +
+              squads, bases; build menu with the Gold (ledger) tab;
+              factory levels, production queues with hotkeys, rally,
+              unit cards with the spec notes, the result card
+main.js       bootstrap, input, the loop, the raid order (right-click a
+              yard with a mixed group)
 ```
 
-`rts.html` loads all of these in the right order. The headless smoke
-test is `node tools/rts-smoke.mjs --shot`; it boots the page in
-Chromium, lets it run, and reports units / buildings / fps / errors.
+`rts.html` loads all of these in the right order.
 
-`village.html` is the preserved copy of the old `index.html` (village
-mode).
-
-The rules that shape the war (straight from Desert Order):
+### The rules that shape the war (from the spec)
 
 - every plant costs resources, takes time, and has a cap per faction;
-- more settlements = more of every building you may own (`max × (1 +
-  floor(sites/2))`), so expansion is not a luxury — it is the production
-  limit;
-- a gun that cannot point up cannot hit aircraft, and aircraft can hit
-  anything that cannot answer; flak is not optional;
-- flak towers (and HQs) are hard targets: a hundred guns shooting one do
-  three times the damage of ten, not ten times (`hardScale(n) = n^-0.52`);
-- weapons have an armour penetration and armour has a number, and the
-  gap between them scales the hit;
+  factory levels cost 1.32× / 1.17× / 1.52× / 1.26× and top out at the
+  settlement's max (12, or 16 with a Base Extension);
+- more settlements = more of every building you may own, so expansion
+  is not a luxury — it is the production limit;
+- the **books**: Energy Points and Military Points are hard ledgers
+  (1000 each); a hundred over the cap and production stops until the
+  books balance (stores take a tenth, the plants idle);
+- a gun that cannot point up cannot hit aircraft; flak is not
+  optional; flaks are hard targets (`hardScale`), plated (L2, 29 g)
+  and long-gunned (L3, 99 g) from the gold ledger;
+- weapons have penetration and armour has a number; the gap scales the
+  hit (`armorMul`, clamped 0.55–1.5); a specialty is 5× on its class
+  and 0.2× on everything else;
 - you can only build on ground you own; taking a settlement means
-  driving a Conquest Truck onto it and holding it; settlements grow the
-  longer you hold them.
+  killing its flaks and holding a Conquest Truck in the yard (14 s);
+  the yard opens, the ground turns, two flaks go up for you;
+- gold is the slow economy: Gold Runners (10 a day → 1 g), the gold
+  shop, and what comes back for one gold after a base falls.
+
+### Verification (no browser in this sandbox)
+
+- `node tools/rts-headless.mjs [--t=seconds] [--seed=N]` — boots the
+  sim without any DOM, runs N seconds, and asserts 14 invariants
+  (base kinds, naval-on-water, train-on-rail, EP/MP books, fuel
+  store > purse, flakless settlements open, industry output, …).
+- `node tools/rts-domstub.mjs [seed] [frames]` — boots the **whole
+  page** under a Node DOM/canvas stub, pumps frames, pans the camera
+  over home / AI / naval / rail sites, then draws every unit shape,
+  every standing building and every ghost/icon directly. This is the
+  oracle for anything the sim-only harness cannot see (sprites,
+  render, ui, minimap, main).
+- `node --check` on every file, then `npm run format` / `npm run lint`
+  (Oxc) — both must be clean.
+- `tools/rts-smoke.mjs` needs a real Chromium and is not runnable here.
 
 ### Hotkeys
 
-- `WASD` / edge of screen — pan
-- `Wheel` — zoom on the cursor
-- `Middle drag` — pan
-- `Left drag` — box select; `Left click` — select one
-- `Double click` — select every one of that kind on screen
-- `Ctrl+1..9` — make a control group; `1..9` — select it; press twice to jump there
-- `Right click` — move / attack
-- `A` attack-move · `M` move · `P` patrol · `H` hold · `S` stop · `R` repair · `U` unload · `C` capture
-- `F` form up · `Tab` cycle armies · `Ctrl+A` select all on screen
-- `Q W E R T Y` — build from the open tab; `B` — back to build menu
-- `Shift+click` — place several buildings in a row; `Ctrl+click` — cancel one queued unit
-- `Space` — pause; `[` / `]` — slower / faster
-- `Home` / `F2` — jump to HQ · `F9` — jump to last alarm
-- `F1` — help · `F3` fog · `F4` territory · `F5` tile grid
-- `Del` / `Backspace` — scuttle selected
-- `Esc` — cancel placement, deselect, close help
+- `WASD` / `Middle drag` / edge of screen — pan · `Wheel` — zoom
+- `Left drag` — box select · `Left click` — select one ·
+  `Double click` — all of that kind on screen · `Ctrl+A` — all on screen
+- `Ctrl+1..9` — make a control group · `1..9` — select it (twice = jump)
+- `Right click` — move / attack / **raid a yard** (mixed groups feed the
+  guns and send the truck in)
+- `A` attack-move · `M` move · `P` patrol · `H` hold · `S` stop ·
+  `C` capture (then click the yard) · `U` upgrade · `Y` rally
+- `F` form up · `Tab` cycle armies
+- `B` — build menu (tabs: Industry / Military / Defence / Command /
+  **Gold** = the ledger) · `Q W E R T Y U I O P` — pick from the open tab
+- `Shift+click` — place several in a row · `Del` / `Backspace` — scuttle
+- `Space` — pause · `1 2 3` — speed · `Q` quality · `K` sound
+- `Home` / `F2` / `H` (no selection) — HQ · `F` (no selection) — fit map
+- `F1` / `?` — help · `F3` fog · `F4` territory · `F5` grid ·
+  `F9` — last alarm · `Esc` — cancel / deselect

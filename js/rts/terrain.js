@@ -1,16 +1,22 @@
-/* Desert Order — the ground.
+/* SANDSTORM — the ground.
 
    A 300x300 tile desert (12000 x 12000 world units): dunes, packed flats,
    mesa ridges nothing can climb, a river that runs to a southern sea, oil
-   seeps, brush, a highway network, and thirty-odd settlement sites worth
-   fighting over.
+   seeps, brush, a highway network, a rail line, and thirty-odd settlement
+   sites worth fighting over.
+
+   The sites are not all the same kind of ground. The war needs them to
+   be different: a navy needs a coast, a railyard needs the track, an
+   airfield needs long dry sight. At map birth every base type is
+   guaranteed its ground — naval sites on the water, train sites on the
+   rail, the rest split between tank, air and rotor ground.
 
    The map is generated once from a seed and then never changes except
    where you build on it. Two things are kept for the renderer: a small
    overview canvas (drawn once, used when the camera is far out) and a
    decor list (rocks, bushes, ripples) that is culled and drawn per frame
    so it stays crisp at every zoom. There is no per-tile memory beyond
-   four flat arrays, and no allocation after worldgen. */
+   five flat arrays, and no allocation after worldgen. */
 (() => {
   "use strict";
   const ZS = (window.ZS = window.ZS || {});
@@ -34,9 +40,11 @@
       this.owner = new Int8Array(N); // territory: -1 nobody, else faction
       this.vis = new Uint8Array(N); // fog for the player: 0/1/2
       this.visFade = new Float32Array(N); // smoothed fog, for drawing
+      this.jam = new Uint8Array(N); // under a jammer tower: blind to all but the owner
       this.roadBonus = new Uint8Array(N);
       this.nodes = []; // oil seeps
       this.sites = []; // capturable settlement sites
+      this.railLines = []; // the track, as chains of sites
       this.decor = null;
       this.overview = null;
       this.version = 0; // bumped when occupancy changes — nav listens
@@ -60,7 +68,6 @@
           const dune = R.fbm(tx * 0.09 + 40, ty * 0.09, seed + 7, 3);
           const relief = R.ridge(tx * 0.022, ty * 0.022, seed + 300, 4);
           shade[i] = R.clamp(((dune * 0.55 + e * 0.45) * 255) | 0, 0, 255);
-          // the ridge crests become rock: sharp, winding, unclimbable
           if (relief > 0.74 && e > 0.42) type[i] = T.ROCK;
           else if (dune > 0.62 || e > 0.62) type[i] = T.FIRM;
           else type[i] = T.SAND;
@@ -73,7 +80,6 @@
         const wob = (R.fbm(tx * 0.03, 11.5, seed + 91, 3) - 0.5) * 26;
         const edge = Math.round(seaLine + wob);
         for (let ty = Math.max(0, edge); ty < MAPH; ty++) type[ty * MAPW + tx] = T.WATER;
-        // a wet margin that reads as a shoreline
         for (let k = 1; k <= 2; k++) {
           const ty = edge - k;
           if (ty >= 0 && type[ty * MAPW + tx] !== T.ROCK) type[ty * MAPW + tx] = T.FIRM;
@@ -118,6 +124,12 @@
       // --- settlement sites --------------------------------------------
       this.placeSites(rnd);
 
+      // --- the rail: two lines, each a chain of sites -------------------
+      this.layRail(rnd);
+
+      // --- the kinds of ground: naval on the water, air in the flats ----
+      this.assignSiteKinds(rnd);
+
       // --- highways ------------------------------------------------------
       this.layRoads();
 
@@ -158,14 +170,13 @@
           const n = R.hash2(tx * 13, ty * 17, this.seed + 99) * (wobble || 0.4);
           if (d > 1 - n * 0.55) continue;
           const i = ty * MAPW + tx;
-          if (this.type[i] === T.OIL) continue;
+          if (this.type[i] === T.OIL || this.type[i] === T.RAIL) continue;
           this.type[i] = kind;
         }
       }
     }
 
     carveRiver(seed) {
-      // a meandering channel from the north edge down to the sea
       let x = 40 + R.hash2(1, 2, seed + 12) * (MAPW - 80);
       const pts = [];
       for (let ty = 0; ty < MAPH; ty++) {
@@ -184,7 +195,6 @@
           const i = p.ty * MAPW + tx;
           this.type[i] = T.WATER;
         }
-        // green banks
         for (let d = -w - 3; d <= w + 3; d += 0.5) {
           const tx = Math.round(p.tx + d);
           if (tx < 0 || tx >= MAPW) continue;
@@ -202,7 +212,6 @@
       return false;
     }
 
-    // flat, dry, and roomy: a place an army could hold
     flatScore(tx, ty, r) {
       let bad = 0,
         n = 0,
@@ -224,6 +233,15 @@
       return 1 - bad / (n * 1.6);
     }
 
+    waterNear(tx, ty, r) {
+      for (let dy = -r; dy <= r; dy += 2)
+        for (let dx = -r; dx <= r; dx += 2) {
+          const i = this.idx(tx + dx, ty + dy);
+          if (i >= 0 && this.type[i] === T.WATER) return true;
+        }
+      return false;
+    }
+
     placeSites(rnd) {
       const want = 34;
       const minGap = 26;
@@ -241,10 +259,10 @@
           ty,
           x: (tx + 0.5) * TILE,
           y: (ty + 0.5) * TILE,
-          r: 11, // territory radius in tiles
+          r: 11,
           owner: -1,
-          garrison: 0,
           tier: 1,
+          kind: null, // assigned by layRail / assignSiteKinds
           name: null,
         });
       }
@@ -305,15 +323,154 @@
       this.sites.forEach((s, i) => (s.name = NAMES[i % NAMES.length]));
     }
 
+    /* ---------- the rail ----------
+       Two lines across the map, each a chain of sites. The track is
+       honest: it runs straight between what it links, it bridges the
+       water, and it gives up at the mesa. Every site it passes becomes
+       train ground. */
+
+    layRail(rnd) {
+      const used = new Set();
+      const home = this.homeSite;
+      for (let line = 0; line < 2; line++) {
+        // start far from the player: the rail serves the far side first
+        let start = null,
+          bs = -1;
+        for (const s of this.sites) {
+          if (s === home || used.has(s)) continue;
+          if (this.type[s.ty * MAPW + s.tx] === T.WATER) continue;
+          const d = Math.hypot(s.tx - home.tx, s.ty - home.ty);
+          const sc = d * (0.7 + rnd() * 0.6);
+          if (sc > bs) {
+            bs = sc;
+            start = s;
+          }
+        }
+        if (!start) continue;
+        used.add(start);
+        const chain = [start];
+        let cur = start;
+        for (let k = 0; k < 5; k++) {
+          let best = null,
+            bd = Infinity;
+          for (const s of this.sites) {
+            if (used.has(s)) continue;
+            if (s === home) continue;
+            const d = Math.hypot(s.tx - cur.tx, s.ty - cur.ty);
+            if (d < 20 || d > 110) continue;
+            // keep the chain roughly in one direction
+            const dx1 = cur.tx - chain[0].tx,
+              dy1 = cur.ty - chain[0].ty;
+            const dx2 = s.tx - cur.tx,
+              dy2 = s.ty - cur.ty;
+            const turn = Math.abs(Math.atan2(dx2 * dy1 - dy2 * dx1, dx1 * dx2 + dy1 * dy2));
+            if (turn > 1.15) continue;
+            const sc = d + turn * 40;
+            if (sc < bd) {
+              bd = sc;
+              best = s;
+            }
+          }
+          if (!best) break;
+          used.add(best);
+          chain.push(best);
+          cur = best;
+        }
+        if (chain.length < 3) continue;
+        this.railLines.push(chain);
+        for (let i = 0; i + 1 < chain.length; i++) this.paintRail(chain[i], chain[i + 1]);
+        for (const s of chain) if (!s.kind) s.kind = "train";
+      }
+    }
+
+    paintRail(a, b) {
+      const steps = Math.ceil(Math.hypot(b.tx - a.tx, b.ty - a.ty) * 2);
+      for (let s = 0; s <= steps; s++) {
+        const t = s / steps;
+        const x = a.tx + (b.tx - a.tx) * t;
+        const y = a.ty + (b.ty - a.ty) * t;
+        const tx = Math.round(x),
+          ty = Math.round(y);
+        // a 2x2 stamp so the track is connected at every junction
+        for (let dy = 0; dy <= 1; dy++)
+          for (let dx = 0; dx <= 1; dx++) {
+            const X = tx + dx,
+              Y = ty + dy;
+            if (X < 0 || Y < 0 || X >= MAPW || Y >= MAPH) continue;
+            const i = Y * MAPW + X;
+            const tt = this.type[i];
+            if (tt === T.ROCK || tt === T.OIL) continue; // the mesa waits
+            this.type[i] = T.RAIL;
+          }
+      }
+      this.version++;
+    }
+
+    /* ---------- the kinds of ground ----------
+       Naval ground needs a coast within a shipyard's reach; air ground
+       wants the longest dry sight; everything the map has not already
+       claimed is tank ground. The player's home keeps its own kind —
+       it builds ground forces and the gold trucks. */
+
+    assignSiteKinds(rnd) {
+      const kinds = { home: 0, tank: 0, air: 0, copter: 0, naval: 0, train: 0 };
+      for (const s of this.sites) {
+        if (s === this.homeSite) {
+          s.kind = "home";
+          kinds.home++;
+          continue;
+        }
+        if (!s.kind) s.kind = "tank";
+        kinds[s.kind] = (kinds[s.kind] || 0) + 1;
+      }
+      const open = this.sites.filter((s) => s !== this.homeSite);
+      // how far the water is, in tiles of looking
+      const distToWater = (s) => {
+        for (let rr = 3; rr <= 40; rr += 3) if (this.waterNear(s.tx, s.ty, rr)) return rr;
+        return 99;
+      };
+      // naval: the coast first. A shipyard reaches the water sixteen
+      // tiles out, so that is the horizon — and past it the navy simply
+      // does not exist on this map
+      const coastal = open
+        .filter((s) => s.kind !== "train" && s.kind !== "home" && distToWater(s) <= 16)
+        .sort((a, b) => distToWater(a) - distToWater(b));
+      const naval = coastal.slice(0, 6);
+      for (const s of naval) {
+        if (s.kind === "train") continue;
+        kinds[s.kind]--;
+        s.kind = "naval";
+        kinds.naval++;
+      }
+      // air: five of the flattest, driest ground
+      const airCand = open
+        .filter((s) => s.kind === "tank")
+        .sort((a, b) => this.flatScore(b.tx, b.ty, 6) - this.flatScore(a.tx, a.ty, 6));
+      for (const s of airCand.slice(0, 5)) {
+        s.kind = "air";
+        kinds.air++;
+        kinds.tank--;
+      }
+      // rotor: four more
+      const copCand = open.filter((s) => s.kind === "tank" && s.kind !== "home");
+      for (let k = 0; k < 4 && k < copCand.length; k++) {
+        const s = copCand[(rnd() * copCand.length) | 0];
+        if (s.kind !== "tank") continue;
+        s.kind = "copter";
+        kinds.copter++;
+        kinds.tank--;
+      }
+      this.kindCounts = kinds;
+    }
+
     /* Lay a strip of highway between two tiles. Nothing that could not
        carry a truck is ever paved over, so a road never eats a cliff, a
-       lake or an oil seep. The home base calls this to lay its own drive
-       out to the world once it knows which way the door faces. */
+       lake, an oil seep or the rail. The home base calls this to lay its
+       own drive out to the world once it knows which way the door faces. */
     paintRoad(x0, y0, x1, y1, w) {
       const steps = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 1.6);
       for (let s = 0; s <= steps; s++) {
         const t = s / steps;
-        // a lazy S so the roads read as roads, not as rulers
         const bx = R.lerp(x0, x1, t) + Math.sin(t * 6.283) * 1.6;
         const by = R.lerp(y0, y1, t) + Math.cos(t * 5.1) * 1.2;
         for (let dy = -w; dy <= w; dy++)
@@ -323,7 +480,7 @@
             if (tx < 0 || ty < 0 || tx >= MAPW || ty >= MAPH) continue;
             const i = ty * MAPW + tx;
             const tt = this.type[i];
-            if (tt === T.ROCK || tt === T.WATER || tt === T.OIL) continue;
+            if (tt === T.ROCK || tt === T.WATER || tt === T.OIL || tt === T.RAIL) continue;
             this.type[i] = T.ROAD;
           }
       }
@@ -333,7 +490,6 @@
     layRoads() {
       const road = (x0, y0, x1, y1, w) => this.paintRoad(x0, y0, x1, y1, w);
 
-      // site-to-site: everyone links to their nearest two neighbours
       for (const s of this.sites) {
         const near = this.sites
           .filter((o) => o !== s)
@@ -343,8 +499,6 @@
           .slice(0, 2);
         for (const o of near) road(s.tx, s.ty, o.tx, o.ty, 0);
       }
-      // a ring road around the map and four highways out through the
-      // middle of each edge (the Desert Order way off the map)
       const edges = [
         { x: MAPW / 2, y: 1 },
         { x: MAPW / 2, y: MAPH - 40 },
@@ -365,7 +519,6 @@
         this.highways = this.highways || [];
         this.highways.push({ x: (e.x + 0.5) * TILE, y: (e.y + 0.5) * TILE });
       }
-      // oil seeps get a spur so a refinery is worth driving to
       for (const n of this.nodes) {
         let best = this.sites[0],
           bs = 1e9;
@@ -388,7 +541,7 @@
         dr = new Float32Array(DECOR_MAX);
       let n = 0;
       // kinds: 0 ripple, 1 pebble, 2 bush, 3 rock chunk, 4 bones, 5 palm,
-      // 6 tyre track, 7 wreck
+      // 6 tyre track, 7 wreck, 8 rail spike
       for (let ty = 0; ty < MAPH && n < DECOR_MAX - 8; ty++) {
         for (let tx = 0; tx < MAPW && n < DECOR_MAX - 8; tx++) {
           const i = ty * MAPW + tx;
@@ -411,9 +564,11 @@
           } else if (t === T.ROAD) {
             chance = 0.1;
             kind = 6;
+          } else if (t === T.RAIL) {
+            chance = 0.3;
+            kind = 8;
           }
           if (kind < 0) continue;
-          // hash-driven thinning: keep the desert sparse but never empty
           if (R.hash2(tx * 3, ty * 7, this.seed + 55) > chance) continue;
           const jx = R.hash2(tx, ty, this.seed + 61) - 0.5;
           const jy = R.hash2(tx, ty, this.seed + 62) - 0.5;
@@ -425,7 +580,6 @@
           n++;
         }
       }
-      // a handful of old wrecks along the roads, for company
       for (let k = 0; k < 40 && n < DECOR_MAX; k++) {
         const tx = 6 + ((rnd() * (MAPW - 12)) | 0);
         const ty = 6 + ((rnd() * (MAPH - 12)) | 0);
@@ -444,9 +598,6 @@
     /* ---------- the overview: one small canvas, drawn once ---------- */
 
     renderOverview() {
-      // keep the overview cheap: one pixel per 16 world units = 750x750 for
-      // the whole map. It is only ever shown zoomed far out, where those
-      // 16 units are well under a screen pixel.
       const step = 16;
       const ow = Math.ceil(R.W / step),
         oh = Math.ceil(R.H / step);
@@ -459,7 +610,6 @@
       const pal = R.PAL;
       for (let ty = 0; ty < oh; ty++) {
         for (let tx = 0; tx < ow; tx++) {
-          // sample the tile under this overview pixel
           const sx = Math.min(MAPW - 1, ((tx * step) / TILE) | 0);
           const sy = Math.min(MAPH - 1, ((ty * step) / TILE) | 0);
           const i = sy * MAPW + sx;
@@ -469,6 +619,7 @@
           else if (t === T.ROCK) col = pal.rock;
           else if (t === T.SCRUB) col = pal.scrub;
           else if (t === T.ROAD) col = pal.road;
+          else if (t === T.RAIL) col = pal.rail;
           else if (t === T.OIL) col = pal.oil;
           else if (t === T.FIRM) col = pal.firm;
           else col = pal.sand;
@@ -510,17 +661,23 @@
       return (ty + 0.5) * TILE;
     }
 
-    // open for a ground unit, ignoring buildings
+    railNear(tx, ty, r) {
+      for (let dy = -r; dy <= r; dy += 1)
+        for (let dx = -r; dx <= r; dx += 1) {
+          const i = this.idx(tx + dx, ty + dy);
+          if (i >= 0 && this.type[i] === T.RAIL) return true;
+        }
+      return false;
+    }
+
     openTile(tx, ty) {
       const i = this.idx(tx, ty);
       return i >= 0 && R.OPEN_BY_T[this.type[i]] === 1;
     }
-    // open and nobody is standing there
     freeTile(tx, ty) {
       const i = this.idx(tx, ty);
       return i >= 0 && R.OPEN_BY_T[this.type[i]] === 1 && this.occ[i] === 0;
     }
-    // water for ships
     seaTile(tx, ty) {
       const i = this.idx(tx, ty);
       return i >= 0 && this.type[i] === T.WATER;
@@ -534,8 +691,17 @@
     }
 
     // can a building of `size` tiles have its top-left at (tx, ty)?
+    // `opts.water`: must stand in water. `opts.rail`: must touch the rail.
     canBuild(tx, ty, size, opts) {
       opts = opts || {};
+      let railTouch = !opts.rail;
+      if (opts.rail) {
+        for (let dy = -2; dy <= size + 1; dy++)
+          for (let dx = -2; dx <= size + 1; dx++) {
+            const i = this.idx(tx + dx, ty + dy);
+            if (i >= 0 && this.type[i] === T.RAIL) railTouch = true;
+          }
+      }
       for (let dy = 0; dy < size; dy++)
         for (let dx = 0; dx < size; dx++) {
           const i = this.idx(tx + dx, ty + dy);
@@ -548,7 +714,7 @@
           }
           if (this.occ[i] !== 0) return false;
         }
-      return true;
+      return railTouch;
     }
 
     markBuilding(tx, ty, size, id) {
@@ -583,7 +749,6 @@
       return null;
     }
 
-    // is this tile inside territory owned by faction f (or nobody)?
     claim(tx, ty, f) {
       const i = this.idx(tx, ty);
       if (i < 0) return -1;

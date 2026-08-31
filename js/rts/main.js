@@ -1,4 +1,4 @@
-/* Desert Order — the bootstrap.
+/* SANDSTORM — the bootstrap.
 
    Makes the world, wires the input, and runs the loop. The order of the
    <script> tags in rts.html is the load order, and it matters: core,
@@ -85,7 +85,7 @@
 
       g.say(
         0,
-        "The company holds " + home.name + ". Six nations want it. So does the Rot.",
+        "The company holds " + home.name + ". Five nations want the sand — go and take some.",
         "good",
       );
       g.say(
@@ -294,7 +294,7 @@
       // a single click's worth of drag still counts as a click
       if (!hit.length) return;
       // prefer fighting units over buildings when the box holds both
-      const mil = hit.filter((u) => u.w || u.def.capture || u.def.repair || u.def.carry);
+      const mil = hit.filter((u) => u.w || u.def.capture || u.def.mp);
       const pick = mil.length ? mil : hit;
       this.g.select(pick, d.add);
       R.UI.selSig = "";
@@ -368,6 +368,17 @@
       }
       if (!sel.length) return;
 
+      // a hostile or neutral settlement under the cursor: the column raids
+      // the yard — guns are fed to the guns, the truck takes the ground
+      const bld = g.buildingAtWorld(w.x, w.y);
+      if (!bld) {
+        const site = this.siteAtPoint(w.x, w.y);
+        if (site && site.owner !== 0) {
+          this.raidSite(sel, site, w);
+          return;
+        }
+      }
+
       // what is under the cursor?
       const tgt = this.pickTarget(w.x, w.y);
       const ord = tgt
@@ -375,6 +386,45 @@
         : { type: "move", x: w.x, y: w.y };
       g.order(sel, ord, e.shiftKey);
       if (ZS.sound) ZS.sound.event(tgt ? "order" : "move", w.x, w.y);
+    },
+
+    // the settlement a point stands in, if any
+    siteAtPoint(x, y) {
+      for (const s of this.g.t.sites) {
+        const r = (s.r + 2) * R.TILE;
+        if (Math.abs(x - s.x) <= r && Math.abs(y - s.y) <= r) return s;
+      }
+      return null;
+    },
+
+    // feed the column to the yard's guns and send the truck in; a group
+    // without a truck only fights — the ground cannot turn
+    raidSite(sel, site, _w) {
+      const g = this.g;
+      const guns = g.buildings.filter(
+        (b) =>
+          !b.dead &&
+          b.site === site &&
+          b.fac !== 0 &&
+          R.hostileTo(0, b.fac) &&
+          (b.def.turret || b.key === "hq"),
+      );
+      const trucks = sel.filter((u) => u.def.capture);
+      const army = sel.filter((u) => !u.def.capture);
+      if (guns.length) {
+        for (let i = 0; i < army.length; i++) {
+          const tgt = guns[i % guns.length];
+          R.Entity.setOrder(g, army[i], { type: "attack", tgt, x: tgt.x, y: tgt.y });
+        }
+      } else if (army.length) {
+        R.Entity.assignFormation(g, army, { type: "amove", x: site.x, y: site.y });
+      }
+      for (const u of trucks)
+        R.Entity.setOrder(g, u, { type: "capture", site, x: site.x, y: site.y });
+      R.FX.marker(g, site.x, site.y, "attack");
+      if (ZS.sound) ZS.sound.event("order", site.x, site.y);
+      if (!trucks.length)
+        R.UI.toast("No Conquest Truck in the group — the yard cannot turn", "bad");
     },
 
     pickTarget(x, y) {
@@ -393,6 +443,23 @@
       const sel = g.selUnits();
       if (!sel.length) {
         this.armed = null;
+        return;
+      }
+      if (kind === "capture") {
+        const site = this.siteAtPoint(w.x, w.y);
+        if (!site || site.owner === 0) {
+          this.armed = null;
+          R.UI.toast("Click the settlement itself — the yard, not the open sand", "bad");
+          return;
+        }
+        const trucks = sel.filter((u) => u.def.capture);
+        for (const u of trucks)
+          R.Entity.setOrder(g, u, { type: "capture", site, x: site.x, y: site.y });
+        const rest = sel.filter((u) => !u.def.capture);
+        if (rest.length) g.order(rest, { type: "amove", x: site.x, y: site.y }, false);
+        this.armed = null;
+        R.FX.marker(g, site.x, site.y, "attack");
+        if (ZS.sound) ZS.sound.event("order");
         return;
       }
       if (kind === "patrol") {
@@ -579,7 +646,7 @@
         e.preventDefault();
         const view = this.cam.visible(this.vw, this.vh, 0);
         const all = this.g.inRect(view.x0, view.y0, view.x1, view.y1, 0);
-        const mil = all.filter((u) => u.w || u.def.capture || u.def.repair || u.def.carry);
+        const mil = all.filter((u) => u.w || u.def.capture || u.def.mp);
         g.select(mil.length ? mil : all, false);
         R.UI.selSig = "";
         return;
@@ -654,7 +721,6 @@
         p: "patrol",
         h: "hold",
         s: "stop",
-        r: "repair",
         c: "capture",
       }[k];
       if (orderKey && !e.ctrlKey && !e.metaKey && selUnits.length) {
@@ -672,7 +738,7 @@
     cycleArmies() {
       const g = this.g;
       const field = g.units.filter(
-        (u) => !u.dead && u.fac === 0 && (u.w || u.def.capture || u.def.repair),
+        (u) => !u.dead && u.fac === 0 && (u.w || u.def.capture || u.def.mp),
       );
       if (!field.length) return;
       // cluster by rough grid cell so "an army" means something
