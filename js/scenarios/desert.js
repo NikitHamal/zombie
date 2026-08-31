@@ -398,6 +398,29 @@
         seeded.push(a);
       }
       if (seeded.length) this.sel = { k: "u", o: seeded[0], all: seeded };
+
+      // each rival outpost keeps a small garrison on its own ground, so a
+      // conqueror is met by soldiers, not just by walls
+      const rng = ZS.rng32((this.world.seed ^ 0xbeef) + this.day);
+      for (let i = 0; i < (this.outposts || []).length; i++) {
+        const site = this.outposts[i];
+        const garrison = ["militia", "archer", "gunner"].slice(0, 1 + (i % 3));
+        for (const id of garrison) {
+          // spawn on the outpost's own ground, then hold the yard
+          const at = this.nav.nearestWalkable(
+            site.x + (rng() - 0.5) * 120,
+            site.y + 30 + rng() * 70,
+            160,
+            true,
+          );
+          const a = ZS.Army.spawn(this, id, true, at);
+          if (!a) continue;
+          a.nat = site.id;
+          a.goal = { x: site.x, y: site.y + 40 };
+          a.path = null;
+          a.hold = true;
+        }
+      }
     }
 
     _moveSelected(x, y) {
