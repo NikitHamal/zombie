@@ -477,17 +477,7 @@
 
       c.restore();
 
-      /* ---- 15. night wash (screen space) ---- */
-      const dl = R.daylight(g.time);
-      if (dl < 0.99) {
-        c.setTransform(dpr, 0, 0, dpr, 0, 0);
-        c.globalAlpha = (1 - dl) * 0.52;
-        c.fillStyle = "#2a3352";
-        c.fillRect(0, 0, vw, vh);
-        c.globalAlpha = 1;
-      }
-
-      /* ---- 16. the selection box (screen space) ---- */
+      /* ---- 15. the selection box (screen space) ---- */
       if (this.box) {
         const b = this.box;
         c.setTransform(dpr, 0, 0, dpr, 0, 0);

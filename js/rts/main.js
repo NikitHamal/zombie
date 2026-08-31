@@ -168,7 +168,9 @@
     },
 
     localE(e) {
-      return { x: e.clientX, y: e.clientY };
+      if (!this.canvas) return { x: e.clientX, y: e.clientY };
+      const rect = this.canvas.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
     },
 
     /* ---------- minimap ---------- */
@@ -194,9 +196,10 @@
     onDown(e) {
       if (this.g.over) return;
       if (ZS.sound) ZS.sound.unlock();
-      const sx = e.clientX,
-        sy = e.clientY;
-      if (R.Mini.hitTest(sx, sy)) return;
+      const p = this.localE(e);
+      const sx = p.x,
+        sy = p.y;
+      if (R.Mini.hitTest(e.clientX, e.clientY)) return;
 
       this.mx = sx;
       this.my = sy;
@@ -241,26 +244,27 @@
     },
 
     onMove(e) {
-      this.mx = e.clientX;
-      this.my = e.clientY;
-      R.Cam.mouseMove(e.clientX, e.clientY);
+      const p = this.localE(e);
+      this.mx = p.x;
+      this.my = p.y;
+      R.Cam.mouseMove(p.x, p.y);
 
       if (this.pan) {
-        this.cam.panBy(e.clientX - this.pan.x, e.clientY - this.pan.y, this.vw, this.vh);
-        this.pan.x = e.clientX;
-        this.pan.y = e.clientY;
+        this.cam.panBy(p.x - this.pan.x, p.y - this.pan.y, this.vw, this.vh);
+        this.pan.x = p.x;
+        this.pan.y = p.y;
         return;
       }
       if (this.drag) {
-        this.drag.x1 = e.clientX;
-        this.drag.y1 = e.clientY;
+        this.drag.x1 = p.x;
+        this.drag.y1 = p.y;
         if (Math.abs(this.drag.x1 - this.drag.x0) > 3 || Math.abs(this.drag.y1 - this.drag.y0) > 3)
           this.drag.moved = true;
         R.Render.box = this.drag.moved ? this.drag : null;
         return;
       }
       if (R.UI.place) {
-        const w = this.toWorld(e.clientX, e.clientY);
+        const w = this.toWorld(p.x, p.y);
         const tx = Math.floor(w.x / TILE),
           ty = Math.floor(w.y / TILE);
         const def = R.BDEF[R.UI.place];
@@ -302,7 +306,8 @@
     },
 
     clickSelect(e) {
-      const w = this.toWorld(e.clientX, e.clientY);
+      const p = this.localE(e);
+      const w = this.toWorld(p.x, p.y);
       const g = this.g;
       // buildings first: they are the thing you are aiming at when you
       // click a base, and they are big
@@ -356,7 +361,8 @@
         this.armed = null;
         return;
       }
-      const w = this.toWorld(e.clientX, e.clientY);
+      const p = this.localE(e);
+      const w = this.toWorld(p.x, p.y);
       const sel = g.selUnits();
 
       // a production building selected: right click sets its rally point
@@ -498,7 +504,8 @@
     tryPlace(e) {
       const g = this.g;
       const key = R.UI.place;
-      const w = this.toWorld(e.clientX, e.clientY);
+      const p = this.localE(e);
+      const w = this.toWorld(p.x, p.y);
       const def = R.BDEF[key];
       const ox = Math.floor((def.size - 1) / 2);
       const gx = R.clamp(((w.x / TILE) | 0) - ox, 0, R.MAPW - def.size);
