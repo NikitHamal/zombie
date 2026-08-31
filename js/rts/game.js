@@ -153,138 +153,136 @@
     }
 
     /* ---------- the home base ----------
-       A walled yard with one way in and a gun on that way in. The
-       industry sits at the back, the flaks across the mouth, and the
-       drive runs out to the road. The door faces the nearest
-       settlement — that is where the highway runs and the Conquest
-       Trucks will come from. */
-
-    exitBearing(site) {
-      let best = null,
-        bd = 1e18;
-      for (const s of this.t.sites) {
-        if (s === site) continue;
-        const d = (s.tx - site.tx) ** 2 + (s.ty - site.ty) ** 2;
-        if (d < bd) {
-          bd = d;
-          best = s;
-        }
-      }
-      let ux = best ? best.tx - site.tx : 1,
-        uy = best ? best.ty - site.ty : 0;
-      if (Math.abs(ux) >= Math.abs(uy)) return { ux: ux < 0 ? -1 : 1, uy: 0 };
-      return { ux: 0, uy: uy < 0 ? -1 : 1 };
-    }
+       The Desert Order shape: a walled yard whose wall is an arch — a
+       square with its corners pulled round — that opens at its down-left
+       corner. The road runs out of the corner, eight flaks stand in an
+       arc OUTSIDE the wall around it, and the small gate sits in between
+       them — the gate the trained troops march out of. The industry
+       crowds the back of the yard, away from the door. */
 
     buildStartBase() {
       const site = this.t.homeSite;
       const f = 0;
       const cx = site.tx,
         cy = site.ty;
-      const { ux, uy } = this.exitBearing(site);
-      const vx = -uy,
-        vy = ux;
 
-      const R0 = 10;
-      const GATE_W = 3;
-      const FLAKS = 10;
-      const FLAK_R = 7;
-      const FLAK_ARC = 3.0;
+      const R0 = 10; // the clear yard, in tiles from the centre
+      const A = R0 + 1; // the arch reaches this far on its axes
+      // the ground is cleared and packed first: the arch, the gate and
+      // the flak arc all stand exactly where they are drawn
+      R.clearBaseGround(this.t, cx, cy, A + 5);
+      const FLAKS = 8;
+      const FLAK_ARC = 1.57; // the arc sweeps from the south wall round to the west
       const APPROACH = 18;
+      const ux = -1,
+        uy = 1; // the bearing out of the yard: down and to the left
+      const bl = Math.hypot(ux, uy);
+      const bx = ux / bl,
+        by = uy / bl;
 
-      site.gateX = (cx + ux * R0 + 0.5) * TILE;
-      site.gateY = (cy + uy * R0 + 0.5) * TILE;
+      // walk the arch: a tile is wall when the superellipse curve crosses
+      // one of its edges — that rings the yard with no gap a column
+      // could slip through. The tiles facing the bearing, through the
+      // full thickness of the wall, are the small gate.
+      const GATE_COS = 0.995;
+      const wallTiles = [];
+      const gateTiles = [];
+      const vAt = (dx, dy) => R.wallRing(dx, dy, A) - 1;
+      for (let dy = -A - 2; dy <= A + 2; dy++)
+        for (let dx = -A - 2; dx <= A + 2; dx++) {
+          const v = vAt(dx, dy);
+          const crossed =
+            v === 0 ||
+            vAt(dx + 1, dy) * v < 0 ||
+            vAt(dx - 1, dy) * v < 0 ||
+            vAt(dx, dy + 1) * v < 0 ||
+            vAt(dx, dy - 1) * v < 0;
+          if (!crossed) continue;
+          const h = Math.hypot(dx, dy) || 1;
+          const cos = (dx * bx + dy * by) / h;
+          if (cos > GATE_COS) gateTiles.push([dx, dy]);
+          else wallTiles.push([dx, dy]);
+        }
+
+      // just outside the gate, on the road — where the troops muster
+      const gx = Math.round(cx + bx * (A + 4)),
+        gy = Math.round(cy + by * (A + 4));
+      site.gateX = (gx + 0.5) * TILE;
+      site.gateY = (gy + 0.5) * TILE;
       site.ux = ux;
       site.uy = uy;
 
       const kk = (dx, dy) => dx + ":" + dy;
       const reserved = new Set();
+      for (const [dx, dy] of gateTiles) reserved.add(kk(dx, dy));
 
-      const gateTiles = [];
-      for (let k = -(GATE_W >> 1); k <= GATE_W >> 1; k++) {
-        const dx = Math.round(ux * R0 + vx * k),
-          dy = Math.round(uy * R0 + vy * k);
-        gateTiles.push([dx, dy]);
-        reserved.add(kk(dx, dy));
-      }
-
+      // the flak arc. Each gun marches straight out from the centre until
+      // it is clear of the arch, so the arc hugs the outside of the wall
+      // round the gate — never inside the yard.
       const flakTiles = [];
       for (let i = 0; i < FLAKS; i++) {
         const th = -FLAK_ARC / 2 + (FLAK_ARC * i) / (FLAKS - 1);
-        const c = Math.cos(th),
-          s = Math.sin(th);
-        const dx = Math.round((ux * c - uy * s) * FLAK_R),
-          dy = Math.round((ux * s + uy * c) * FLAK_R);
-        if (reserved.has(kk(dx, dy))) continue;
-        flakTiles.push([dx, dy]);
+        const dxn = bx * Math.cos(th) - by * Math.sin(th);
+        const dyn = by * Math.cos(th) + bx * Math.sin(th);
+        let dx = 0,
+          dy = 0;
+        for (let r = A + 1; r < A * 2.4; r += 0.5) {
+          dx = Math.round(cx + dxn * r) - cx;
+          dy = Math.round(cy + dyn * r) - cy;
+          if (R.wallRing(dx, dy, A) > 1.45 && !reserved.has(kk(dx, dy))) break;
+        }
+        if (R.wallRing(dx, dy, A) <= 1.45 || reserved.has(kk(dx, dy))) continue;
         reserved.add(kk(dx, dy));
+        flakTiles.push([dx, dy]);
       }
 
+      // the industry, at the back of the yard — the corner round the
+      // gate is left open for the muster
       const PLAN = [
-        ["hq", -6.5, -4.5, 1],
-        ["concrete", -6.5, 0, 2],
-        ["steel", -6.5, 4.5, 2],
-        ["works", -2.5, -6.5, 1],
-        ["oil", -2.5, -3, 1],
-        ["alu", -2.5, 0.5, 1],
-        ["flak", -2.5, 4, 1],
-        ["flak", -2.5, 7.5, 1],
+        ["hq", 2, -5, 1],
+        ["concrete", -6, -6, 2],
+        ["steel", 0, -7, 2],
+        ["works", 6, 0, 1],
+        ["oil", 6, 5, 1],
+        ["alu", -6, 0, 1],
       ];
-      const put = (key, a, b, lvl) => {
+      const put = (key, dx, dy, lvl) => {
         const size = R.BDEF[key].size;
-        const wx = cx + ux * a + vx * b,
-          wy = cy + uy * a + vy * b;
-        const tx0 = Math.round(wx - size / 2),
-          ty0 = Math.round(wy - size / 2);
+        const tx0 = Math.round(cx + dx - size / 2),
+          ty0 = Math.round(cy + dy - size / 2);
         for (let r = 0; r <= 5; r++) {
           for (let s = 0; s < (r ? r * 8 : 1); s++) {
-            const an = (s / (r * 8)) * R.TAU;
+            const an = (s / (r ? r * 8 : 1)) * R.TAU;
             const tx = Math.round(tx0 + (r ? Math.cos(an) * r : 0)),
               ty = Math.round(ty0 + (r ? Math.sin(an) * r : 0));
-            if (!this.yardClear(tx, ty, size, cx, cy, R0, reserved)) continue;
+            if (!this.yardClear(tx, ty, size, cx, cy, A, reserved)) continue;
             return this.addBuilding(key, f, tx, ty, lvl || 1, true);
           }
         }
         return null;
       };
-      for (const [key, a, b, lvl] of PLAN) put(key, a, b, lvl);
+      for (const [key, dx, dy, lvl] of PLAN) put(key, dx, dy, lvl);
 
       for (const [dx, dy] of flakTiles) this.addBuilding("flak", f, cx + dx, cy + dy, 1, true);
 
       const seen = new Set();
-      for (let a = -R0; a <= R0; a++) {
-        const ring = [
-          [a, -R0],
-          [a, R0],
-          [-R0, a],
-          [R0, a],
-        ];
-        for (const [dx, dy] of ring) {
-          const k = kk(dx, dy);
-          if (seen.has(k)) continue;
-          seen.add(k);
-          let doorway = false;
-          for (const [gdx, gdy] of gateTiles) if (gdx === dx && gdy === dy) doorway = true;
-          if (doorway) continue;
-          this.addBuilding("wall", f, cx + dx, cy + dy, 1, true);
-        }
+      for (const [dx, dy] of wallTiles) {
+        const k = kk(dx, dy);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        this.addBuilding("wall", f, cx + dx, cy + dy, 1, true);
       }
       for (const [dx, dy] of gateTiles) this.addBuilding("gate", f, cx + dx, cy + dy, 1, true);
 
-      const g0 = gateTiles[gateTiles.length >> 1];
-      this.t.paintRoad(
-        cx + g0[0] + ux * 2,
-        cy + g0[1] + uy * 2,
-        cx + g0[0] + ux * (2 + APPROACH),
-        cy + g0[1] + uy * (2 + APPROACH),
-        1,
-      );
+      // the drive runs out of the gate, down and to the left
+      this.t.paintRoad(gx, gy, Math.round(gx + bx * APPROACH), Math.round(gy + by * APPROACH), 1);
 
+      // the opening garrison, mustered inside the gate
       const spots = [];
-      for (let a = 2; a <= 5; a++)
-        for (let b = -3; b <= 3; b++) {
-          const x = (cx + ux * a + vx * b + 0.5) * TILE,
-            y = (cy + uy * a + vy * b + 0.5) * TILE;
+      for (let dy = 2; dy <= 6; dy++)
+        for (let dx = -6; dx <= -2; dx++) {
+          const x = (cx + dx + 0.5) * TILE,
+            y = (cy + dy + 0.5) * TILE;
           if (this.nav.openAt(x, y, 0, f)) spots.push({ x, y });
         }
       const give = (key, n) => {
@@ -302,18 +300,22 @@
 
       this.say(
         0,
-        "Ten flaks cover the gate at " + site.name + ". Hold them and the base holds.",
+        "Eight flaks stand outside the arch at " +
+          site.name +
+          ", round the gate. Hold them and the base holds.",
         "good",
       );
       this.say(0, "A Conquest Truck takes ground: kill the flaks, then drive it in.", "");
     }
 
-    yardClear(tx, ty, size, cx, cy, R0, reserved) {
+    yardClear(tx, ty, size, cx, cy, A, reserved) {
       for (let dy = 0; dy < size; dy++)
         for (let dx = 0; dx < size; dx++) {
           const x = tx + dx,
             y = ty + dy;
-          if (Math.abs(x - cx) >= R0 || Math.abs(y - cy) >= R0) return false;
+          // inside the arch, and clear of the wall band itself
+          if (R.wallRing(x - cx, y - cy, A) > 0.85) return false;
+          if (Math.abs(x - cx) >= A || Math.abs(y - cy) >= A) return false;
           if (reserved && reserved.has(x - cx + ":" + (y - cy))) return false;
           if (!this.t.canBuild(tx, ty, size, {})) return false;
         }
@@ -450,7 +452,7 @@
         bd = 1e18;
       for (const s of this.t.sites) {
         const d = (s.tx - (tx + size / 2)) ** 2 + (s.ty - (ty + size / 2)) ** 2;
-        const r = (s.r + 2) ** 2;
+        const r = (s.r + 4) ** 2;
         if (d < r && d < bd) {
           bd = d;
           site = s;
@@ -520,6 +522,11 @@
           }
         b.onOil = on;
       }
+      // the Desert Order habit: a works on a gated yard musters its
+      // troops outside the wall — every fresh crew marches out of the
+      // gate. The steward's own rally (Y) overrides it.
+      if (def.cat === "mil" && site && site.gateX !== undefined && fac === site.owner)
+        b.rally = { x: site.gateX, y: site.gateY };
       if (fac >= 0) {
         const f = this.factions[fac];
         f.counts[key] = (f.counts[key] || 0) + 1;
@@ -527,7 +534,7 @@
       }
       this.buildings.push(b);
       this.t.markBuilding(tx, ty, size, b.id);
-      this.nav.markFootprint(tx, ty, size, true, fac, !!def.gate);
+      this.nav.markFootprint(tx, ty, size, true, fac, !!def.gate, def.gate ? site : null);
       return b;
     }
 
@@ -535,7 +542,7 @@
       if (b.dead) return;
       b.dead = true;
       this.t.clearBuilding(b.tx, b.ty, b.size);
-      this.nav.markFootprint(b.tx, b.ty, b.size, false, b.fac, !!b.def.gate);
+      this.nav.markFootprint(b.tx, b.ty, b.size, false, b.fac, !!b.def.gate, null);
       if (b.fac >= 0) {
         const f = this.factions[b.fac];
         f.counts[b.key] = Math.max(0, (f.counts[b.key] || 1) - 1);
@@ -863,6 +870,8 @@
         if (o.fac === e.fac) return;
         if (!R.hostileTo(e.fac, o.fac)) return;
         if (noBld && o.kind === "b") return;
+        // the wall and the gate are part of the ground: no gun shoots them
+        if (o.kind === "b" && o.def.inert) return;
         if (o.kind === "u" && o.def.stealth && !o.detected) return;
         const d2 = R.dist2(e.x, e.y, o.x, o.y);
         const lim = R.Combat.rangeTo(this, e, o);

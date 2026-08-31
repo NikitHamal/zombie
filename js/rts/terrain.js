@@ -27,7 +27,7 @@
     N = MAPW * MAPH;
   const T = R.T;
 
-  const DECOR_MAX = 26000;
+  const DECOR_MAX = 60000;
 
   class Terrain {
     constructor(seed) {
@@ -66,16 +66,19 @@
           const i = ty * MAPW + tx;
           const e = R.fbm(tx * 0.018, ty * 0.018, seed, 4);
           const dune = R.fbm(tx * 0.09 + 40, ty * 0.09, seed + 7, 3);
+          // the mesa country comes in ranges, not noise: a very slow
+          // mask decides where the ridges are allowed to rise at all
+          const rangeMask = R.fbm(tx * 0.006, ty * 0.006, seed + 400, 2);
           const relief = R.ridge(tx * 0.022, ty * 0.022, seed + 300, 4);
           shade[i] = R.clamp(((dune * 0.55 + e * 0.45) * 255) | 0, 0, 255);
-          if (relief > 0.74 && e > 0.42) type[i] = T.ROCK;
+          if (relief > 0.74 - rangeMask * 0.14 && e > 0.42) type[i] = T.ROCK;
           else if (dune > 0.62 || e > 0.62) type[i] = T.FIRM;
           else type[i] = T.SAND;
         }
       }
 
       // --- the sea: the southern edge ----------------------------------
-      const seaLine = MAPH - 34;
+      const seaLine = MAPH - 56;
       for (let tx = 0; tx < MAPW; tx++) {
         const wob = (R.fbm(tx * 0.03, 11.5, seed + 91, 3) - 0.5) * 26;
         const edge = Math.round(seaLine + wob);
@@ -90,13 +93,13 @@
       this.carveRiver(seed);
 
       // --- oasis lakes --------------------------------------------------
-      const lakes = 4 + ((rnd() * 4) | 0);
+      const lakes = 10 + ((rnd() * 6) | 0);
       for (let k = 0; k < lakes; k++) {
         const cx = 24 + rnd() * (MAPW - 48);
-        const cy = 24 + rnd() * (MAPH - 70);
-        const rad = 3.5 + rnd() * 5;
+        const cy = 24 + rnd() * (MAPH - 90);
+        const rad = 4.5 + rnd() * 7;
         this.blob(cx, cy, rad, T.WATER, 0.55 + rnd() * 0.3);
-        this.blob(cx, cy, rad + 2.6, T.SCRUB, 0.6);
+        this.blob(cx, cy, rad + 3.2, T.SCRUB, 0.6);
       }
 
       // --- brush: wherever there is water, and on the flats -------------
@@ -111,12 +114,12 @@
 
       // --- oil seeps ----------------------------------------------------
       let tries = 0;
-      while (this.nodes.length < 16 && tries++ < 6000) {
+      while (this.nodes.length < 40 && tries++ < 24000) {
         const tx = 12 + ((rnd() * (MAPW - 24)) | 0);
-        const ty = 12 + ((rnd() * (MAPH - 60)) | 0);
+        const ty = 12 + ((rnd() * (MAPH - 80)) | 0);
         const i = ty * MAPW + tx;
         if (type[i] !== T.SAND && type[i] !== T.FIRM) continue;
-        if (this.nearNode(tx, ty, 22)) continue;
+        if (this.nearNode(tx, ty, 30)) continue;
         this.blob(tx, ty, 1.1, T.OIL, 0.3);
         this.nodes.push({ tx, ty, x: (tx + 0.5) * TILE, y: (ty + 0.5) * TILE });
       }
@@ -243,12 +246,14 @@
     }
 
     placeSites(rnd) {
-      const want = 34;
-      const minGap = 26;
+      // a huge map wants its grounds far apart: the war is a walk of
+      // minutes between settlements, not seconds
+      const want = 46;
+      const minGap = 46;
       let guard = 0;
-      while (this.sites.length < want && guard++ < 9000) {
-        const tx = 16 + ((rnd() * (MAPW - 32)) | 0);
-        const ty = 12 + ((rnd() * (MAPH - 52)) | 0);
+      while (this.sites.length < want && guard++ < 120000) {
+        const tx = 20 + ((rnd() * (MAPW - 40)) | 0);
+        const ty = 20 + ((rnd() * (MAPH - 104)) | 0);
         if (this.flatScore(tx, ty, 4) < 0.55) continue;
         let ok = true;
         for (const s of this.sites) if (Math.hypot(s.tx - tx, s.ty - ty) < minGap) ok = false;

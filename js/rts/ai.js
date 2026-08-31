@@ -74,6 +74,9 @@
       }
       // the gate faces the map centre, and the flaks arc over the mouth
       const R0 = 7;
+      const A = R0 + 1; // the arch reaches this far on its axes
+      // packed ground under the base, so the arch lands where it is drawn
+      R.clearBaseGround(g.t, cx, cy, A + 4);
       let best = null,
         bd = 1e18;
       for (const s of g.t.sites) {
@@ -98,38 +101,53 @@
       if (!ux && !uy) ux = 1;
       const vx = -uy,
         vy = ux;
-      const gw = 3;
-      for (let k = -(gw >> 1); k <= gw >> 1; k++)
-        put("gate", Math.round(ux * R0 + vx * k), Math.round(uy * R0 + vy * k), 1);
-      for (let a = -R0; a <= R0; a++) {
-        for (const [dx, dy] of [
-          [a, -R0],
-          [a, R0],
-          [-R0, a],
-          [R0, a],
-        ]) {
-          let doorway = false;
-          for (let k = -(gw >> 1); k <= gw >> 1; k++)
-            if (dx === Math.round(ux * R0 + vx * k) && dy === Math.round(uy * R0 + vy * k))
-              doorway = true;
-          if (doorway) continue;
-          put("wall", dx, dy, 1);
+      // the wall is an arch: tiles the curve crosses, with a small gate
+      // through its full thickness where the bearing faces it
+      const GATE_COS = 0.995;
+      const bl = Math.hypot(ux, uy);
+      const bx = ux / bl,
+        by = uy / bl;
+      const vAt = (dx, dy) => R.wallRing(dx, dy, A) - 1;
+      for (let dy = -A - 2; dy <= A + 2; dy++)
+        for (let dx = -A - 2; dx <= A + 2; dx++) {
+          const v = vAt(dx, dy);
+          const crossed =
+            v === 0 ||
+            vAt(dx + 1, dy) * v < 0 ||
+            vAt(dx - 1, dy) * v < 0 ||
+            vAt(dx, dy + 1) * v < 0 ||
+            vAt(dx, dy - 1) * v < 0;
+          if (!crossed) continue;
+          const h = Math.hypot(dx, dy) || 1;
+          const cos = (dx * bx + dy * by) / h;
+          put(cos > GATE_COS ? "gate" : "wall", dx, dy, 1);
         }
-      }
       site.ux = ux;
       site.uy = uy;
-      site.gateX = (cx + ux * R0 + 0.5) * TILE;
-      site.gateY = (cy + uy * R0 + 0.5) * TILE;
-      // the flak arc and a little point defence
-      const flaks = 6 + Math.round((p.turret || 1) * 3);
-      for (let i = 0; i < flaks; i++) {
-        const th = -2.6 + (5.2 * i) / (flaks - 1);
-        put(
-          "flak",
-          Math.round((ux * Math.cos(th) - uy * Math.sin(th)) * 5),
-          Math.round((ux * Math.sin(th) + uy * Math.cos(th)) * 5),
-          1,
-        );
+      site.gateX = (cx + ux * (A + 3) + 0.5) * TILE;
+      site.gateY = (cy + uy * (A + 3) + 0.5) * TILE;
+      // the troops muster outside the wall: anything on this site that
+      // builds picks up the gate as its rally point
+      for (const b of g.buildings)
+        if (b.site === site && b.fac === f && b.def.cat === "mil")
+          b.rally = { x: site.gateX, y: site.gateY };
+      // the flak arc: eight guns outside the arch, round the gate. Each
+      // gun marches out from the centre until it is clear of the wall,
+      // so the arc hugs the outside of it — never inside the yard.
+      const gk = new Set();
+      for (let i = 0; i < 8; i++) {
+        const th = -1.57 / 2 + (1.57 * i) / 7;
+        const dxn = ux * Math.cos(th) + vx * Math.sin(th);
+        const dyn = uy * Math.cos(th) + vy * Math.sin(th);
+        let dx = 0,
+          dy = 0;
+        for (let r = A + 1; r < A * 2.4; r += 0.5) {
+          dx = Math.round(cx + dxn * r) - cx;
+          dy = Math.round(cy + dyn * r) - cy;
+          if (R.wallRing(dx, dy, A) > 1.45 && !gk.has(dx + ":" + dy)) break;
+        }
+        gk.add(dx + ":" + dy);
+        put("flak", dx, dy, 1);
       }
       put("mg", Math.round(ux * 4 - vx * 2), Math.round(uy * 4 - vy * 2), 1);
       put("atgun", Math.round(ux * 4 + vx * 2), Math.round(uy * 4 + vy * 2), 1);

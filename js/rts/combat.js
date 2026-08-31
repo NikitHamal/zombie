@@ -265,6 +265,9 @@
     hit(g, src, tgt, w, x, y, fall) {
       if (!tgt || tgt.dead) return;
       if (tgt.kind === "u" && tgt.inside) return;
+      // the wall and the gate soak it up and stand: only the flaks,
+      // the guns and the crews behind them can be hurt
+      if (tgt.kind === "b" && tgt.def.inert) return;
       if (src && src.fac !== undefined && src.fac === tgt.fac) return;
       if (src && src.fac !== undefined && !R.hostileTo(src.fac, tgt.fac)) return;
 

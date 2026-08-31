@@ -307,6 +307,8 @@
       // buildings first: they are the thing you are aiming at when you
       // click a base, and they are big
       let hit = g.buildingAtWorld(w.x, w.y);
+      // the wall and the gate are part of the ground: they do not click
+      if (hit && hit.kind === "b" && hit.def.inert) hit = null;
       if (hit && hit.fac !== 0 && !g.visible(w.x, w.y)) hit = null;
       if (!hit) {
         const u = g.unitAt(w.x, w.y, 30);
@@ -430,7 +432,7 @@
     pickTarget(x, y) {
       const g = this.g;
       const b = g.buildingAtWorld(x, y);
-      if (b && b.fac !== 0 && R.hostileTo(0, b.fac) && g.visible(x, y)) return b;
+      if (b && !b.def.inert && b.fac !== 0 && R.hostileTo(0, b.fac) && g.visible(x, y)) return b;
       const u = g.unitAt(x, y, 34);
       if (u && u.fac !== 0 && R.hostileTo(0, u.fac) && g.visibleNow(u.x, u.y)) return u;
       return null;

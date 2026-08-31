@@ -790,11 +790,14 @@ under `js/rts/`:
 core.js       constants, palette, noise, the six inks, the game clock,
               day/night, the movement layers (ground / air / sea / rail)
 camera.js     RTS camera: edge scroll, glide-to, shake
-terrain.js    300×300-tile procedural desert: dunes, sea, oil, scrub,
-              34 settlement sites with kinds, two rail lines, roads,
+terrain.js    560×560-tile procedural desert: dune seas, mesa ranges,
+              the southern sea, rivers, oasis lakes, oil, scrub, 46
+              settlement sites kept far apart, two rail lines, roads,
               decor, fog + territory arrays, an overview canvas
 nav.js        tile A* with layers; rail is its own layer (trains never
-              breach); walls are breachable by non-rail units
+              breach). The base wall is inert ground: nothing shoots it,
+              nothing chews it; the gate opens for its own side, and for
+              everybody else only when the site's flaks are down
 defs.js       the single source of truth: 4 resources at spec scale,
               ~79 units (cost/mp/grp/speed/sight/fuel/time/shape/spec/
               quota/ammo/capture/train/water), 27 buildings, the gold

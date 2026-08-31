@@ -57,8 +57,7 @@ function stubCanvas() {
           return () => ({ addColorStop() {} });
         if (k === "measureText") return () => ({ width: 0 });
         if (k === "getImageData") return (a, b) => ({ data: new Uint8ClampedArray(a * b * 4) });
-        if (k === "createImageData")
-          return (a, b) => ({ data: new Uint8ClampedArray(a * b * 4) });
+        if (k === "createImageData") return (a, b) => ({ data: new Uint8ClampedArray(a * b * 4) });
         return () => undefined;
       },
       set() {
@@ -200,7 +199,11 @@ function main() {
 
   /* ---- 2. the garrison can reach open ground outside the wall ---- */
   const home = g.t.homeSite;
-  const outside = g.nav.nearestOpen(home.tx + 26, home.ty + 26, 20, 0);
+  // the probe stands outside the gate — the door the troops march out
+  // of — on the open ground the road runs to
+  const outside = home.gateX
+    ? g.nav.nearestOpen((home.gateX / TILE) | 0, (home.gateY / TILE) | 0, 8, 0)
+    : null;
   const garrison = g.units.filter((u) => !u.dead && u.fac === 0 && u.layer === 0);
   let reachable = 0;
   if (outside) {
@@ -215,54 +218,99 @@ function main() {
     reachable + "/" + garrison.length + " found a route",
   );
 
-  /* ---- 3. an enemy APC can path INTO the base ---- */
-  // A conquering APC asks as faction 1 with breach rights: it may walk
-  // our gate only if it were an ally (it is not) and may chew a wall at
-  // a price. The cautious query — no faction — must stay shut out.
-  const apcSpot = outside
-    ? { x: (outside.tx + 0.5) * TILE, y: (outside.ty + 0.5) * TILE }
-    : null;
-  let apcRoute = null;
-  if (apcSpot) apcRoute = g.nav.astar(apcSpot.x, apcSpot.y, home.x, home.y, 0, 1, true);
+  /* ---- 3. the assault doctrine: flaks first, then the gate ---- */
+  // While the flaks stand, the gate is shut to everybody — no breach, no
+  // chewing the wall. A cautious stranger gets the same answer.
+  const apcSpot = outside ? { x: (outside.tx + 0.5) * TILE, y: (outside.ty + 0.5) * TILE } : null;
+  let shutRoute = apcSpot ? g.nav.astar(apcSpot.x, apcSpot.y, home.x, home.y, 0, 1, true) : null;
   check(
-    "an enemy can path to the command centre",
-    !!apcRoute,
-    apcRoute ? apcRoute.length + " waypoints" : "no route at all — the base is sealed",
+    "an enemy cannot path in while the flaks stand",
+    !shutRoute,
+    shutRoute ? "a route in exists with the guns still up" : "the gate holds",
   );
-  // where does the route cross the wall ring? The design says the door,
-  // and the flaks that watch it. Count crossings over gate tiles vs
-  // wall tiles — the goal tile itself sits inside, so walk every leg.
-  if (apcRoute) {
-    let gateLegs = 0,
-      wallLegs = 0;
-    for (let k = 0; k < apcRoute.length; k++) {
-      const p = apcRoute[k],
-        q = apcRoute[k + 1] || p;
-      const steps = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.y - p.y) / (TILE * 0.5)));
-      for (let s = 0; s <= steps; s++) {
-        const x = p.x + ((q.x - p.x) * s) / steps,
-          y = p.y + ((q.y - p.y) * s) / steps;
-        const tx = Math.floor(x / TILE),
-          ty = Math.floor(y / TILE);
-        const i = g.t.idx(tx, ty);
-        if (i < 0) continue;
-        if (g.nav.gateOf[i] >= 0) gateLegs++;
-        else if (g.nav.bFac[i] >= 0) wallLegs++;
-      }
-    }
-    const throughGate = gateLegs > 0;
-    check(
-      "the enemy route prefers the gate to the walls",
-      throughGate,
-      gateLegs + " gate steps vs " + wallLegs + " wall steps",
-    );
-  }
   const cautious = apcSpot ? g.nav.astar(apcSpot.x, apcSpot.y, home.x, home.y, 0) : null;
-  check("a neutral query cannot just walk in", !cautious, cautious ? "the door opened for a stranger" : "door shut");
+  check(
+    "a neutral query cannot just walk in",
+    !cautious,
+    cautious ? "the door opened for a stranger" : "door shut",
+  );
+  // the flaks die — all of them — and the yard stands open: now the
+  // conquering APC can drive at the command centre, and it goes through
+  // the gate, not through the arch. (The removal happens further down,
+  // after the flak-arc checks have counted the guns as they stand.)
+  const homeFlaks = g.buildings.filter((x) => !x.dead && x.fac === 0 && x.def.startFlak);
+  const openTheYard = () => {
+    if (homeFlaks.some((b) => !b.dead)) {
+      for (const b of homeFlaks) g.removeBuilding(b, true);
+      g.nav.sync(g);
+    }
+  };
 
-  /* ---- 4. the starter flak arc ---- */
+  /* ---- 4. the starter flak arc: eight guns, all outside the arch ---- */
+  const wallRingV = (dx, dy) => {
+    const n = 3.5,
+      a = 11;
+    return Math.pow(Math.abs(dx) / a, n) + Math.pow(Math.abs(dy) / a, n);
+  };
   const flaks = g.buildings.filter((b) => !b.dead && b.fac === 0 && b.def.startFlak);
-  check("the base opens with its starter flak arc", flaks.length >= 10, flaks.length + " found");
+  const inside = flaks.filter(
+    (b) => wallRingV(b.tx + b.size / 2 - home.tx, b.ty + b.size / 2 - home.ty) <= 1.05,
+  );
+  check(
+    "the base opens with its starter flak arc",
+    flaks.length === 8 && inside.length === 0,
+    flaks.length + " found, " + inside.length + " of them inside the wall",
+  );
+  // the works musters its crews outside the arch: the rally sits beyond
+  // the wall, by the gate, so new troops march out of it
+  const works = g.buildings.find((b) => !b.dead && b.fac === 0 && b.key === "works");
+  const rOut =
+    works &&
+    works.rally &&
+    (Math.abs(works.rally.x / TILE - home.tx) > 10 ||
+      Math.abs(works.rally.y / TILE - home.ty) > 10);
+  check(
+    "new troops muster outside the wall",
+    !!rOut,
+    works && works.rally
+      ? "rally at " + Math.round(works.rally.x / TILE) + "," + Math.round(works.rally.y / TILE)
+      : "no rally on the works",
+  );
+
+  /* ---- 4a. the yard opens: flaks down, the gate lets the enemy in ---- */
+  if (apcSpot) {
+    openTheYard();
+    const apcRoute = g.nav.astar(apcSpot.x, apcSpot.y, home.x, home.y, 0, 1, true);
+    check(
+      "an enemy drives in once the flaks are down",
+      !!apcRoute,
+      apcRoute ? apcRoute.length + " waypoints" : "no route — the gate did not open",
+    );
+    if (apcRoute) {
+      let gateLegs = 0,
+        wallLegs = 0;
+      for (let k = 0; k < apcRoute.length; k++) {
+        const p = apcRoute[k],
+          q = apcRoute[k + 1] || p;
+        const steps = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.y - p.y) / (TILE * 0.5)));
+        for (let s = 0; s <= steps; s++) {
+          const x = p.x + ((q.x - p.x) * s) / steps,
+            y = p.y + ((q.y - p.y) * s) / steps;
+          const tx = Math.floor(x / TILE),
+            ty = Math.floor(y / TILE);
+          const i = g.t.idx(tx, ty);
+          if (i < 0) continue;
+          if (g.nav.gateOf[i] >= 0) gateLegs++;
+          else if (g.nav.bFac[i] >= 0) wallLegs++;
+        }
+      }
+      check(
+        "the enemy route prefers the gate to the walls",
+        gateLegs > 0,
+        gateLegs + " gate steps vs " + wallLegs + " wall steps",
+      );
+    }
+  }
 
   /* ---- 4b. every base type got its ground ---- */
   const kinds = { home: 0, tank: 0, air: 0, copter: 0, naval: 0, train: 0 };
@@ -287,15 +335,29 @@ function main() {
 
   /* ---- 4c. the books balance at the opening ---- */
   const p0 = g.factions[0];
-  check("the energy book starts in the black", p0.ep > 0 && p0.ep <= p0.epMax + R.EP_TOLERANCE, p0.ep + "/" + p0.epMax);
-  check("the military book starts in the black", p0.mp >= 0 && p0.mp <= p0.mpMax + R.MP_TOLERANCE, p0.mp + "/" + p0.mpMax);
-  check("the store beats the opening purse", p0.store.fuel > p0.res.fuel, "fuel " + Math.round(p0.res.fuel) + " in a " + Math.round(p0.store.fuel) + " store");
+  check(
+    "the energy book starts in the black",
+    p0.ep > 0 && p0.ep <= p0.epMax + R.EP_TOLERANCE,
+    p0.ep + "/" + p0.epMax,
+  );
+  check(
+    "the military book starts in the black",
+    p0.mp >= 0 && p0.mp <= p0.mpMax + R.MP_TOLERANCE,
+    p0.mp + "/" + p0.mpMax,
+  );
+  check(
+    "the store beats the opening purse",
+    p0.store.fuel > p0.res.fuel,
+    "fuel " + Math.round(p0.res.fuel) + " in a " + Math.round(p0.store.fuel) + " store",
+  );
 
   /* ---- 4d. the capture rule: down the flaks, the ground opens ---- */
   const site = g.t.sites.find((s) => s.owner === -1 && s.kind !== "home");
   if (site) {
     const before = site.open;
-    const theirFlaks = g.buildings.filter((b) => !b.dead && b.fac === -1 && b.def.flak && b.site === site);
+    const theirFlaks = g.buildings.filter(
+      (b) => !b.dead && b.fac === -1 && b.def.flak && b.site === site,
+    );
     for (const b of theirFlaks) g.removeBuilding(b, true);
     check(
       "a flakless settlement stands open",

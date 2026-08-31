@@ -40,7 +40,7 @@
         bd = 1e18;
       for (const s of g.t.sites) {
         const d = (s.tx - cx) ** 2 + (s.ty - cy) ** 2;
-        const r = (s.r + 2) ** 2;
+        const r = (s.r + 4) ** 2;
         if (d < r && d < bd) {
           bd = d;
           best = s;

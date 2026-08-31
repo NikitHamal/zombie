@@ -12,8 +12,9 @@
   /* ---------- scale ---------- */
 
   const TILE = 40; // world units per tile — a tank is about one tile long
-  const MAPW = 300,
-    MAPH = 300; // tiles — 12000 x 12000 world units, "very vast"
+  const MAPW = 560,
+    MAPH = 560; // tiles — 22400 x 22400 world units. Desert Order vast:
+  // the nations sit a full map away from you and the war takes a day to walk.
   const W = MAPW * TILE,
     H = MAPH * TILE;
 

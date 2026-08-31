@@ -21,15 +21,14 @@
    Two rules own everything else in here:
 
    1. A GATE IS A DOOR, NOT A WALL. Every tile remembers whose building
-      stands on it, and a gate belongs to the nation that raised it: their
-      units drive straight through, everybody else has to break it. A base
-      with no door is a box, and a garrison that cannot march out is not a
-      garrison.
-   2. IF YOU CANNOT GO ROUND IT, GO THROUGH IT. Hostile A* is allowed to
-      route through enemy walls at a cost — a gate costs little, a wall
-      costs a lot, so an attack walks up the drive rather than chewing a
-      random hole. It only ever applies when there is no open route, so a
-      unit that can walk round a wall still walks round it.
+      stands on it, and the door belongs to the ground it stands in: the
+      owner's units drive straight through, and so does anybody once the
+      base's flaks are down and the yard stands open. A base with no door
+      is a box, and a garrison that cannot march out is not a garrison.
+   2. THE WALL DOES NOT NEGOTIATE. The arch is part of the ground — no
+      faction can chew it, no gun targets it. The only way in is the gate,
+      and the only way to open the gate is to kill the flaks that watch
+      it. That is the whole shape of an assault.
 
    And one invariant, enforced in `legalize()`: no unit ever occupies a
    tile a unit could not stand on. Not at spawn, not on unload, not after
@@ -46,11 +45,6 @@
 
   const CACHE_MAX = 220;
   const WEIGHT = 1.22; // heuristic inflation
-  // what it costs to shoot your way through, in tiles of walking.
-  // The gap between them is the design: the door must be the way in
-  // from ANY direction, or the flak arc guards a mouth nobody uses.
-  const GATE_COST = 14; // knock the gate down and pour through
-  const WALL_COST = 96; // chewing a wall is a siege — walk round instead
   const DIRS = [
     [1, 0, 1],
     [-1, 0, 1],
@@ -71,6 +65,7 @@
       this.blockA = new Uint8Array(N); // 1 = ground fire cannot pass (rock, buildings)
       this.gateOf = new Int8Array(N); // whose gate stands on this tile, -1 = none
       this.bFac = new Int8Array(N); // who owns the building on this tile, -1 = none
+      this.gateSite = new Map(); // gate tile -> the settlement it belongs to
       this.version = 0;
       this.tver = -1;
       this.game = null; // the game, for the full rebuild (set by Game)
@@ -132,6 +127,7 @@
               if (b.def.gate) {
                 gO[i] = b.fac;
                 bA[i] = 0;
+                if (b.site) this.gateSite.set(i, b.site);
               }
             }
         }
@@ -142,7 +138,7 @@
     }
 
     // a building went up or came down: patch just its footprint
-    markFootprint(tx, ty, size, solid, fac, isGate) {
+    markFootprint(tx, ty, size, solid, fac, isGate, site) {
       const t = this.t;
       const v = solid ? 1 : 0;
       const owner = solid && fac !== undefined ? fac : -1;
@@ -156,6 +152,8 @@
           this.blockR[i] = solid ? 1 : t.type[i] === T.RAIL ? 0 : 1;
           this.bFac[i] = owner;
           this.gateOf[i] = solid && isGate ? owner : -1;
+          if (solid && isGate && site) this.gateSite.set(i, site);
+          else if (!solid) this.gateSite.delete(i);
         }
       this.version++;
       this.cache.clear();
@@ -178,18 +176,16 @@
     passTile(i, fac) {
       if (this.blockG[i] === 0) return true;
       const go = this.gateOf[i];
-      if (go < 0) return false;
+      if (go < 0) return false; // the wall: part of the ground, it does not open
+      // the gate belongs to the settlement it stands in: the owner's
+      // units drive through, and everybody drives through once the
+      // flaks are down and the yard stands open
+      const site = this.gateSite.get(i);
+      if (site) {
+        if (fac >= 0 && site.owner === fac) return true;
+        return !!site.open;
+      }
       return fac >= 0 && R.sameTeam(fac, go);
-    }
-
-    // a tile we cannot stand on but could shoot our way through.
-    // Returns the extra cost in tiles of walking, or -1 for "not at all".
-    breachCost(i, fac) {
-      if (this.passTile(i, fac)) return -1;
-      const bf = this.bFac[i];
-      if (bf < 0) return -1; // rock and water do not negotiate
-      if (R.sameTeam(fac, bf)) return -1;
-      return this.gateOf[i] >= 0 ? GATE_COST : WALL_COST;
     }
 
     open(tx, ty, layer, fac) {
@@ -348,8 +344,9 @@
 
     /* Returns an array of world waypoints (or null). `layer`: 0 ground,
        1 air, 2 sea. `fac` is who is walking — it decides which doors are
-       open. `breach` allows routing through enemy walls when there is no
-       other way in. `cap` overrides the expansion limit. */
+       open. `breach` only loosens the goal: a besieger may aim at the
+       wall itself. Nothing walks through it. `cap` overrides the
+       expansion limit. */
     astar(sx, sy, gx, gy, layer, fac, breach, cap) {
       layer = layer || 0;
       if (layer === 1) return [{ x: gx, y: gy }];
@@ -389,10 +386,9 @@
       }
 
       const straight = Math.hypot(gtx - stx, gty - sty);
-      // a breacher walks the whole way round the wall ring to reach the
-      // door — its route is nothing like the straight line, so it gets
-      // the wider budget
-      const base = R.clamp(straight * 70 + 400, 1200, 7000);
+      // a route that has to walk round a base to reach its gate is far
+      // longer than the straight line — the budget allows for the detour
+      const base = R.clamp(straight * 90 + 600, 1500, 12000);
       const limit = cap || (breach ? base * 7 : base);
 
       const gen = ++this.gen;
@@ -431,16 +427,11 @@
             ny = iy + DIRS[d][1];
           if (nx < 0 || ny < 0 || nx >= MAPW || ny >= MAPH) continue;
           const ni = ny * MAPW + nx;
-          let step = DIRS[d][2];
+          const step = DIRS[d][2];
           if (grid[ni] !== 0) {
             if (d >= 4) continue; // no squeezing diagonally through a wall
             if (layer === 3) continue; // the rail does not negotiate
-            if (!this.passTile(ni, who)) {
-              // not our door. Chew through it, or go round.
-              const bc = breach ? this.breachCost(ni, who) : -1;
-              if (bc < 0) continue;
-              step += bc;
-            }
+            if (!this.passTile(ni, who)) continue; // the wall does not open
           }
           if (d >= 4) {
             // no cutting a diagonal past a corner

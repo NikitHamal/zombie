@@ -2405,7 +2405,8 @@
       time: 6,
       max: 400,
       wall: true,
-      desc: "One tile of wall. Cheap, and it is what an attack breaks on.",
+      inert: true, // part of the base itself: not clickable, never a target
+      desc: "The base wall. One piece of the arch — it is not built, it comes with the ground, and no gun bothers it.",
     },
     gate: {
       name: "Gate",
@@ -2419,7 +2420,8 @@
       max: 40,
       wall: true,
       gate: true,
-      desc: "Your own units drive through. Everybody else has to break it.",
+      inert: true, // the door opens when the flaks fall; it is never shot
+      desc: "The way in. It opens for its own side, and for everybody else only once the base's flaks are down.",
     },
 
     crane: {
@@ -2586,11 +2588,43 @@
   R.BDEF = B;
   R.BKEYS = Object.keys(B);
 
+  /* ---------- the shape of a base wall ----------
+     The Desert Order bases do not draw squares: the wall is an arch —
+     a square whose corners have been pulled round. A superellipse
+     (|x/a|^n + |y/a|^n = 1, n a little over 3) is that shape: roomy
+     like the square it replaced, rounded like the screenshots. `v`
+     under 1 is inside the wall, the band around 1 is the wall itself. */
+  R.WALL_N = 3.5;
+  R.wallRing = function (dx, dy, a) {
+    const nx = Math.abs(dx) / a,
+      ny = Math.abs(dy) / a;
+    return Math.pow(nx, R.WALL_N) + Math.pow(ny, R.WALL_N);
+  };
+
+  /* ---------- the ground a base stands on ----------
+     The arch, the gate and the flak arc are drawn before they are
+     built, and every piece has to land exactly where it was drawn —
+     so the disc under the base is cleared and packed first. Water is
+     left alone (a naval base keeps its shore) and so are the rail and
+     any oil seep under the yard. */
+  R.clearBaseGround = function (t, cx, cy, rad) {
+    for (let dy = -rad; dy <= rad; dy++)
+      for (let dx = -rad; dx <= rad; dx++) {
+        if (dx * dx + dy * dy > rad * rad) continue;
+        const i = t.idx(cx + dx, cy + dy);
+        if (i < 0) continue;
+        const v = t.type[i];
+        if (v === R.T.WATER || v === R.T.OIL || v === R.T.RAIL) continue;
+        t.type[i] = R.T.FIRM;
+      }
+    t.version++;
+  };
+
   // the build menu, in the order it is drawn
   R.BUILD_MENU = [
     { key: "econ", name: "Industry", keys: ["concrete", "steel", "alu", "oil"] },
     { key: "mil", name: "Military", keys: ["works", "airfield", "heli", "shipyard", "trainyard"] },
-    { key: "def", name: "Defence", keys: ["flak", "wall", "gate", "mg", "atgun", "howitzer"] },
+    { key: "def", name: "Defence", keys: ["flak", "mg", "atgun", "howitzer"] },
     {
       key: "cmd",
       name: "Command",
