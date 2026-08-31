@@ -63,7 +63,6 @@
       put("concrete", 3, -3, 1);
       put("steelmill", 3, 0, 1);
       put("refinery", -5, 3, 1);
-      put("barracks", 3, 3, 1);
       put("works", -5, -5, 1);
       if (ai.p.air > 1) put("airfield", -5, 2, 1);
       if (ai.p.sea > 1) {
@@ -105,10 +104,8 @@
             g.addUnit(key, f, p.x, p.y);
           }
         };
-        give("rifle", 4);
-        give("mg", 2);
-        give("ltank", 2);
-        give("scout", 1);
+        give("ltank", 3);
+        give("scout", 2);
       }
     },
 
@@ -206,7 +203,6 @@
         ["aluworks", Math.max(1, Math.round(2.5 * p.eco))],
         ["power", Math.round(2 * p.eco)],
         ["depot", 1],
-        ["barracks", Math.max(1, Math.round(2 * p.army))],
         ["works", Math.max(1, Math.round(2 * p.army))],
         ["radar", 1],
         ["repair", 1],

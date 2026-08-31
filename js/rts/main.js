@@ -113,11 +113,7 @@
       this.canvas.style.height = vh + "px";
       this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       this.cam.clamp(vw, vh);
-      // the minimap is a square in the bottom-left; keep it honest on
-      // small screens by shrinking it rather than clipping it
-      const ms = Math.max(150, Math.min(230, Math.round(Math.min(vw * 0.19, vh * 0.3))));
-      R.Mini.resize(ms);
-      R.UI.layout();
+      if (R.Mini.canvas) R.Mini.resize(236);
     },
 
     /* ==================================================================
@@ -131,8 +127,14 @@
       cv.addEventListener("contextmenu", (e) => e.preventDefault());
 
       cv.addEventListener("pointerdown", (e) => this.onDown(e));
-      window.addEventListener("pointermove", (e) => this.onMove(e));
-      window.addEventListener("pointerup", (e) => this.onUp(e));
+      window.addEventListener("pointermove", (e) => {
+        this.onMove(e);
+        if (this.miniDrag) this.onMini(e, false);
+      });
+      window.addEventListener("pointerup", (e) => {
+        this.onUp(e);
+        this.miniDrag = false;
+      });
       cv.addEventListener("pointerleave", () => R.Cam.mouseLeave());
       cv.addEventListener(
         "wheel",
@@ -143,15 +145,6 @@
         },
         { passive: false },
       );
-
-      // the minimap takes its own clicks, before the canvas sees them
-      R.Mini.canvas.addEventListener("pointerdown", (e) => this.onMini(e, true));
-      window.addEventListener("pointermove", (e) => {
-        if (this.miniDrag) this.onMini(e, false);
-      });
-      window.addEventListener("pointerup", () => {
-        this.miniDrag = false;
-      });
 
       window.addEventListener("keydown", (e) => this.onKey(e, true));
       window.addEventListener("keyup", (e) => this.onKey(e, false));
@@ -186,11 +179,11 @@
         e.preventDefault();
         e.stopPropagation();
       }
-      if (!this.miniDrag) return;
-      const r = R.Mini.rect;
-      const px = e.clientX - r.x,
-        py = e.clientY - r.y;
-      const k = R.W / R.Mini.rect.w;
+      if (!this.miniDrag || !R.Mini.canvas) return;
+      const rect = R.Mini.canvas.getBoundingClientRect();
+      const px = e.clientX - rect.left,
+        py = e.clientY - rect.top;
+      const k = R.W / (rect.width || 1);
       const x = R.clamp(px * k, 0, R.W),
         y = R.clamp(py * k, 0, R.H);
       R.Cam.centerOn(x, y, this.vw, this.vh);
@@ -469,19 +462,20 @@
 
       R.Cam.key(e, true);
 
-      /* ---- global ---- */
+      /* ---- global & build menu ---- */
       if (k === "escape") {
         if (R.UI.helpOpen) R.UI.toggleHelp(false);
         else if (R.UI.place) R.UI.cancelPlace();
+        else if (R.UI.buildOpen) R.UI.toggleBuild(false);
         else if (this.armed) {
           this.armed = null;
           this.patrolFrom = null;
         } else if (R.UI.rally) R.UI.rally = false;
         else g.clearSel();
-        R.UI.selSig = "";
+        R.UI.deckSig = "";
         return;
       }
-      if (k === "f1") {
+      if (k === "f1" || k === "?") {
         e.preventDefault();
         R.UI.toggleHelp();
         return;
@@ -491,12 +485,20 @@
         R.UI.setSpeed(0);
         return;
       }
-      if (k === "[") {
-        R.UI.setSpeed(Math.max(1, g.speed - 1));
+      if (k === "b" && !e.ctrlKey && !e.metaKey) {
+        R.UI.toggleBuild();
         return;
       }
-      if (k === "]") {
-        R.UI.setSpeed(Math.min(3, g.speed + 1));
+      if (k === "q" && !e.ctrlKey && !e.metaKey && !R.UI.buildOpen && !g.selection().length) {
+        ZS.Perf.cycle();
+        R.UI.toast("Quality: tier " + ZS.Perf.tier);
+        return;
+      }
+      if (k === "k" && !e.ctrlKey && !e.metaKey) {
+        if (ZS.sound && ZS.sound.toggleMute) {
+          const muted = ZS.sound.toggleMute();
+          R.UI.toast(muted ? "Sound muted" : "Sound on");
+        }
         return;
       }
       if (k === "f3") {
@@ -513,82 +515,63 @@
         R.Render.showGrid = !R.Render.showGrid;
         return;
       }
-      if (k === "home" || k === "f2") {
-        const hq = g.factions[0].hq;
-        const s = g.t.homeSite;
-        const t = hq && hq.kind === "b" ? hq : s;
-        R.Cam.glideTo(t.x, t.y, 1.0);
-        return;
-      }
       if (k === "f9") {
         if (this.lastAlarm) R.Cam.glideTo(this.lastAlarm.x, this.lastAlarm.y, 0.8);
         else R.UI.toast("Nothing has raised the alarm yet");
         return;
       }
 
-      /* ---- control groups ---- */
-      if (k >= "0" && k <= "9") {
+      const selUnits = g.selUnits();
+
+      // Camera navigation
+      if (k === "home" || k === "f2" || (k === "h" && !selUnits.length)) {
+        const hq = g.factions[0].hq;
+        const s = g.t.homeSite;
+        const t = hq && hq.kind === "b" ? hq : s;
+        R.Cam.glideTo(t.x, t.y, 1.0);
+        return;
+      }
+      if (k === "f" && !selUnits.length) {
+        this.cam.fit(R.W, R.H, this.vw, this.vh);
+        return;
+      }
+
+      /* ---- control groups or game speed ---- */
+      if (k >= "1" && k <= "9") {
         const n = parseInt(k, 10);
-        const sel = g.selection();
         if (e.ctrlKey || e.metaKey) {
+          const sel = g.selection();
           R.UI.groups[n] = sel.map((o) => o.id);
           R.UI.toast("Group " + n + " set — " + sel.length);
           return;
         }
         const ids = R.UI.groups[n];
-        if (!ids || !ids.length) return;
-        const list = [];
-        for (const u of g.units) if (!u.dead && ids.indexOf(u.id) >= 0) list.push(u);
-        for (const b of g.buildings) if (!b.dead && ids.indexOf(b.id) >= 0) list.push(b);
-        if (list.length) {
-          g.select(list, e.shiftKey);
-          R.UI.selSig = "";
-          // a second press on the same group flies the camera there
-          if (this.lastGroup === n && performance.now() - this.lastGroupT < 380) {
-            let cx = 0,
-              cy = 0;
-            for (const o of list) {
-              cx += o.x;
-              cy += o.y;
+        if (ids && ids.length) {
+          const list = [];
+          for (const u of g.units) if (!u.dead && ids.indexOf(u.id) >= 0) list.push(u);
+          for (const b of g.buildings) if (!b.dead && ids.indexOf(b.id) >= 0) list.push(b);
+          if (list.length) {
+            g.select(list, e.shiftKey);
+            R.UI.selSig = "";
+            if (this.lastGroup === n && performance.now() - this.lastGroupT < 380) {
+              let cx = 0,
+                cy = 0;
+              for (const o of list) {
+                cx += o.x;
+                cy += o.y;
+              }
+              R.Cam.glideTo(cx / list.length, cy / list.length);
             }
-            R.Cam.glideTo(cx / list.length, cy / list.length);
-          }
-          this.lastGroup = n;
-          this.lastGroupT = performance.now();
-        }
-        return;
-      }
-
-      /* ---- build hotkeys ---- */
-      if (R.UI.place || R.UI.tab) {
-        const cat = R.BUILD_MENU.find((c) => c.key === R.UI.tab);
-        if (cat) {
-          const i = ["q", "w", "e", "r", "t", "y"].indexOf(k);
-          if (i >= 0 && cat.keys[i]) {
-            R.UI.pickBuild(cat.keys[i]);
+            this.lastGroup = n;
+            this.lastGroupT = performance.now();
             return;
           }
         }
-      }
-      // production hotkeys while a factory is selected
-      if (R.UI.tab === "prod") {
-        const sel = g.selection();
-        const b = sel.length === 1 && sel[0].kind === "b" ? sel[0] : null;
-        if (b && R.PRODUCES[b.key]) {
-          const i = ["q", "w", "e", "r", "t", "y"].indexOf(k);
-          const key = R.PRODUCES[b.key][i];
-          if (key) {
-            R.UI.queueUnit(b, key);
-            return;
-          }
+        // If not a group recall, set game speed
+        if (n >= 1 && n <= 3) {
+          R.UI.setSpeed(n);
+          return;
         }
-      }
-      if (k === "b") {
-        R.UI.place = null;
-        R.UI.tab = "econ";
-        R.UI.cmdSig = "";
-        R.UI.refreshCmd(true);
-        return;
       }
 
       /* ---- selection ---- */
@@ -618,6 +601,52 @@
         return;
       }
 
+      /* ---- building upgrade & rally ---- */
+      const sel = g.selection();
+      if (k === "u" && !selUnits.length) {
+        if (sel.length === 1 && sel[0].kind === "b" && sel[0].fac === 0) {
+          const b = sel[0];
+          const cost = R.Base.upCostFor(g, b);
+          if (cost && b.built && !b.upgrading) {
+            if (R.Base.startUpgrade(g, b)) {
+              R.UI.deckSig = "";
+              if (ZS.sound) ZS.sound.event("order");
+            } else {
+              R.UI.toast("Not enough " + R.UI.missingOf(cost), "bad");
+            }
+          }
+          return;
+        }
+      }
+      if (k === "y" && !selUnits.length) {
+        if (sel.length === 1 && sel[0].kind === "b" && R.PRODUCES[sel[0].key]) {
+          R.UI.rally = true;
+          R.UI.toast("Right-click the map to set rally point");
+          return;
+        }
+      }
+
+      /* ---- QWERTY build or produce shortcuts ---- */
+      const hkIdx = ["q", "w", "e", "r", "t", "y"].indexOf(k);
+      if (hkIdx >= 0 && !e.ctrlKey && !e.metaKey) {
+        // if factory selected, queue unit
+        if (sel.length === 1 && sel[0].kind === "b" && R.PRODUCES[sel[0].key]) {
+          const prods = R.PRODUCES[sel[0].key];
+          if (prods[hkIdx]) {
+            R.UI.queueUnit(sel[0], prods[hkIdx]);
+            return;
+          }
+        }
+        // if no units selected, select building to place
+        if (!selUnits.length) {
+          const activeCat = R.BUILD_MENU.find((c) => c.key === R.UI.buildTab) || R.BUILD_MENU[0];
+          if (activeCat && activeCat.keys[hkIdx]) {
+            R.UI.pickBuild(activeCat.keys[hkIdx]);
+            return;
+          }
+        }
+      }
+
       /* ---- orders ---- */
       const orderKey = {
         a: "amove",
@@ -626,14 +655,13 @@
         h: "hold",
         s: "stop",
         r: "repair",
-        u: "unload",
         c: "capture",
       }[k];
-      if (orderKey && !e.ctrlKey && !e.metaKey) {
+      if (orderKey && !e.ctrlKey && !e.metaKey && selUnits.length) {
         R.UI.beginOrder(orderKey);
         return;
       }
-      if (k === "f") {
+      if (k === "f" && selUnits.length) {
         R.UI.formUp();
         return;
       }
@@ -702,7 +730,7 @@
           this.lastAlarm = { x: m.x, y: m.y };
 
       R.Render.frame(g, this.cam, dt, this.vw, this.vh);
-      R.Mini.draw(g, this.cam);
+      R.Mini.draw(g, this.cam, this.vw, this.vh);
       R.UI.frame();
       if (ZS.sound) ZS.sound.tick(dt);
     },

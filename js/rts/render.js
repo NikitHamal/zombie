@@ -115,7 +115,7 @@
         else if (k === T.ROCK) col = PAL.rock;
         else if (k === T.SCRUB) col = PAL.scrub;
         else if (k === T.ROAD) col = PAL.road;
-        else if (k === T.OIL) col = PAL.oil;
+        else if (k === T.OIL) col = PAL.sand;
         else if (k === T.FIRM) col = PAL.firm;
         else col = PAL.sand;
         // water gets deeper as it goes south, so the sea reads as a sea
@@ -203,16 +203,14 @@
           }
           ctx.stroke();
         } else if (k === T.OIL) {
-          // a black seep with a sheen on it
-          ctx.fillStyle = "rgba(46,40,32,0.85)";
+          // a natural hand-drawn sketch oil pool
+          ctx.fillStyle = "rgba(50,42,32,0.65)";
           ctx.beginPath();
-          ctx.arc(px + TILE / 2, py + TILE / 2, TILE * 0.34, 0, R.TAU);
+          ctx.arc(px + TILE / 2, py + TILE / 2, TILE * 0.38, 0, R.TAU);
           ctx.fill();
-          ctx.strokeStyle = "rgba(120,140,120,0.4)";
-          ctx.lineWidth = 1.2;
-          ctx.beginPath();
-          ctx.arc(px + TILE / 2 - 3, py + TILE / 2 - 3, TILE * 0.15, 0.4, 2.2);
-          ctx.stroke();
+          ctx.strokeStyle = "rgba(60,50,38,0.75)";
+          ctx.lineWidth = 1.4;
+          ZS.wcirc(ctx, px + TILE / 2, py + TILE / 2, TILE * 0.38, t.seed + i, 1.2);
         } else if (k === T.SAND) {
           // dune crest: one long wobbly line following the shade gradient
           const hr = R.hash2(tx, ty, t.seed + 77);
@@ -264,23 +262,22 @@
         gr = 0,
         b = 0,
         a = 0;
-      if (ow >= 0 && v > 0) {
+      if (ow >= 0 && (Render.showFog ? v > 0 : true)) {
         const ink = R.FACTIONS[ow].ink;
         r = ink[0];
         gr = ink[1];
         b = ink[2];
-        a = ow === 0 ? 30 : 26;
+        a = ow === 0 ? 24 : 18;
       }
-      // --- fog: unseen is nearly opaque, remembered is a grey veil ---
-      if (v === 0) {
-        r = gr = b = 0;
-        a = 216;
-      } else if (v === 1) {
-        // explored but not seen: memory, dimmed and desaturated
-        r = (r * 0.45 + 96 * 0.55) | 0 || 0;
-        gr = (gr * 0.45 + 92 * 0.55) | 0 || 0;
-        b = (b * 0.45 + 82 * 0.55) | 0 || 0;
-        a = Math.max(a, 104);
+      if (Render.showFog) {
+        if (v === 0) {
+          r = 40;
+          gr = 34;
+          b = 28;
+          a = 150;
+        } else if (v === 1) {
+          a = Math.max(a, 35);
+        }
       }
       d[o] = r;
       d[o + 1] = gr;
@@ -314,8 +311,8 @@
      ================================================================== */
 
   const Render = {
-    showFog: true,
-    showTerritory: true,
+    showFog: false,
+    showTerritory: false,
     showGrid: false,
     ghost: null, // {key, tx, ty, ok, reason}
     box: null, // {x0,y0,x1,y1} screen-space selection box
@@ -390,9 +387,9 @@
         c.stroke();
       }
 
-      /* ---- 3. territory + fog overlay ---- */
-      if (overlayT < 0 || g.time - overlayT > 0.25) bakeOverlay(g);
-      if (this.showFog || this.showTerritory) {
+      /* ---- 3. territory + fog overlay (disabled for clean paper style) ---- */
+      if (this.showFog) {
+        if (overlayT < 0 || g.time - overlayT > 0.25) bakeOverlay(g);
         c.imageSmoothingEnabled = true;
         c.globalAlpha = 1;
         c.drawImage(overlayCv, 0, 0, R.W, R.H);

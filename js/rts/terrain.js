@@ -111,7 +111,7 @@
         const i = ty * MAPW + tx;
         if (type[i] !== T.SAND && type[i] !== T.FIRM) continue;
         if (this.nearNode(tx, ty, 22)) continue;
-        this.blob(tx, ty, 2.2, T.OIL, 0.9);
+        this.blob(tx, ty, 1.1, T.OIL, 0.3);
         this.nodes.push({ tx, ty, x: (tx + 0.5) * TILE, y: (ty + 0.5) * TILE });
       }
 

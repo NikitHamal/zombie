@@ -98,23 +98,25 @@
             gg = 0,
             b = 0,
             a = 0;
-          if (ow >= 0 && v > 0) {
+          if (ow >= 0) {
             const ink = R.FACTIONS[ow].ink;
             r = ink[0];
             gg = ink[1];
             b = ink[2];
-            a = 92;
+            a = 60;
           }
-          if (v === 0) {
-            r = 44;
-            gg = 40;
-            b = 34;
-            a = 214;
-          } else if (v === 1) {
-            a = Math.max(a, 96);
-            r = (r * 0.4 + 74 * 0.6) | 0;
-            gg = (gg * 0.4 + 70 * 0.6) | 0;
-            b = (b * 0.4 + 62 * 0.6) | 0;
+          if (R.Render.showFog) {
+            if (v === 0) {
+              r = 44;
+              gg = 40;
+              b = 34;
+              a = 214;
+            } else if (v === 1) {
+              a = Math.max(a, 96);
+              r = (r * 0.4 + 74 * 0.6) | 0;
+              gg = (gg * 0.4 + 70 * 0.6) | 0;
+              b = (b * 0.4 + 62 * 0.6) | 0;
+            }
           }
           d[o] = r;
           d[o + 1] = gg;
@@ -128,8 +130,10 @@
 
     /* ---------- the frame ---------- */
 
-    draw(g, cam) {
-      if (!this.ctx) return;
+    draw(g, cam, vw, vh) {
+      if (!this.ctx || !this.canvas || !this.canvas.isConnected) return;
+      vw = vw || window.innerWidth;
+      vh = vh || window.innerHeight;
       const c = this.ctx;
       this.bakeBase(g);
       if (g.time - terrT > 0.4) this.bakeTerritory(g);

@@ -118,14 +118,6 @@
           this.claimSite(s2, i);
         }
       }
-      // three sites start infested: that is where the Rot comes from
-      const rest = this.t.sites.filter((s) => s.owner === -1);
-      for (let i = 0; i < R.HORDE.nests && i < rest.length; i++) {
-        const s = rest[(i * 7 + 3) % rest.length];
-        s.nest = true;
-        s.owner = 6;
-        this.claimSite(s, 6);
-      }
     }
 
     buildStartBase() {
@@ -147,7 +139,6 @@
       put("steelmill", 3, 0, 2);
       put("aluworks", -5, -1, 1);
       put("refinery", -5, 3, 1);
-      put("barracks", 3, 3, 1);
       put("works", -5, -5, 1);
       put("radar", 0, 4, 1);
       put("repair", -1, 4, 1);
@@ -208,13 +199,10 @@
             );
         }
       };
-      give("rifle", 4);
-      give("mg", 2);
-      give("at", 2);
-      give("ltank", 3);
-      give("scout", 2);
+      give("ltank", 4);
+      give("scout", 3);
       give("truck", 1);
-      give("eng", 2);
+      give("supply", 1);
     }
 
     /* ==================================================================

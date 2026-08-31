@@ -20,37 +20,16 @@
 
   const Horde = {
     setup(g) {
-      g.horde = { wave: 0, nextT: R.HORDE.startAfter, nests: 0 };
-      this.countNests(g);
-      g.say(0, "Something is moving in the settlements to the south.", "warn");
+      g.horde = { wave: 0, nextT: 999999, nests: 0 };
     },
 
-    countNests(g) {
-      let n = 0;
-      for (const s of g.t.sites) if (s.nest) n++;
-      g.horde.nests = n;
-      return n;
+    countNests() {
+      return 0;
     },
 
-    nestLost(g, site) {
-      this.countNests(g);
-      g.say(0, site.name + " is clean — the Rot has lost a nest", "good");
-      R.FX.ping(g, site.x, site.y, "good");
-    },
+    nestLost() {},
 
-    update(g, dt) {
-      if (!g.horde) this.setup(g);
-      const h = g.horde;
-      if (!this.countNests(g)) return; // all clean: the Rot is done
-      h.nextT -= dt;
-      if (h.nextT > 0) {
-        this.trickle(g, dt);
-        return;
-      }
-      h.wave++;
-      h.nextT = R.HORDE.waveEvery * (0.85 + Math.random() * 0.3);
-      this.wave(g, h);
-    },
+    update() {},
 
     roll(key, wave) {
       const M = R.HORDE.mix;
