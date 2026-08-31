@@ -653,14 +653,45 @@
     // units fight structures too, not just the living. A soldier in range of
     // a hostile building opens fire on it (and an armour piece or a bomber
     // pulls the wall down), which is what makes an RTS about ground.
-    // Delegates to the base agent/army update for everything else.
+    // Units never trade a living target for a wall: agents come first,
+    // then structures, then the plain agent/army update.
     update(a, dt, t, grid, nav) {
       if (a.st === 4) {
         const d = ZS.Units.def(a.unit);
-        const tgt = this._hostileStruct(a, d.rng || 26);
-        if (tgt && this._fireStruct(a, tgt, d, dt, t)) return;
+        const sight = (ZS.Army.BAL && ZS.Army.BAL.SIGHT) || 340;
+        if (!this._agentTarget(a, sight)) {
+          const tgt = this._hostileStruct(a, d.rng || 26);
+          if (tgt && this._fireStruct(a, tgt, d, dt, t)) return;
+        }
       }
       super.update(a, dt, t, grid, nav);
+    }
+
+    // the nearest living foe in range, using the field's own "who fights
+    // whom" so the priority matches the rest of the army
+    _agentTarget(a, rng) {
+      let best = null,
+        bd = rng * rng;
+      for (const o of this.agents || []) {
+        if (o === a || o.dead || o.gone) continue;
+        if (o.st === 4) {
+          if (!ZS.Army.opposed(a, o)) continue;
+        } else if (
+          (a.foe && o.st === 0) || // an invader will cut a civilian
+          (!a.foe && (o.st === 2 || o.st === 3 || (o.st === 4 && o.foe)))
+        ) {
+          // ours fight the dead and raiders
+        } else {
+          continue;
+        }
+        const d = Math.hypot(o.x - a.x, o.y - a.y);
+        if (d > rng) continue;
+        if (d < bd) {
+          bd = d;
+          best = o;
+        }
+      }
+      return best;
     }
 
     _hostileStruct(a, rng) {
