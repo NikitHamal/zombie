@@ -321,19 +321,24 @@
         continue;
       }
       const blk = S.walkBlocked(a);
-      if (a.x < m) a.vx += (m - a.x) * dt * 8;
-      if (a.x > world.w - m) a.vx -= (a.x - (world.w - m)) * dt * 8;
-      if (a.y < m) a.vy += (m - a.y) * dt * 8;
-      if (a.y > world.h - m) a.vy -= (a.y - (world.h - m)) * dt * 8;
+      const LIM = 24000;
+      if (a.x < -LIM) a.vx += (-LIM - a.x) * dt * 2;
+      if (a.x > LIM) a.vx -= (a.x - LIM) * dt * 2;
+      if (a.y < -LIM) a.vy += (-LIM - a.y) * dt * 2;
+      if (a.y > LIM) a.vy -= (a.y - LIM) * dt * 2;
+      if (a.x < m && a.x > -5000) a.vx += (m - a.x) * dt * 2;
+      if (a.x > world.w - m && a.x < world.w + 5000) a.vx -= (a.x - (world.w - m)) * dt * 2;
+      if (a.y < m && a.y > -5000) a.vy += (m - a.y) * dt * 2;
+      if (a.y > world.h - m && a.y < world.h + 5000) a.vy -= (a.y - (world.h - m)) * dt * 2;
       const v = Math.hypot(a.vx, a.vy);
       let maxv = S.maxSpeed(a);
-      if (S.swim && nav.isWater(a.x, a.y)) maxv *= SWIM_FRAC; // swimmers
+      if (S.swim && nav.isWater(a.x, a.y)) maxv *= SWIM_FRAC;
       if (v > maxv) {
         a.vx *= maxv / v;
         a.vy *= maxv / v;
       }
-      const nx = ZS.clamp(a.x + a.vx * dt, 12, world.w - 12);
-      const ny = ZS.clamp(a.y + a.vy * dt, 12, world.h - 12);
+      const nx = a.x + a.vx * dt;
+      const ny = a.y + a.vy * dt;
       hardClamp(a, nx, ny, blk, nav);
       a.gait += dt * (2 + Math.hypot(a.vx, a.vy) * 0.13);
       // track cell + building for occupancy counts and shelter logic

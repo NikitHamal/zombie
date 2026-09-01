@@ -30,18 +30,10 @@
       this.clamp(vw, vh);
     }
 
-    // keep zoom in sensible bounds, allow generous exploration of the whole region
-    clamp(vw, vh) {
+    // keep zoom in sensible bounds — the world is infinite, the camera may
+    // pan anywhere; the village is at the centre but the paper goes on.
+    clamp() {
       this.zoom = ZS.clamp(this.zoom, this.minZoom, this.maxZoom);
-      const hw = vw / this.zoom / 2,
-        hh = vh / this.zoom / 2;
-      const pad = 900;
-      const minX = Math.min(this.world.w / 2, hw - pad);
-      const maxX = Math.max(this.world.w / 2, this.world.w - hw + pad);
-      const minY = Math.min(this.world.h / 2, hh - pad);
-      const maxY = Math.max(this.world.h / 2, this.world.h - hh + pad);
-      this.x = ZS.clamp(this.x, minX, maxX);
-      this.y = ZS.clamp(this.y, minY, maxY);
     }
 
     toWorld(sx, sy, vw, vh) {

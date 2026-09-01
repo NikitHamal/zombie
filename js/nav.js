@@ -1,13 +1,8 @@
 /* Navigation: a 20px cell grid over the whole world.
    Cell values: 0 = blocked (water, wall), 1 = land, 2 = building floor,
    3 = intact door. Interiors and intact doors block zombies but not
-   humans; a broken door becomes plain land (nav.doorBroken). astar() and
-   los() are the only geometry agents use for movement, so water and walls
-   are a hard block — no agent can ever end up inside them, no matter how
-   fast they run. A scenario that sets `swim` treats water as a
-   soft block instead: astar() treats water cells as passable at 4x cost
-   (it swims only when the swim beats the detour), los() sees across it,
-   and the core caps in-water speed (SWIM_FRAC in agents.js). */
+   humans; a broken door becomes plain land (nav.doorBroken). The world is
+   infinite — beyond the mapped town the land goes on. */
 (() => {
   "use strict";
   const ZS = (window.ZS = window.ZS || {});
@@ -43,15 +38,14 @@
       this.h = world.h / CELL;
       this.n = this.w * this.h;
       this.val = new Uint8Array(this.n);
-      this.val.fill(1); // land until proven otherwise
-      this.wm = new Uint8Array(this.n); // 1 = water cell (river/lake/pond)
-      // persistent A* work arrays, stamped per search (no per-call alloc)
+      this.val.fill(1);
+      this.wm = new Uint8Array(this.n);
       this.g = new Float32Array(this.n);
       this.fs = new Float32Array(this.n);
       this.from = new Int32Array(this.n);
       this.stamp = new Int32Array(this.n);
       this.gen = 0;
-      this.version = 0; // bumped when a door breaks; agents replan on change
+      this.version = 0;
     }
 
     idx(x, y) {
@@ -63,25 +57,36 @@
 
     cellAt(x, y) {
       const i = this.idx(x, y);
-      return i < 0 ? 0 : this.val[i];
+      if (i < 0) {
+        const w = this.world;
+        if (w.nearRiver && w.nearRiver(x, y, 2)) return 0;
+        if (w.inLake && w.inLake(x, y, 0)) return 0;
+        if (w._inWaterPoly && w._inWaterPoly(x, y)) return 0;
+        return 1;
+      }
+      return this.val[i];
     }
 
-    // floors (2) and intact doors (3) pass humans only: a zombie inside
-    // (via a broken door) can still path back out, but nothing can cross
-    // a wall or an intact door
     isWalkable(x, y, isZombie) {
       const i = this.idx(x, y);
-      if (i < 0) return false;
+      if (i < 0) {
+        const w = this.world;
+        if (w._inWaterPoly && w._inWaterPoly(x, y)) return false;
+        if (w.inLake && w.inLake(x, y, 0)) return false;
+        if (w.nearRiver && w.nearRiver(x, y, 0)) return false;
+        return true;
+      }
       const v = this.val[i];
       if (v === 3 || v === 2) return !isZombie;
       return v >= 1;
     }
 
-    // water test: a blocked cell that is river/lake/pond water. Walls are
-    // blocked too but not water; door-front cells carved in the river are
-    // plain land again (val 1), so they read as land, not water
     isWater(x, y) {
       const i = this.idx(x, y);
+      if (i < 0) {
+        const w = this.world;
+        return !!(w.nearRiver && w.nearRiver(x, y, 0)) || !!(w.inLake && w.inLake(x, y, 0));
+      }
       return i >= 0 && this.val[i] === 0 && this.wm[i] === 1;
     }
     centerOf(i) {
@@ -91,7 +96,6 @@
       };
     }
 
-    // mark a world rect's cells (cell centers inside the rect)
     markRect(x, y, w, h, v, onlyIf) {
       const ix0 = Math.max(0, (x / CELL) | 0),
         iy0 = Math.max(0, (y / CELL) | 0),
@@ -107,34 +111,35 @@
         }
     }
 
-    // water from the world's river/lake/pond polygons (matches the
-    // drawing exactly); ponds are optional smaller lakes (world.ponds)
     markWater() {
-      const river = this.world.river.pts,
-        lake = this.world.lake.pts,
+      const river = this.world.river ? this.world.river.pts : [],
+        lake = this.world.lake ? this.world.lake.pts : [],
         ponds = this.world.ponds || [];
-      for (let iy = 0; iy < this.h; iy++)
+      for (let iy = 0; iy < this.h; iy++) {
         for (let ix = 0; ix < this.w; ix++) {
           const x = (ix + 0.5) * CELL,
             y = (iy + 0.5) * CELL;
-          if (pointInPoly(x, y, river) || pointInPoly(x, y, lake)) {
-            const i = iy * this.w + ix;
+          const i = iy * this.w + ix;
+          if (
+            (river.length && pointInPoly(x, y, river)) ||
+            (lake.length && pointInPoly(x, y, lake)) ||
+            (this.world.nearRiver && this.world.nearRiver(x, y, 2))
+          ) {
             this.val[i] = 0;
             this.wm[i] = 1;
             continue;
           }
-          for (let i = 0; i < ponds.length; i++)
-            if (pointInPoly(x, y, ponds[i].pts)) {
-              const pi = iy * this.w + ix;
-              this.val[pi] = 0;
-              this.wm[pi] = 1;
+          for (let p = 0; p < ponds.length; p++) {
+            if (ponds[p].pts && pointInPoly(x, y, ponds[p].pts)) {
+              this.val[i] = 0;
+              this.wm[i] = 1;
               break;
             }
+          }
         }
+      }
     }
 
-    // clear straight-line travel (cell-by-cell) between two world points;
-    // swim-capable callers see across water
     los(x1, y1, x2, y2, isZombie, swim) {
       const dx = x2 - x1,
         dy = y2 - y1;
@@ -146,28 +151,44 @@
           py = y1 + (dy * i) / steps;
         if (!this.isWalkable(px, py, isZombie) && !(swim && this.isWater(px, py))) return false;
       }
-      // the endpoint: whatever stands there is reachable through whatever
-      // the ray passed — a human-walkable point (floor, door, land) is
-      // sightable from every side (the ray's intermediate cells carry the
-      // side's own mask; the side's agent is clamped to its own cells)
       return this.isWalkable(x2, y2, false) || (swim && this.isWater(x2, y2));
     }
 
-    /* 8-directional A* with an octile heuristic and a binary heap.
-       Diagonal moves never cut corners. Returns a simplified path as an
-       array of world-space {x,y} waypoints (start excluded) or null when
-       the target is unreachable. swim: water cells become passable at
-       4x cost — the swim is only taken when it beats the detour (the
-       unit-cost heuristic stays admissible, so the path stays optimal). */
     astar(x1, y1, x2, y2, isZombie, maxExpand, swim) {
-      const si = this.idx(x1, y1),
+      let si = this.idx(x1, y1),
         ti = this.idx(x2, y2);
-      if (si < 0 || ti < 0 || si === ti) return null;
-      // a zombie already inside a building (start on a floor cell) may roam
-      // that interior and out through broken doors; a zombie outside can
-      // never path into floors, and no zombie crosses an intact door
+      let outX = null,
+        outY = null;
+      if (ti < 0) {
+        outX = x2;
+        outY = y2;
+        const ex = ZS.clamp(x2, 40, this.world.w - 40);
+        const ey = ZS.clamp(y2, 40, this.world.h - 40);
+        let p = this.nearestWalkable(ex, ey, 400, isZombie);
+        if (!p) p = this.nearestWalkable(this.world.w / 2, this.world.h / 2, 1200, isZombie);
+        if (!p) return null;
+        ti = this.idx(p.x, p.y);
+        if (ti < 0) return null;
+        x2 = p.x;
+        y2 = p.y;
+      }
+      if (si < 0) {
+        const ex = ZS.clamp(x1, 40, this.world.w - 40);
+        const ey = ZS.clamp(y1, 40, this.world.h - 40);
+        let p = this.nearestWalkable(ex, ey, 400, isZombie);
+        if (!p) p = this.nearestWalkable(this.world.w / 2, this.world.h / 2, 1200, isZombie);
+        if (!p) return null;
+        si = this.idx(p.x, p.y);
+        if (si < 0) return null;
+        x1 = p.x;
+        y1 = p.y;
+      }
+      if (si === ti) {
+        if (outX !== null) return [{ x: outX, y: outY }];
+        return null;
+      }
       const inB = isZombie && this.val[si] === 2;
-      const tw = swim && this.val[ti] === 0 && this.wm[ti] === 1; // water target
+      const tw = swim && this.val[ti] === 0 && this.wm[ti] === 1;
       if (!this.isWalkable(x2, y2, isZombie) && !tw && !(inB && this.val[ti] === 2)) return null;
 
       this.gen++;
@@ -192,7 +213,6 @@
         (v >= 2 && (!isZombie || inB) && !(v === 3 && isZombie)) ||
         (swim && v === 0 && wm[ni] === 1);
 
-      // binary min-heap of [f, i]; stale entries are skipped on pop
       const heap = [];
       const push = (f, i) => {
         heap.push([f, i]);
@@ -253,7 +273,6 @@
           const v = val[ni];
           if (!free(v, ni)) continue;
           if (dx && dy) {
-            // no corner cutting: both orthogonal neighbors must be open
             if (!free(val[iy * w + nx], iy * w + nx) || !free(val[ny * w + ix], ny * w + ix))
               continue;
           }
@@ -269,13 +288,12 @@
 
       if (stamp[ti] !== gen) return null;
 
-      // walk back, drop collinear points, map to world coords
       const raw = [];
       let i = ti;
       while (i !== si) {
         raw.push(i);
         i = from[i];
-        if (raw.length > 4000) return null; // loop guard (should be impossible)
+        if (raw.length > 4000) return null;
       }
       raw.reverse();
       const kept = [raw[0]];
@@ -287,32 +305,44 @@
         if (ax !== bx || ay !== by) kept.push(raw[k]);
       }
       kept.push(raw[raw.length - 1]);
-      return kept.map((ci) => this.centerOf(ci));
+      const path = kept.map((ci) => this.centerOf(ci));
+      if (outX !== null) path.push({ x: outX, y: outY });
+      return path;
     }
 
-    // first walkable point within maxR of (x, y), spiral search
     nearestWalkable(x, y, maxR, isZombie) {
-      if (this.isWalkable(x, y, isZombie)) return { x, y };
+      if (this.isWalkable(x, y, isZombie)) {
+        const i = this.idx(x, y);
+        return i >= 0 ? this.centerOf(i) : { x, y };
+      }
       for (let r = 10; r <= maxR; r += 10) {
         const n = Math.max(10, (r * 0.7) | 0);
         for (let k = 0; k < n; k++) {
           const an = (k / n) * Math.PI * 2 + r * 0.35;
           const px = x + Math.cos(an) * r,
             py = y + Math.sin(an) * r;
-          const i = this.idx(px, py);
-          if (i >= 0 && this.isWalkable(px, py, isZombie)) return this.centerOf(i);
+          if (this.isWalkable(px, py, isZombie)) {
+            const i = this.idx(px, py);
+            return i >= 0 ? this.centerOf(i) : { x: px, y: py };
+          }
         }
       }
       return null;
     }
 
-    // random open-land point (never floor, water or walls)
     randLand() {
       for (let i = 0; i < 300; i++) {
-        const x = 30 + Math.random() * (this.world.w - 60);
-        const y = 30 + Math.random() * (this.world.h - 60);
-        const idx = this.idx(x, y);
-        if (idx >= 0 && this.val[idx] === 1) return this.centerOf(idx);
+        const far = Math.random() < 0.3;
+        const x = far
+          ? (Math.random() - 0.5) * this.world.w * 2 + this.world.w * 0.5
+          : 30 + Math.random() * (this.world.w - 60);
+        const y = far
+          ? (Math.random() - 0.5) * this.world.h * 2 + this.world.h * 0.5
+          : 30 + Math.random() * (this.world.h - 60);
+        if (this.isWalkable(x, y, false) && this.cellAt(x, y) === 1) {
+          const idx = this.idx(x, y);
+          return idx >= 0 ? this.centerOf(idx) : { x, y };
+        }
       }
       for (let i = 0; i < this.n; i++) if (this.val[i] === 1) return this.centerOf(i);
       return { x: this.world.w / 2, y: this.world.h / 2 };

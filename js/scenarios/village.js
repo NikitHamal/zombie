@@ -1341,8 +1341,10 @@
     _applySavedMap(world, nav) {
       const s = this.loaded;
       if (!s || !s.bs) return;
-      // if the save is from a different world size, discard it
-      if (s.ww && s.wh && (s.ww !== world.w || s.wh !== world.h)) {
+      // the world is now larger and infinite — an old save from the smaller
+      // 2200×1600 still fits inside it; only discard a save that is larger
+      // than the current map and would not fit
+      if (s.ww && s.wh && (s.ww > world.w || s.wh > world.h)) {
         this.loaded = null;
         try {
           localStorage.removeItem(SAVE_KEY);
@@ -4495,7 +4497,7 @@
       if (night > 0.01) {
         c.fillStyle =
           "rgba(26,30,48," + (night * (this.season.night ? 0.5 : 0.44)).toFixed(3) + ")";
-        c.fillRect(0, 0, world.w, world.h);
+        c.fillRect(vis.x0 - 200, vis.y0 - 200, vis.x1 - vis.x0 + 400, vis.y1 - vis.y0 + 400);
         // firelight: the beacons, then the lit windows
         for (const s of world.buildings) ZS.Structs.glow(c, s, t, night);
         c.save();

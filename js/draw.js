@@ -11,28 +11,136 @@
   /* ---------- world furniture ---------- */
 
   function drawWater(c, world) {
-    if (!world.lake && !world.river) return; // tile worlds have no river
+    if (!world.lake && !world.river) return;
     c.lineCap = "round";
     c.lineWidth = 2;
+    c.fillStyle = "rgba(96,138,166,0.30)";
     c.strokeStyle = "rgba(64,102,132,0.75)";
     if (world.lake && world.lake.pts.length) {
       ZS.wpoly(c, world.lake.pts, 71, 2.2, true);
+      c.fill();
       c.stroke();
     }
-    ZS.wpoly(c, world.river.pts, 731, 2.2, true);
-    c.stroke();
-    // smaller ponds boil with their own seeds
+    if (world.river && world.river.pts.length) {
+      ZS.wpoly(c, world.river.pts, 731, 2.2, true);
+      c.fill();
+      c.stroke();
+    }
     if (world.ponds)
       for (let i = 0; i < world.ponds.length; i++) {
         ZS.wpoly(c, world.ponds[i].pts, 77 + i * 13, 2.2, true);
+        c.fill();
         c.stroke();
       }
-    // boiling ripples
     c.strokeStyle = "rgba(64,102,132,0.4)";
     c.lineWidth = 1.1;
     for (const rp of world.ripples) {
       ZS.wline(c, rp.x - rp.w / 2, rp.y, rp.x, rp.y - 2, rp.s, 1.2);
       ZS.wline(c, rp.x, rp.y - 2, rp.x + rp.w / 2, rp.y, rp.s + 9, 1.2);
+    }
+  }
+
+  function drawInfiniteWater(c, world, vis) {
+    if (!world.river) {
+      drawWater(c, world);
+      return;
+    }
+    const r = world.river;
+    if (r.baseX && !r.ori) {
+      drawWater(c, world);
+      return;
+    }
+    c.lineCap = "round";
+    c.lineWidth = 2;
+    c.fillStyle = "rgba(96,138,166,0.30)";
+    c.strokeStyle = "rgba(64,102,132,0.75)";
+    if (world.lake && world.lake.pts.length) {
+      ZS.wpoly(c, world.lake.pts, 71, 2.2, true);
+      c.fill();
+      c.stroke();
+    }
+    const left = [],
+      right = [];
+    const ori = r.ori || "v";
+    const step = 38;
+    if (ori === "v") {
+      const y0 = Math.floor(vis.y0 / step) * step - step * 2;
+      const y1 = Math.ceil(vis.y1 / step) * step + step * 2;
+      for (let y = y0; y <= y1; y += step) {
+        const x = world.riverX(y);
+        const hw = world.riverW(y) / 2;
+        left.push({ x: x - hw - 3, y });
+        right.push({ x: x + hw + 3, y });
+      }
+      if (left.length) {
+        const pts = left.concat(right.reverse());
+        ZS.wpoly(c, pts, 731, 2.2, true);
+        c.fill();
+        c.stroke();
+      }
+    } else if (ori === "h") {
+      const x0 = Math.floor(vis.x0 / step) * step - step * 2;
+      const x1 = Math.ceil(vis.x1 / step) * step + step * 2;
+      for (let x = x0; x <= x1; x += step) {
+        const y =
+          (r.baseY || world.h * 0.5) +
+          Math.sin(x * (r.f1 || 0.0021) + r.p1) * r.a1 +
+          Math.sin(x * (r.f2 || 0.0007) + r.p2) * r.a2;
+        const hw = (r.baseW + Math.sin(x * 0.0016 + r.p3) * 28) / 2;
+        left.push({ x, y: y - hw - 3 });
+        right.push({ x, y: y + hw + 3 });
+      }
+      if (left.length) {
+        const pts = left.concat(right.reverse());
+        ZS.wpoly(c, pts, 731, 2.2, true);
+        c.fill();
+        c.stroke();
+      }
+    } else {
+      if (r.pts && r.pts.length) {
+        ZS.wpoly(c, r.pts, 731, 2.2, true);
+        c.fill();
+        c.stroke();
+      }
+    }
+    if (world.ponds)
+      for (let i = 0; i < world.ponds.length; i++) {
+        ZS.wpoly(c, world.ponds[i].pts, 77 + i * 13, 2.2, true);
+        c.fill();
+        c.stroke();
+      }
+    c.strokeStyle = "rgba(64,102,132,0.4)";
+    c.lineWidth = 1.1;
+    for (const rp of world.ripples) {
+      if (rp.x < vis.x0 - 40 || rp.x > vis.x1 + 40 || rp.y < vis.y0 - 40 || rp.y > vis.y1 + 40)
+        continue;
+      ZS.wline(c, rp.x - rp.w / 2, rp.y, rp.x, rp.y - 2, rp.s, 1.2);
+      ZS.wline(c, rp.x, rp.y - 2, rp.x + rp.w / 2, rp.y, rp.s + 9, 1.2);
+    }
+    if (r.ori) {
+      const rng = ZS.rng32((world.seed ^ 0x71ab) + 9);
+      for (let i = 0; i < 8; i++) {
+        if (ori === "v") {
+          const y = vis.y0 + rng() * (vis.y1 - vis.y0);
+          const x = world.riverX(y) + (rng() - 0.5) * world.riverW(y) * 0.6;
+          const w = 8 + rng() * 10;
+          const s = rng() * 100;
+          c.strokeStyle = "rgba(64,102,132,0.22)";
+          ZS.wline(c, x - w / 2, y, x, y - 2, s, 1.2);
+          ZS.wline(c, x, y - 2, x + w / 2, y, s + 9, 1.2);
+        } else if (ori === "h") {
+          const x = vis.x0 + rng() * (vis.x1 - vis.x0);
+          const y =
+            (r.baseY || world.h * 0.5) +
+            Math.sin(x * (r.f1 || 0.0021) + r.p1) * r.a1 +
+            Math.sin(x * (r.f2 || 0.0007) + r.p2) * r.a2;
+          const w = 8 + rng() * 10;
+          const s = rng() * 100;
+          c.strokeStyle = "rgba(64,102,132,0.22)";
+          ZS.wline(c, x - w / 2, y, x, y - 2, s, 1.2);
+          ZS.wline(c, x, y - 2, x + w / 2, y, s + 9, 1.2);
+        }
+      }
     }
   }
 
@@ -425,15 +533,15 @@
     c.save();
     cam.apply(c, vw, vh);
 
-    // continuous paper ground fill covering the visible world view
-    c.fillStyle = "#f3edde";
     const hw = vw / cam.zoom / 2 + 100;
     const hh = vh / cam.zoom / 2 + 100;
+    c.fillStyle = "#f3edde";
     c.fillRect(cam.x - hw, cam.y - hh, hw * 2, hh * 2);
-
-    // pre-rendered ground (speckle, stains, terrain texture)
+    const vis0 = cam.visible(vw, vh, 160);
+    if (world.drawInfinite) world.drawInfinite(c, vis0);
     c.drawImage(world.canvas, 0, 0, world.w, world.h);
-    drawWater(c, world);
+    if (world.river && world.river.ori) drawInfiniteWater(c, world, vis0);
+    else drawWater(c, world);
     // the scenario's own ground pass (tile washes, boiling borders)
     if (ZS.scenario.drawGround) ZS.scenario.drawGround(c, world, t);
     if (world.stains) world.stains.draw(c);
