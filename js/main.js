@@ -63,7 +63,6 @@
   resize();
   if (perf) perf.onTier = resize; // stepping down re-sizes the canvas
   cam.fit(W, H);
-  cam.minZoom = cam.zoom * 0.8; // a little paper margin around the world frame
   ZS.Sim.init(world, W, H);
 
   // debug/verification handle (also a hook for future player/vehicle work)
@@ -202,6 +201,27 @@
     { passive: false },
   );
 
+  /* ---------- keyboard movement (Arrow keys only — WASD are game shortcuts) ---------- */
+  const keysDown = new Set();
+  window.addEventListener("keydown", (e) => {
+    if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
+    if (
+      e.code === "ArrowLeft" ||
+      e.code === "ArrowRight" ||
+      e.code === "ArrowUp" ||
+      e.code === "ArrowDown"
+    ) {
+      e.preventDefault();
+      keysDown.add(e.code);
+    }
+  });
+  window.addEventListener("keyup", (e) => {
+    keysDown.delete(e.code);
+  });
+  window.addEventListener("blur", () => {
+    keysDown.clear();
+  });
+
   /* ---------- main loop ---------- */
 
   let last = performance.now();
@@ -216,6 +236,22 @@
     }
     ZS.setBoil(t);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    // keyboard camera pan
+    let kx = 0,
+      ky = 0;
+    if (keysDown.has("ArrowLeft")) kx -= 1;
+    if (keysDown.has("ArrowRight")) kx += 1;
+    if (keysDown.has("ArrowUp")) ky -= 1;
+    if (keysDown.has("ArrowDown")) ky += 1;
+    if (kx !== 0 || ky !== 0) {
+      if (cam.auto) cam.auto = false;
+      const panSpeed = (950 / cam.zoom) * dt;
+      cam.x += kx * panSpeed;
+      cam.y += ky * panSpeed;
+      cam.clamp(W, H);
+    }
+
     // the clock: a scenario may run it slower or faster (the village's
     // 1x/2x/3x, and 0 while paused). Fast-forward runs the same step
     // several times so nothing tunnels through a wall.

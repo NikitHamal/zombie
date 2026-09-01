@@ -38,7 +38,7 @@
 
   /* ---------- tunables: every number in the game lives here ---------- */
   const BAL = {
-    DAY_LEN: 120, // seconds of daylight (06:00 → 19:00)
+    DAY_LEN: 180, // seconds of daylight (06:00 → 19:00)
     DUSK: 9, // the warning: the horn, the sky, everyone home
     NIGHT_LEN: 70, // 19:00 → 06:00
     DAWN: 3,
@@ -481,23 +481,34 @@
       this.nav = nav;
       const W = world.w,
         H = world.h;
-      world.water({ riverBaseX: 170, lake: { x: W * 0.8, y: H * 0.3, r: 165 } });
+      const cx = W * 0.5,
+        cy = H * 0.54;
+      this.center = { x: cx, y: cy };
+      world.water({ riverBaseX: cx - 650, lake: { x: cx + 460, y: cy - 280, r: 190 } });
       nav.markWater();
-      world.forest = { x: W * 0.5, y: 300, r: 400 };
+      world.forest = { x: cx + 80, y: cy - 560, r: 460 };
       world.placeAllTrees({
         grovePos: [
-          { x: W * 0.2, y: H * 0.78 },
-          { x: W * 0.82, y: H * 0.8 },
-          { x: W * 0.66, y: H * 0.42 },
+          { x: cx - 400, y: cy + 340 },
+          { x: cx + 440, y: cy + 320 },
+          { x: cx + 360, y: cy - 160 },
+          { x: cx - 440, y: cy - 260 },
+          // outer groves filling the wider landscape
+          { x: cx - 800, y: cy - 500 },
+          { x: cx + 800, y: cy - 400 },
+          { x: cx - 700, y: cy + 600 },
+          { x: cx + 700, y: cy + 550 },
+          { x: cx - 900, y: cy + 100 },
+          { x: cx + 900, y: cy + 50 },
+          { x: cx, y: cy + 700 },
+          { x: cx - 500, y: cy - 700 },
+          { x: cx + 500, y: cy - 650 },
         ],
       });
       for (const tr of world.trees) tr.amt = BAL.NODE.tree;
       world.buildings = [];
 
       const rng = ZS.rng32(world.seed ^ 0x5011);
-      this.center = { x: W * 0.48, y: H * 0.66 };
-      const cx = this.center.x,
-        cy = this.center.y;
 
       // the ruin
       const hall = ZS.Structs.ruin("hall", cx, cy, rng() * 997);
@@ -524,7 +535,8 @@
       }
       if (this.loaded) this._applySavedMap(world, nav);
 
-      // rock, bramble, wreckage
+      // rock, bramble, wreckage — scattered across the whole world
+      const mapR = Math.max(W, H) * 0.48;
       const scatter = (n, kind, r0, r1, amt) => {
         let placed = 0;
         for (let i = 0; i < n * 30 && placed < n; i++) {
@@ -556,10 +568,10 @@
           placed++;
         }
       };
-      scatter(9, "rock", 320, 900, BAL.NODE.rock);
-      scatter(6, "rock", 180, 340, BAL.NODE.rock);
-      scatter(11, "bush", 150, 620, BAL.NODE.bush);
-      scatter(6, "wreck", 200, 780, BAL.NODE.wreck);
+      scatter(18, "rock", 320, mapR, BAL.NODE.rock);
+      scatter(10, "rock", 180, 500, BAL.NODE.rock);
+      scatter(18, "bush", 150, mapR * 0.8, BAL.NODE.bush);
+      scatter(10, "wreck", 200, mapR * 0.7, BAL.NODE.wreck);
       nav.version++;
       this.trees0 = world.trees.length;
     }
@@ -632,8 +644,8 @@
       this.agents = agents;
       const s = this.loaded;
       const n = s && s.pop ? s.pop.length : BAL.POP0;
-      const cx = this.hall.x + this.hall.w / 2,
-        cy = this.hall.y + this.hall.h / 2;
+      const cx = this.hall ? this.hall.x + this.hall.w / 2 : this.center.x,
+        cy = this.hall ? this.hall.y + this.hall.h / 2 : this.center.y;
       if (s && s.pop) {
         for (const p of s.pop) {
           const a = this.makeAgent(p.x, p.y, 0);
@@ -675,7 +687,7 @@
         this.day = s.day || 1;
         this.res = Object.assign({}, BAL.START, s.res);
         this.done = s.done || {};
-        if (s.hallHp) this.hall.hp = Math.min(this.hall.maxHp, s.hallHp);
+        if (s.hallHp && this.hall) this.hall.hp = Math.min(this.hall.maxHp, s.hallHp);
       }
       this.loaded = null;
       for (const a of agents) this._dress(a);
@@ -1329,15 +1341,22 @@
     _applySavedMap(world, nav) {
       const s = this.loaded;
       if (!s || !s.bs) return;
+      // if the save is from a different world size, discard it
+      if (s.ww && s.wh && (s.ww !== world.w || s.wh !== world.h)) {
+        this.loaded = null;
+        try {
+          localStorage.removeItem(SAVE_KEY);
+        } catch {}
+        return;
+      }
       world.buildings.length = 0;
       this.hall = null;
       for (const b of world.trees) b.amt = BAL.NODE.tree;
       for (const [kind, x, y, lvl, hp, built, ruined, prog] of s.bs) {
-        const st = ZS.Structs.make(
-          kind,
-          x + ZS.Structs.CAT[kind].w / 2,
-          y + ZS.Structs.CAT[kind].h / 2,
-        );
+        const cat = ZS.Structs.CAT[kind];
+        if (!cat) continue;
+        if (x < 0 || y < 0 || x + cat.w > world.w || y + cat.h > world.h) continue;
+        const st = ZS.Structs.make(kind, x + cat.w / 2, y + cat.h / 2);
         st.lvl = lvl;
         st.hp = hp;
         st.built = !!built;
@@ -1777,6 +1796,8 @@
       ]);
       return {
         v: 2,
+        ww: this.world.w,
+        wh: this.world.h,
         day: this.day,
         seed: this.world.seed,
         hallHp: this.hall ? Math.round(this.hall.hp) : 0,

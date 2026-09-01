@@ -86,64 +86,74 @@
         opacity: 0.65;
       }
 
-      /* the clock, top centre */
+      /* the clock and controls, top left */
       #bar {
-        top: 12px;
-        left: 50%;
-        transform: translateX(-50%) rotate(-0.3deg);
-        padding: 5px 10px;
+        top: 10px;
+        left: 10px;
+        transform: rotate(-0.3deg);
+        padding: 4px 8px;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 5px;
         white-space: nowrap;
       }
       #bar #clock {
-        font-size: 17px;
+        font-size: 15px;
+        font-weight: bold;
       }
       #bar #wx {
         opacity: 0.7;
-        font-size: 14px;
+        font-size: 13px;
       }
       #bar .sep {
         width: 1px;
-        height: 18px;
+        height: 16px;
         background: rgba(60, 50, 40, 0.3);
+        margin: 0 1px;
       }
 
       /* the stores, top right */
       #res {
-        top: 12px;
-        right: 12px;
-        padding: 6px 10px;
+        top: 10px;
+        right: 10px;
+        padding: 4px 8px;
         display: flex;
         flex-direction: column;
         gap: 2px;
         align-items: flex-end;
         transform: rotate(0.35deg);
       }
-      #res .chip {
+      #res .res-row {
         display: flex;
         align-items: center;
-        gap: 5px;
-        font-size: 14.5px;
+        gap: 7px;
+      }
+      #res .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 13.5px;
         opacity: 0.9;
+        white-space: nowrap;
       }
       #res .chip i {
-        width: 9px;
-        height: 9px;
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
         border: 1px solid rgba(60, 50, 40, 0.4);
       }
       #res .chip .cap {
-        font-size: 12px;
+        font-size: 11px;
         opacity: 0.55;
       }
       #res .chip.wide {
-        font-size: 12.5px;
-        opacity: 0.62;
-        margin-top: 2px;
+        font-size: 12px;
+        opacity: 0.65;
+        margin-top: 1px;
         border-top: 1px dashed rgba(60, 50, 40, 0.25);
-        padding-top: 3px;
+        padding-top: 1px;
+        text-align: right;
+        white-space: nowrap;
       }
 
       /* the selection card, bottom left */
@@ -425,23 +435,31 @@
     <canvas id="c"></canvas>
     <div id="ui">
       <div id="bar" class="paper">
-        <span id="clock">DAY 1 · 06:00</span>
+        <span id="clock">DAY 1</span>
         <span id="wx">spring · clear</span>
-        <span class="sep"></span>
-        <button id="sp0" title="pause (space)">II</button>
-        <button id="sp1" title="normal speed (1)">&#9654;</button>
-        <button id="sp2" title="fast (2)">&#9654;&#9654;</button>
-        <button id="sp3" title="faster (3)">&#9654;&#9654;&#9654;</button>
         <span class="sep"></span>
         <button id="roles" title="the roster — who does what (V)">roles</button>
         <button id="buildb" title="build something (B)">build</button>
         <button id="workb" title="the workshop — what the village learns (T)">workshop</button>
         <button id="armyb" title="the field — train and order the army (A)">field</button>
-        <button id="natb" title="the world beyond — the nations (D)">nations</button>
         <button id="mapb" title="the valley — send parties out (M)">valley</button>
+        <button id="natb" title="the world beyond — the nations (D)">nations</button>
         <button id="bookb" title="the record — what has happened, and saving (L)">record</button>
+<<<<<<< Updated upstream
         <button id="pilotb" title="the steward — let him play the village for you (P)">steward</button>
         <button id="watchb" title="watch — the camera follows the trouble, and the quiet runs on (W)">watch</button>
+=======
+<<<<<<< Updated upstream
+        <button id="pilotb" title="the steward — let him play the village for you (P)">
+          steward
+        </button>
+        <button
+          id="watchb"
+          title="watch — the camera follows the trouble, and the quiet runs on (W)"
+        >
+          watch
+        </button>
+>>>>>>> Stashed changes
         <span class="sep"></span>
         <button id="home" title="centre on the hall (H)">hall</button>
         <button id="fit" title="fit the whole map (F)">map</button>
@@ -449,6 +467,12 @@
         <button id="qualb" title="picture quality (Q)">quality</button>
         <button id="sound" title="mute (K)">sound</button>
         <button id="helpb" title="keys (?)">?</button>
+=======
+        <span class="sep"></span>
+        <button id="pilotb" title="the steward — let him play the village for you (P)">steward</button>
+        <button id="watchb" title="watch (W)">watch</button>
+        <button id="settingsb" title="settings, sound, speed & controls (?)">⚙</button>
+>>>>>>> Stashed changes
       </div>
 
       <div id="res" class="paper"></div>
@@ -459,9 +483,16 @@
 
       <div id="helpwrap">
         <div class="card paper">
+<<<<<<< Updated upstream
           <h2>the hollow</h2>
           Nothing here is yours to control directly — only to direct. The
           village works by day and hides by night.
+=======
+<<<<<<< Updated upstream
+          <h2>the desert order</h2>
+          You hold a walled outpost on the waste, and you take more of it. Build, research, field
+          tanks and gunships and fleets — and send them out to take the ground.
+>>>>>>> Stashed changes
           <div style="margin-top: 8px">
             <div><span class="k">V</span>the roster — everybody, and the work you give them</div>
             <div><span class="k">M</span>the valley — send parties out for what you need</div>
@@ -496,6 +527,60 @@
             <div><span class="k">N</span>ring the bell — everyone comes home</div>
             <div><span class="k">J</span>job icons · <span class="k">shift+V</span>names</div>
             <div><span class="k">K</span>mute · <span class="k">esc</span>cancel</div>
+=======
+          <div
+            style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(60, 50, 40, 0.3); padding-bottom: 4px; margin-bottom: 8px;"
+          >
+            <h2 style="margin: 0; font-size: 18px">settings & guide</h2>
+            <button id="settings-close" style="font-size: 13px; padding: 0 6px">✕</button>
+          </div>
+
+          <div style="margin-bottom: 10px">
+            <div style="font-size: 12.5px; opacity: 0.7; margin-bottom: 4px">speed:</div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap">
+              <button id="sp0" title="pause (space)">II pause</button>
+              <button id="sp1" title="normal speed (1)">▶ normal</button>
+              <button id="sp2" title="fast (2)">▶▶ fast</button>
+              <button id="sp3" title="faster (3)">▶▶▶ faster</button>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 12px">
+            <div style="font-size: 12.5px; opacity: 0.7; margin-bottom: 4px">controls:</div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap">
+              <button id="sound" title="mute/unmute (K)">sound</button>
+              <button id="qualb" title="picture quality (Q)">quality</button>
+              <button id="bell" title="ring the bell (N)">bell</button>
+              <button id="home" title="centre on hall (H)">hall</button>
+              <button id="fit" title="fit view (F)">map</button>
+            </div>
+          </div>
+
+          <div style="border-top: 1px dashed rgba(60, 50, 40, 0.25); padding-top: 8px">
+            <div style="font-size: 12.5px; opacity: 0.7; margin-bottom: 4px">
+              keys & shortcuts:
+            </div>
+            <div style="margin-top: 4px; font-size: 13.5px; line-height: 1.55">
+              <div>
+                <span class="k">V</span>the roster · <span class="k">B</span>build ·
+                <span class="k">T</span>workshop · <span class="k">A</span>the field
+              </div>
+              <div>
+                <span class="k">M</span>the valley · <span class="k">D</span>nations ·
+                <span class="k">L</span>record · <span class="k">P</span>steward ·
+                <span class="k">W</span>watch
+              </div>
+              <div>
+                <span class="k">click</span>villager, then assign:
+                <span class="k">L W S F M B R G C X</span>
+              </div>
+              <div>
+                <span class="k">space</span>pause · <span class="k">1 2 3</span>speed ·
+                <span class="k">N</span>bell · <span class="k">K</span>sound ·
+                <span class="k">Q</span>quality · <span class="k">?</span>settings
+              </div>
+            </div>
+>>>>>>> Stashed changes
           </div>
           <div class="foot">
             drag to pan · wheel to zoom · the hall falling ends the run
@@ -505,9 +590,20 @@
     </div>
 
     <script>
+<<<<<<< Updated upstream
       var ZS_WW = 2200;
       var ZS_WH = 1600;
       var ZS_SCEN = "ScenarioVillage";
+=======
+      var ZS_WW = 3200;
+<<<<<<< Updated upstream
+      var ZS_WH = 2200;
+      var ZS_SCEN = "ScenarioDesert";
+=======
+      var ZS_WH = 2400;
+      var ZS_SCEN = "ScenarioVillage";
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
     </script>
     <script src="js/sketch.js"></script>
     <script src="js/village/perf.js"></script>

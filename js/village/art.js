@@ -837,11 +837,12 @@
     decorate(st, world, nav, cx, cy, seed) {
       const sc = st.c;
       const rng = ZS.rng32((seed | 0) ^ 0x77af);
-      const n = 900;
+      const mapR = Math.max(world.w, world.h) * 0.52;
+      const n = 2400;
       sc.save();
       for (let i = 0; i < n; i++) {
         const a = rng() * TAU;
-        const r = 60 + Math.pow(rng(), 0.6) * 620;
+        const r = 60 + Math.pow(rng(), 0.6) * mapR;
         const x = cx + Math.cos(a) * r,
           y = cy + Math.sin(a) * r * 0.85;
         if (x < 20 || y < 20 || x > world.w - 20 || y > world.h - 20) continue;
@@ -1099,19 +1100,16 @@
               Math.random() * 99,
             );
           } else if (pn < cap * 0.5) {
-            const k = Math.random();
-            if (k < 0.6)
-              emit(
-                "mote",
-                x,
-                vis.y0 + Math.random() * h,
-                6,
-                0,
-                4 + Math.random() * 4,
-                1 + Math.random(),
-                Math.random() * 99,
-              );
-            else emit("leaf", x, y, 26 * wind, 22, 12, 2.4 + Math.random() * 2, Math.random() * 99);
+            emit(
+              "mote",
+              x,
+              vis.y0 + Math.random() * h,
+              6,
+              0,
+              4 + Math.random() * 4,
+              1 + Math.random(),
+              Math.random() * 99,
+            );
           }
         }
       // fireflies: only at night, only near the grass, only when rich
@@ -1163,15 +1161,6 @@
           c.beginPath();
           c.arc(p.x, p.y, p.r, 0, TAU);
           c.fill();
-        } else if (p.k === "leaf") {
-          c.save();
-          c.translate(p.x, p.y);
-          c.rotate(t * 2 + p.s);
-          c.fillStyle = "rgba(158,124,64,0.42)";
-          c.beginPath();
-          c.ellipse(0, 0, p.r * 1.6, p.r * 0.7, 0, 0, TAU);
-          c.fill();
-          c.restore();
         } else if (p.k === "fire") {
           const bl = 0.4 + 0.6 * Math.abs(Math.sin(t * 3 + p.s * 6));
           c.fillStyle = "rgba(226,214,120," + (0.5 * bl * Math.min(1, f * 2)).toFixed(2) + ")";

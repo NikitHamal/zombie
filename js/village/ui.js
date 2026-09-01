@@ -66,13 +66,20 @@
       click("bookb", () => this.act("chron-panel"));
       click("pilotb", () => this.act("pilot"));
       click("watchb", () => this.act("watch"));
-      click("qualb", () => this.act("quality"));
+      click("settingsb", () => this.toggleHelp());
+      click("settings-close", () => this.toggleHelp(false));
+      click("qualb", () => (ZS.Perf ? ZS.Perf.cycle() : null));
       click("home", () => scen.focusHall());
       click("fit", () => scen.fitView());
       click("bell", () => scen.ringBell());
       click("sound", () => scen.toggleSound());
       click("helpb", () => this.toggleHelp());
-      click("helpwrap", () => this.toggleHelp(false));
+      const helpwrap = q("helpwrap");
+      if (helpwrap) {
+        helpwrap.addEventListener("click", (e) => {
+          if (e.target === helpwrap) this.toggleHelp(false);
+        });
+      }
       window.addEventListener("keydown", (e) => this.key(e));
       // The panel's rows are rebuilt whenever the village changes, so the
       // clicks are delegated — and taken on *press*: a node that is replaced
@@ -654,10 +661,12 @@
 
     paintBar() {
       const s = this.scen;
-      this.el.clock.textContent = "DAY " + s.day + "  ·  " + s.clockText();
+      this.el.clock.textContent = "DAY " + s.day;
       this.el.wx.textContent = s.season.name + " · " + s.weather.name;
       this.el.wx.title = s.season.desc + " · " + s.weather.desc;
-      for (let i = 0; i < 4; i++) this.el.speeds[i].classList.toggle("on", s.speed === i);
+      for (let i = 0; i < 4; i++) {
+        if (this.el.speeds[i]) this.el.speeds[i].classList.toggle("on", s.speed === i);
+      }
       if (this.el.pilotb && ZS.Autopilot) this.el.pilotb.classList.toggle("on", ZS.Autopilot.on(s));
       if (this.el.watchb && ZS.Watch) this.el.watchb.classList.toggle("on", ZS.Watch.on(s));
       document.body.classList.toggle("night", s.phase !== "day");
@@ -680,15 +689,17 @@
         (n >= cap * 0.75 ? '<span class="cap">/' + cap + "</span>" : "") +
         "</span>";
       this.el.res.innerHTML =
+        '<div class="res-row">' +
         row("wood", r.wood, "#8a6a3a") +
         row("stone", r.stone, "#8b8779") +
         row("food", r.food, "#b1963e") +
         row("scrap", r.scrap, "#6f7681") +
         (r.arms > 0.5 || s.has("smith") ? row("arms", r.arms, "#7d7a86") : "") +
+        "</div>" +
         (s.winterWood
-          ? '<span class="chip wide">winter burn <b>' + s.winterWood + "</b> wood a day</span>"
+          ? '<div class="chip wide">winter burn <b>' + s.winterWood + "</b> wood/day</div>"
           : "") +
-        '<span class="chip wide">villagers <b>' +
+        '<div class="chip wide">villagers <b>' +
         v +
         "</b>/" +
         s.popCap() +
@@ -698,7 +709,7 @@
         (ZS.Units && ZS.Units.count(s) ? " · field <b>" + ZS.Units.count(s) + "</b>" : "") +
         " · holds " +
         cap +
-        " of each</span>";
+        "</div>";
     },
 
     paintSel() {

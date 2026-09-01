@@ -89,12 +89,14 @@
         };
         const left = [],
           right = [];
-        for (let y = 14; y <= this.h - 14; y += 120) {
-          const x = ZS.clamp(this.riverX(y), 60, this.w - 60);
+        for (let y = -2000; y <= this.h + 2000; y += 120) {
+          const x = this.riverX(y);
           const hw = this.riverW(y) / 2;
           left.push({ x: x - hw - 3, y });
           right.push({ x: x + hw + 3, y });
-          this.river.samples.push({ x, y, hw });
+          if (y >= 0 && y <= this.h) {
+            this.river.samples.push({ x, y, hw });
+          }
         }
         this.river.pts = left.concat(right.reverse());
         if (!(opts.towns === false))
@@ -694,12 +696,6 @@
       for (let i = 0, n = ((W * H) / 16000) | 0; i < n; i++) {
         ZS.wcirc(g, Math.random() * W, Math.random() * H, 1.5 + Math.random() * 2, i * 11.3, 0.5);
       }
-
-      // hand-drawn world frame (like the original page border)
-      g.strokeStyle = "rgba(60,50,40,0.55)";
-      ZS.sketchRect(g, 10, 10, W - 20, H - 20);
-      g.strokeStyle = "rgba(60,50,40,0.30)";
-      ZS.sketchRect(g, 16, 16, W - 32, H - 32);
     }
   }
 

@@ -10,25 +10,38 @@
       this.x = world.w / 2;
       this.y = world.h / 2;
       this.zoom = 1;
-      this.minZoom = 0.1;
+      this.minZoom = 0.28;
       this.maxZoom = 2.5;
       this.auto = false;
     }
 
-    // fit the whole world into the viewport, centered
+    // fit the village into the viewport, centered
     fit(vw, vh) {
-      this.zoom = Math.min(vw / this.world.w, vh / this.world.h);
-      this.x = this.world.w / 2;
-      this.y = this.world.h / 2;
+      const s = ZS.scenario;
+      if (s && s.center) {
+        this.x = s.center.x;
+        this.y = s.center.y;
+      } else {
+        this.x = this.world.w / 2;
+        this.y = this.world.h / 2;
+      }
+      this.minZoom = 0.28;
+      this.zoom = Math.max(0.7, Math.min(1.1, vw / 1100));
+      this.clamp(vw, vh);
     }
 
-    // keep zoom and the view rect inside the world
+    // keep zoom in sensible bounds, allow generous exploration of the whole region
     clamp(vw, vh) {
       this.zoom = ZS.clamp(this.zoom, this.minZoom, this.maxZoom);
       const hw = vw / this.zoom / 2,
         hh = vh / this.zoom / 2;
-      this.x = hw * 2 >= this.world.w ? this.world.w / 2 : ZS.clamp(this.x, hw, this.world.w - hw);
-      this.y = hh * 2 >= this.world.h ? this.world.h / 2 : ZS.clamp(this.y, hh, this.world.h - hh);
+      const pad = 900;
+      const minX = Math.min(this.world.w / 2, hw - pad);
+      const maxX = Math.max(this.world.w / 2, this.world.w - hw + pad);
+      const minY = Math.min(this.world.h / 2, hh - pad);
+      const maxY = Math.max(this.world.h / 2, this.world.h - hh + pad);
+      this.x = ZS.clamp(this.x, minX, maxX);
+      this.y = ZS.clamp(this.y, minY, maxY);
     }
 
     toWorld(sx, sy, vw, vh) {

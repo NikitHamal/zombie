@@ -425,7 +425,13 @@
     c.save();
     cam.apply(c, vw, vh);
 
-    // pre-rendered ground
+    // continuous paper ground fill covering the visible world view
+    c.fillStyle = "#f3edde";
+    const hw = vw / cam.zoom / 2 + 100;
+    const hh = vh / cam.zoom / 2 + 100;
+    c.fillRect(cam.x - hw, cam.y - hh, hw * 2, hh * 2);
+
+    // pre-rendered ground (speckle, stains, terrain texture)
     c.drawImage(world.canvas, 0, 0, world.w, world.h);
     drawWater(c, world);
     // the scenario's own ground pass (tile washes, boiling borders)
